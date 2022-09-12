@@ -24,6 +24,25 @@ class RawData:
     def __bool__(self):
         return self.bit_length() > 0
 
+    def dump(self, always_wide=False) -> str:
+        if self.bit_length() % 8 != 0:
+            return f"{self.bit_length()} bits"  # Not implemented, yet
+        lines = (self.byte_length() + 15) // 16
+        r = []
+        show_wid = 16 if always_wide or lines > 1 else self.byte_length()
+        for li in range(0, lines):
+            off = li * 16
+            wid = min(16, self.byte_length() - off)
+            h_line = ["  "] * (show_wid - wid)
+            c_line = [" "]
+            for i in range(0, wid):
+                octet = self.octet(off + i)
+                h_line.append(f"{octet:02x}")
+                c_line.append(chr(octet) if 32 < octet < 128 else ".")
+            line = " ".join(h_line) + " " + "".join(c_line)
+            r.append(line)
+        return "\n".join(r)
+
 
 class ByteData(RawData):
     """Bytes"""

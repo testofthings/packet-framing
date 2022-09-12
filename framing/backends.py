@@ -17,14 +17,17 @@ class EditableBackend(FrameBackend):
     def set(self, field: FieldBase[S, T], frame: 'Frame[S]', value: T) -> Self:
         self.changes[field] = value
 
+    def copy(self) -> Self:
+        n_frame = type(self.frame)(EditableBackend())  # A kludge!
+        c = n_frame.backend
+        c.changes.update(self.changes)
+        return c
+
     def __repr__(self):
-        r = []
-        state = EncodingState()
-        for f in self.structure.fields.values():
-            v = self.get(f, self.frame)
-            raw = f.encode(v, state)
-            r.append(f"{f.field_name} = {raw}")
-        return "\n".join(r)
+        # create a copy to show, so that we do not update state
+        c = self.copy()
+        c.encode()
+        return c.pretty_print()
 
     def encode(self) -> RawData:
         self.structure.commit(self.frame)
@@ -34,3 +37,21 @@ class EditableBackend(FrameBackend):
             v = self.get(f, self.frame)
             f_list.append(f.encode(v, state))
         return Raw.merge(f_list)
+
+    def pretty_print(self, indent='') -> str:
+        r = []
+        name_space = max([len(n) for n in self.structure.fields.keys()]) + 1
+        state = EncodingState()
+        for n, f in self.structure.fields.items():
+            v = self.get(f, self.frame)
+            ev = f.encode(v, state)
+            sv = ev.dump(always_wide=True).split("\n")
+            for i in range(0, len(sv)):
+                line = indent
+                if i == 0:
+                    line += n + " " * (name_space - len(n))
+                else:
+                    line += " " * name_space
+                line += sv[i]
+                r.append(line)
+        return "\n".join(r)
