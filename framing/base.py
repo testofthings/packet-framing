@@ -149,27 +149,27 @@ class Structure(typing.Generic[S]):
         for cp in self.commit_procedures:
             cp(frame)
 
-    def raw_field(self, bits: int = None, bytes: int = None, default: RawData = Raw.empty,
-                  name: str = None) -> FieldBase[S, RawData]:
+    def raw(self, bits: int = None, bytes: int = None, default: RawData = Raw.empty,
+            name: str = None) -> FieldBase[S, RawData]:
         fn = self._get_a_name(name)
         default = default if default else Raw.zeroes(bit_length=bits, byte_length=bytes)
         f = RawField(fn, default)
         self.fields[fn] = f
         return f
 
-    def int_field(self, bits: int = None, bytes: int = None, default=0, name: str = None) -> FieldBase[S, int]:
+    def integer(self, bits: int = None, bytes: int = None, default=0, name: str = None) -> FieldBase[S, int]:
         fn = self._get_a_name(name)
         f = IntField(fn, FixedLittleEndianCodec(bytes), default)
         self.fields[fn] = f
         return f
 
-    def string_field(self, name: str = None, default="") -> FieldBase[S, str]:
+    def string(self, name: str = None, default="") -> FieldBase[S, str]:
         fn = self._get_a_name(name)
         f = StringField(fn, default)
         self.fields[fn] = f
         return f
 
-    def struct_field(self, struct_type: typing.Type[F], name: str = None) -> FieldBase[S, F]:
+    def struct(self, struct_type: typing.Type[F], name: str = None) -> FieldBase[S, F]:
         fn = self._get_a_name(name)
         f = Subframe(fn, struct_type)
         self.fields[fn] = f
@@ -180,7 +180,9 @@ class Structure(typing.Generic[S]):
 
     @classmethod
     def get_struct(cls, frame: Frame[S]) -> 'Structure[S]':
-        return getattr(frame, "struct_")
+        if hasattr(frame, "fields_"):
+            return getattr(frame, "fields_")  # underscored to avoid naming collision
+        return getattr(frame, "fields")
 
     def _get_a_name(self, override: Optional[str]) -> str:
         """Get name or temporary name for a field"""
