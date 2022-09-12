@@ -1,3 +1,6 @@
+from typing import Iterable, List
+
+
 class RawData:
     """Raw data buffer"""
     def bit_length(self) -> int:
@@ -37,6 +40,28 @@ class ByteData(RawData):
         return self.data[byte_offset]
 
 
+class MergedData(RawData):
+    def __init__(self, components: List[RawData]):
+        self.components = components
+        self.length = sum([c.bit_length() for c in components])
+        assert self.length % 8 == 0, "Not supporting merging of bit-data blocks"
+
+    def bit_length(self) -> int:
+        return self.length
+
+    def byte_length(self) -> int:
+        return self.length // 8
+
+    def octet(self, byte_offset: int) -> int:
+        off = byte_offset
+        for c in self.components:
+            c_len = c.byte_length()
+            if off < c_len:
+                return c.octet(off)
+            off -= c_len
+        assert "Offset out of range"
+
+
 class ZeroData(RawData):
     """All bits zero"""
     def __init__(self, bit_length: int):
@@ -63,11 +88,15 @@ class Raw:
         return ByteData(bytes.fromhex(hex_string))
 
     @classmethod
-    def zeroes(cls, bit_length: int = None, byte_length: int = None) -> RawData:
+    def zeroes(cls, byte_length: int = None, bit_length: int = None) -> RawData:
         if byte_length is not None:
             assert bit_length is None or bit_length == byte_length * 8
             return ZeroData(byte_length * 8)
         if bit_length is not None:
             return ZeroData(bit_length)
         return cls.empty
+
+    @classmethod
+    def merge(cls, components: Iterable[RawData]) -> RawData:
+        return MergedData(list(components))
 
