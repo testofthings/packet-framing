@@ -4,7 +4,7 @@ import typing
 from typing import Optional, Tuple
 from typing_extensions import Self
 
-from framing.raw_data import RawData
+from framing.raw_data import RawData, RawFactory
 
 # Frame or subclass
 S = typing.TypeVar("S", bound='Frame')
@@ -15,9 +15,10 @@ T = typing.TypeVar("T")
 
 class FieldBase(typing.Generic[S, T]):
     """Base class for fields"""
-    def __init__(self, name: str, type_name: str):
+    def __init__(self, name: str, type_name: str, default_value: T):
         self.field_name = name
         self.type_name = type_name
+        self.default_value = default_value
 
     def get(self, frame: 'Frame[S]') -> T:
         raise NotImplementedError()
@@ -59,13 +60,13 @@ class Frame(typing.Generic[S]):
         return self
 
     def __repr__(self):
-        return Structure.get_struct(self).__repr__()
+        return self.backend.__repr__()
 
 
 class RawField(FieldBase[S, RawData]):
     """Raw data field"""
-    def __init__(self, name: str):
-        super().__init__(name, "int")
+    def __init__(self, name: str, default_value: RawData):
+        super().__init__(name, "int", default_value)
 
     def get(self, frame: 'Frame[S]') -> RawData:
         return RawData()
@@ -73,8 +74,8 @@ class RawField(FieldBase[S, RawData]):
 
 class IntField(FieldBase[S, int]):
     """Integer field"""
-    def __init__(self, name: str):
-        super().__init__(name, "int")
+    def __init__(self, name: str, default_value: int):
+        super().__init__(name, "int", default_value)
 
     def get(self, frame: 'Frame[S]') -> T:
         return 0
@@ -82,8 +83,8 @@ class IntField(FieldBase[S, int]):
 
 class StringField(FieldBase[S, str]):
     """String field"""
-    def __init__(self, name: str):
-        super().__init__(name, "str")
+    def __init__(self, name: str, default_value: str):
+        super().__init__(name, "str", default_value)
 
     def get(self, frame: 'Frame[S]') -> T:
         return ""
@@ -112,21 +113,23 @@ class Structure(typing.Generic[S]):
         self.fields: typing.Dict[str, FieldBase[S]] = {}
         self.built = False
 
-    def raw_field(self, bits: int = None, bytes: int = None, name: str = None) -> FieldBase[S, RawData]:
+    def raw_field(self, bits: int = None, bytes: int = None, default: RawData = RawFactory.empty,
+                  name: str = None) -> FieldBase[S, RawData]:
         fn = self._get_a_name(name)
-        f = RawField(fn)
+        default = default if default else RawFactory.zeroes(bit_length=bits, byte_length=bytes)
+        f = RawField(fn, default)
         self.fields[fn] = f
         return f
 
-    def int_field(self, bits: int = None, bytes: int = None, name: str = None) -> FieldBase[S, int]:
+    def int_field(self, bits: int = None, bytes: int = None, default=0, name: str = None) -> FieldBase[S, int]:
         fn = self._get_a_name(name)
-        f = IntField(fn)
+        f = IntField(fn, default)
         self.fields[fn] = f
         return f
 
-    def string_field(self, name: str = None) -> FieldBase[S, str]:
+    def string_field(self, name: str = None, default="") -> FieldBase[S, str]:
         fn = self._get_a_name(name)
-        f = StringField(fn)
+        f = StringField(fn, default)
         self.fields[fn] = f
         return f
 
