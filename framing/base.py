@@ -40,17 +40,16 @@ class FrameBackend:
             self.structure.finish_building(to_frame)
 
     def get(self, field: FieldBase[S, T], frame: 'Frame[S]') -> T:
-        return field.get(frame)
+        raise NotImplementedError()
 
     def set(self, field: FieldBase[S, T], frame: 'Frame[S]', value: T) -> Self:
-        raise Exception("Editing not allowed with this backend")
+        raise NotImplemented("Editing not allowed with this backend")
 
 
 class Frame(typing.Generic[S]):
     """Base class for frames"""
-    def __init__(self, backend: FrameBackend = None):
-        self.backend = backend or FrameBackend()
-        self.backend.assign(self)
+    def __init__(self, backend: FrameBackend):
+        self.backend = backend
 
     def get(self, field: FieldBase[S, T]) -> T:
         return self.backend.get(field, self)

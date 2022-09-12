@@ -1,7 +1,8 @@
-from framing.base import Frame, Structure
+from framing.base import Structure
+from framing.frames import BaseFrame
 
 
-class EthernetII(Frame['EthetnetII']):
+class EthernetII(BaseFrame['EthetnetII']):
     struct_ = Structure['EthernetII']()
 
     destination = struct_.raw_field(bytes=6)
