@@ -8,16 +8,33 @@ class RawData:
         """Length in full bytes"""
         return self.bit_length() // 8
 
-    def octet(self, byte_offset: int):
+    def octet(self, byte_offset: int) -> int:
         raise NotImplementedError()
 
     def __repr__(self):
+        if self.bit_length() == 0:
+            return "()"
         if self.bit_length() % 8 != 0:
             return f"Bit-data length={self.bit_length()} bits"
         return " ".join([f"{self.octet(o):02d}" for o in range(0, self.byte_length())])
 
     def __bool__(self):
         return self.bit_length() > 0
+
+
+class ByteData(RawData):
+    """Bytes"""
+    def __init__(self, data: bytes):
+        self.data = data
+
+    def bit_length(self) -> int:
+        return len(self.data) * 8
+
+    def byte_length(self) -> int:
+        return len(self.data)
+
+    def octet(self, byte_offset: int) -> int:
+        return self.data[byte_offset]
 
 
 class ZeroData(RawData):
@@ -28,7 +45,7 @@ class ZeroData(RawData):
     def bit_length(self) -> int:
         return self.length
 
-    def octet(self, byte_offset: int):
+    def octet(self, byte_offset: int) -> int:
         return 0
 
 
@@ -36,6 +53,10 @@ class RawFactory:
     """Raw data factory"""
 
     empty = ZeroData(0)
+
+    @classmethod
+    def hex(cls, hex_string: str) -> RawData:
+        return ByteData(bytes.fromhex(hex_string))
 
     @classmethod
     def zeroes(cls, bit_length: int = None, byte_length: int = None) -> RawData:

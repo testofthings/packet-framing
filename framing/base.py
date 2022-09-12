@@ -1,7 +1,7 @@
 import inspect
-import traceback
 import typing
-from typing import Optional, Tuple
+from typing import Optional
+
 from typing_extensions import Self
 
 from framing.raw_data import RawData, RawFactory
@@ -11,6 +11,11 @@ S = typing.TypeVar("S", bound='Frame')
 
 # Field value type
 T = typing.TypeVar("T")
+
+
+class EncodingState:
+    """Encoding state"""
+    pass
 
 
 class FieldBase(typing.Generic[S, T]):
@@ -25,6 +30,9 @@ class FieldBase(typing.Generic[S, T]):
 
     def set(self, frame: 'Frame[S]', value: T) -> T:
         pass
+
+    def encode(self, value: T, state: EncodingState) -> RawData:
+        raise NotImplementedError()
 
 
 class FrameBackend:
@@ -71,6 +79,9 @@ class RawField(FieldBase[S, RawData]):
     def get(self, frame: 'Frame[S]') -> RawData:
         return RawData()
 
+    def encode(self, value: RawData, state: EncodingState) -> RawData:
+        return value
+
 
 class IntField(FieldBase[S, int]):
     """Integer field"""
@@ -80,6 +91,9 @@ class IntField(FieldBase[S, int]):
     def get(self, frame: 'Frame[S]') -> T:
         return 0
 
+    def encode(self, value: int, state: EncodingState) -> RawData:
+        return RawFactory.zeroes(byte_length=2)  # FIXME
+
 
 class StringField(FieldBase[S, str]):
     """String field"""
@@ -88,6 +102,9 @@ class StringField(FieldBase[S, str]):
 
     def get(self, frame: 'Frame[S]') -> T:
         return ""
+
+    def encode(self, value: str, state: EncodingState) -> RawData:
+        return RawFactory.empty  # FIXME
 
 
 # Type for sub-frames
