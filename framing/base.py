@@ -4,7 +4,8 @@ from typing import Optional
 
 from typing_extensions import Self
 
-from framing.raw_data import RawData, RawFactory
+from framing.codecs import IntegerCodec, FixedLittleEndianCodec
+from framing.raw_data import RawData, Raw
 
 # Frame or subclass
 S = typing.TypeVar("S", bound='Frame')
@@ -26,13 +27,18 @@ class FieldBase(typing.Generic[S, T]):
         self.default_value = default_value
 
     def get(self, frame: 'Frame[S]') -> T:
-        raise NotImplementedError()
+        return frame.get(self)
 
     def set(self, frame: 'Frame[S]', value: T) -> T:
-        pass
+        frame.set(self, value)
 
     def encode(self, value: T, state: EncodingState) -> RawData:
         raise NotImplementedError()
+
+    def to_string(self, frame: 'Frame[S]') -> str:
+        """A string representation of current value, for unit tests"""
+        enc = self.encode(self.get(frame), EncodingState())
+        return f"{enc}"
 
 
 class FrameBackend:
@@ -76,23 +82,18 @@ class RawField(FieldBase[S, RawData]):
     def __init__(self, name: str, default_value: RawData):
         super().__init__(name, "int", default_value)
 
-    def get(self, frame: 'Frame[S]') -> RawData:
-        return RawData()
-
     def encode(self, value: RawData, state: EncodingState) -> RawData:
         return value
 
 
 class IntField(FieldBase[S, int]):
     """Integer field"""
-    def __init__(self, name: str, default_value: int):
+    def __init__(self, name: str, codec: IntegerCodec, default_value: int):
         super().__init__(name, "int", default_value)
-
-    def get(self, frame: 'Frame[S]') -> T:
-        return 0
+        self.codec = codec
 
     def encode(self, value: int, state: EncodingState) -> RawData:
-        return RawFactory.zeroes(byte_length=2)  # FIXME
+        return self.codec.encode(value)
 
 
 class StringField(FieldBase[S, str]):
@@ -100,11 +101,8 @@ class StringField(FieldBase[S, str]):
     def __init__(self, name: str, default_value: str):
         super().__init__(name, "str", default_value)
 
-    def get(self, frame: 'Frame[S]') -> T:
-        return ""
-
     def encode(self, value: str, state: EncodingState) -> RawData:
-        return RawFactory.empty  # FIXME
+        return Raw.empty  # FIXME
 
 
 # Type for sub-frames
@@ -130,17 +128,17 @@ class Structure(typing.Generic[S]):
         self.fields: typing.Dict[str, FieldBase[S]] = {}
         self.built = False
 
-    def raw_field(self, bits: int = None, bytes: int = None, default: RawData = RawFactory.empty,
+    def raw_field(self, bits: int = None, bytes: int = None, default: RawData = Raw.empty,
                   name: str = None) -> FieldBase[S, RawData]:
         fn = self._get_a_name(name)
-        default = default if default else RawFactory.zeroes(bit_length=bits, byte_length=bytes)
+        default = default if default else Raw.zeroes(bit_length=bits, byte_length=bytes)
         f = RawField(fn, default)
         self.fields[fn] = f
         return f
 
     def int_field(self, bits: int = None, bytes: int = None, default=0, name: str = None) -> FieldBase[S, int]:
         fn = self._get_a_name(name)
-        f = IntField(fn, default)
+        f = IntField(fn, FixedLittleEndianCodec(bytes), default)
         self.fields[fn] = f
         return f
 

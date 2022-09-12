@@ -16,7 +16,7 @@ class RawData:
             return "()"
         if self.bit_length() % 8 != 0:
             return f"Bit-data length={self.bit_length()} bits"
-        return " ".join([f"{self.octet(o):02d}" for o in range(0, self.byte_length())])
+        return " ".join([f"{self.octet(o):02x}" for o in range(0, self.byte_length())])
 
     def __bool__(self):
         return self.bit_length() > 0
@@ -49,10 +49,14 @@ class ZeroData(RawData):
         return 0
 
 
-class RawFactory:
+class Raw:
     """Raw data factory"""
 
     empty = ZeroData(0)
+
+    @classmethod
+    def bytes(cls, data: bytes) -> RawData:
+        return ByteData(data)
 
     @classmethod
     def hex(cls, hex_string: str) -> RawData:
