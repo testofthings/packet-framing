@@ -1,3 +1,4 @@
+import inspect
 import traceback
 import typing
 from typing import Optional, Tuple
@@ -27,6 +28,17 @@ class FieldBase(typing.Generic[S, T]):
 
 class FrameBackend:
     """Base class for frame backend"""
+    def __init__(self):
+        self.frame: Optional[Frame] = None
+        self.structure: Optional[Structure] = None
+
+    def assign(self, to_frame: 'Frame'):
+        assert self.frame is None, "Can only assign a backend once"
+        self.frame = to_frame
+        self.structure = Structure.get_struct(to_frame)
+        if not self.structure.built:
+            self.structure.finish_building(to_frame)
+
     def get(self, field: FieldBase[S, T], frame: 'Frame[S]') -> T:
         return field.get(frame)
 
@@ -36,8 +48,9 @@ class FrameBackend:
 
 class Frame(typing.Generic[S]):
     """Base class for frames"""
-    def __init__(self, backend=FrameBackend()):
-        self.backend = backend
+    def __init__(self, backend: FrameBackend = None):
+        self.backend = backend or FrameBackend()
+        self.backend.assign(self)
 
     def get(self, field: FieldBase[S, T]) -> T:
         return self.backend.get(field, self)
@@ -47,8 +60,7 @@ class Frame(typing.Generic[S]):
         return self
 
     def __repr__(self):
-        struct = getattr(self, "struct_")
-        return struct.__repr__()
+        return Structure.get_struct(self).__repr__()
 
 
 class RawField(FieldBase[S, RawData]):
@@ -99,37 +111,54 @@ class Structure(typing.Generic[S]):
     """Structure definition for a frame"""
     def __init__(self):
         self.fields: typing.Dict[str, FieldBase[S]] = {}
+        self.built = False
 
     def raw_field(self, bits: int = None, bytes: int = None, name: str = None) -> FieldBase[S, RawData]:
-        fn, cn = self._get_field_name(name)
+        fn = self._get_a_name(name)
         f = RawField(fn)
         self.fields[fn] = f
         return f
 
     def int_field(self, bits: int = None, bytes: int = None, name: str = None) -> FieldBase[S, int]:
-        fn, cn = self._get_field_name(name)
+        fn = self._get_a_name(name)
         f = IntField(fn)
         self.fields[fn] = f
         return f
 
     def string_field(self, name: str = None) -> FieldBase[S, str]:
-        fn, cn = self._get_field_name(name)
+        fn = self._get_a_name(name)
         f = StringField(fn)
         self.fields[fn] = f
         return f
 
     def struct_field(self, struct_type: typing.Type[F], name: str = None) -> FieldBase[S, F]:
-        fn, cn = self._get_field_name(name)
+        fn = self._get_a_name(name)
         f = Subframe(fn, struct_type)
         self.fields[fn] = f
         return f
 
     @classmethod
-    def _get_field_name(self, override: Optional[str]) -> Tuple[str, str]:
-        stack = traceback.extract_stack(limit=3)
-        f_name = override or stack[-2].name
-        cl_name = stack[-3].name
-        return f_name, cl_name
+    def get_struct(cls, frame: Frame[S]) -> 'Structure[S]':
+        return getattr(frame, "struct_")
+
+    def _get_a_name(self, override: Optional[str]) -> str:
+        """Get name or temporary name for a field"""
+        return override if override else f"__{len(self.fields)}"
+
+    def finish_building(self, frame: S):
+        i_names: typing.Dict[FieldBase, str] = {}
+        for member in inspect.getmembers(frame):
+            name, v = member
+            if isinstance(v, FieldBase):
+                i_names[v] = name
+        # keep order of fields
+        old_names = self.fields.copy()
+        self.fields.clear()
+        for n, v in old_names.items():
+            nn = i_names[v] if n.startswith("__") else n
+            v.field_name = nn
+            self.fields[nn] = v
+        self.built = True
 
     def __repr__(self) -> str:
         r = []
