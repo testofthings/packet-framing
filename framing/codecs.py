@@ -34,6 +34,3 @@ class IntegerCodecs:
     @classmethod
     def bits(cls, bits: int) -> IntegerCodec:
         return IntegerCodec()
-
-
-

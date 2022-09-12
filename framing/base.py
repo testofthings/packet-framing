@@ -1,6 +1,6 @@
 import inspect
 import typing
-from typing import Optional
+from typing import Optional, Callable, List
 
 from typing_extensions import Self
 
@@ -32,6 +32,12 @@ class FieldBase(typing.Generic[S, T]):
     def set(self, frame: 'Frame[S]', value: T) -> T:
         frame.set(self, value)
 
+    def get_bit_length(self, frame: 'Frame[S]') -> int:
+        return self.get_byte_length(frame) * 8
+
+    def get_byte_length(self, frame: 'Frame[S]') -> int:
+        raise NotImplementedError()
+
     def encode(self, value: T, state: EncodingState) -> RawData:
         raise NotImplementedError()
 
@@ -60,6 +66,10 @@ class FrameBackend:
     def set(self, field: FieldBase[S, T], frame: 'Frame[S]', value: T) -> Self:
         raise NotImplemented("Editing not allowed with this backend")
 
+    def encode(self) -> RawData:
+        """Encode the frame into bytes"""
+        raise NotImplementedError()
+
 
 class Frame(typing.Generic[S]):
     """Base class for frames"""
@@ -81,6 +91,12 @@ class RawField(FieldBase[S, RawData]):
     """Raw data field"""
     def __init__(self, name: str, default_value: RawData):
         super().__init__(name, "int", default_value)
+
+    def get_bit_length(self, frame: 'Frame[S]') -> int:
+        return self.get(frame).bit_length()
+
+    def get_byte_length(self, frame: 'Frame[S]') -> int:
+        return self.get(frame).byte_length()
 
     def encode(self, value: RawData, state: EncodingState) -> RawData:
         return value
@@ -126,7 +142,12 @@ class Structure(typing.Generic[S]):
     """Structure definition for a frame"""
     def __init__(self):
         self.fields: typing.Dict[str, FieldBase[S]] = {}
+        self.commit_procedures: List[Callable[[S], None]] = []
         self.built = False
+
+    def commit(self, frame: S):
+        for cp in self.commit_procedures:
+            cp(frame)
 
     def raw_field(self, bits: int = None, bytes: int = None, default: RawData = Raw.empty,
                   name: str = None) -> FieldBase[S, RawData]:
@@ -153,6 +174,9 @@ class Structure(typing.Generic[S]):
         f = Subframe(fn, struct_type)
         self.fields[fn] = f
         return f
+
+    def at_commit(self, update: Callable[[F], None]):
+        self.commit_procedures.append(update)
 
     @classmethod
     def get_struct(cls, frame: Frame[S]) -> 'Structure[S]':

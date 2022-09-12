@@ -3,7 +3,7 @@ from typing import Dict, Any
 from typing_extensions import Self
 
 from framing.base import FrameBackend, FieldBase, S, T, Structure, EncodingState
-from framing.raw_data import RawData
+from framing.raw_data import RawData, Raw
 
 
 class EditableBackend(FrameBackend):
@@ -18,13 +18,19 @@ class EditableBackend(FrameBackend):
         self.changes[field] = value
 
     def __repr__(self):
-        struct = Structure.get_struct(self.frame)
         r = []
         state = EncodingState()
-        for f in struct.fields.values():
+        for f in self.structure.fields.values():
             v = self.get(f, self.frame)
             raw = f.encode(v, state)
             r.append(f"{f.field_name} = {raw}")
         return "\n".join(r)
 
-
+    def encode(self) -> RawData:
+        self.structure.commit(self.frame)
+        f_list = []
+        state = EncodingState()
+        for f in self.structure.fields.values():
+            v = self.get(f, self.frame)
+            f_list.append(f.encode(v, state))
+        return Raw.merge(f_list)
