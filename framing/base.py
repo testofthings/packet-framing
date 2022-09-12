@@ -1,6 +1,6 @@
 import inspect
 import typing
-from typing import Optional, Callable, List
+from typing import Optional, Callable, List, Any
 
 from typing_extensions import Self
 
@@ -25,6 +25,7 @@ class FieldBase(typing.Generic[S, T]):
         self.field_name = name
         self.type_name = type_name
         self.default_value = default_value
+        self.commit_procedure: Optional[Callable[[Frame[S]], T]] = None
 
     def get(self, frame: 'Frame[S]') -> T:
         return frame.get(self)
@@ -45,6 +46,10 @@ class FieldBase(typing.Generic[S, T]):
         """A string representation of current value, for unit tests"""
         enc = self.encode(self.get(frame), EncodingState())
         return f"{enc}"
+
+    def at_commit(self, procedure: Callable[[S], T]) -> Self:
+        self.commit_procedure = procedure
+        return self
 
 
 class FrameBackend:
@@ -189,12 +194,13 @@ class Structure(typing.Generic[S]):
         return override if override else f"__{len(self.fields)}"
 
     def finish_building(self, frame: S):
+        # find field names
         i_names: typing.Dict[FieldBase, str] = {}
         for member in inspect.getmembers(frame):
             name, v = member
             if isinstance(v, FieldBase):
                 i_names[v] = name
-        # keep order of fields
+        # ...keep order of fields
         old_names = self.fields.copy()
         self.fields.clear()
         for n, v in old_names.items():
@@ -202,6 +208,14 @@ class Structure(typing.Generic[S]):
             v.field_name = nn
             self.fields[nn] = v
         self.built = True
+
+        # collect commit procedures from fields
+        for f in self.fields.values():
+            if f.commit_procedure is not None:
+                def procedure(fr: Frame[S]):
+                    value = f.commit_procedure(fr)
+                    fr.set(f, value)
+                self.commit_procedures.append(procedure)
 
     def __repr__(self) -> str:
         r = []

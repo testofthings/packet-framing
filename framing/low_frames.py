@@ -13,9 +13,7 @@ class EthernetII(BaseFrame['EthetnetII']):
     crc_checksum = fields.raw(bytes=4)
     padding = fields.raw()
 
-    def add_padding(self):
-        d_len = 14 + EthernetII.data.get_byte_length(self) + 4
-        pad_len = max(64 - d_len, 0)
-        EthernetII.padding.set(self, Raw.zeroes(pad_len))
+    def update_padding(self):
+        return Raw.zeroes(max(64 - (14 + self.data.get_byte_length(self) + 4), 0))
 
-    fields.at_commit(add_padding)
+    padding.at_commit(update_padding)
