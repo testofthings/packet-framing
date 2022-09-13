@@ -27,22 +27,23 @@ class FieldBase(typing.Generic[S, T]):
         self.default_value = default_value
         self.commit_procedure: Optional[Callable[[Frame[S]], T]] = None
 
-    def get(self, frame: 'Frame[S]') -> T:
+    def get(self, frame: S) -> T:
         return frame.get(self)
 
-    def set(self, frame: 'Frame[S]', value: T) -> T:
+    def set(self, frame: S, value: T) -> T:
         frame.set(self, value)
+        return value
 
-    def get_bit_length(self, frame: 'Frame[S]') -> int:
+    def get_bit_length(self, frame: S) -> int:
         return self.get_byte_length(frame) * 8
 
-    def get_byte_length(self, frame: 'Frame[S]') -> int:
-        raise NotImplementedError()
+    def get_byte_length(self, frame: S) -> int:
+        raise -1  # FIXME
 
     def encode(self, value: T, state: EncodingState) -> RawData:
         raise NotImplementedError()
 
-    def to_string(self, frame: 'Frame[S]') -> str:
+    def to_string(self, frame: S) -> str:
         """A string representation of current value, for unit tests"""
         enc = self.encode(self.get(frame), EncodingState())
         return f"{enc}"
@@ -65,10 +66,10 @@ class FrameBackend:
         if not self.structure.built:
             self.structure.finish_building(to_frame)
 
-    def get(self, field: FieldBase[S, T], frame: 'Frame[S]') -> T:
+    def get(self, field: FieldBase[S, T], frame: 'Frame') -> T:
         raise NotImplementedError()
 
-    def set(self, field: FieldBase[S, T], frame: 'Frame[S]', value: T) -> Self:
+    def set(self, field: FieldBase[S, T], frame: 'Frame', value: T) -> Self:
         raise NotImplemented("Editing not allowed with this backend")
 
     def encode(self) -> RawData:
@@ -97,10 +98,18 @@ class RawField(FieldBase[S, RawData]):
     def __init__(self, name: str, default_value: RawData):
         super().__init__(name, "int", default_value)
 
-    def get_bit_length(self, frame: 'Frame[S]') -> int:
+    def get(self, frame: S) -> RawData:
+        return frame.get(self)
+
+    def set(self, frame: S, value: RawData) -> RawData:
+        frame.set(self, value)
+        return value
+
+
+    def get_bit_length(self, frame: S) -> int:
         return self.get(frame).bit_length()
 
-    def get_byte_length(self, frame: 'Frame[S]') -> int:
+    def get_byte_length(self, frame: S) -> int:
         return self.get(frame).byte_length()
 
     def encode(self, value: RawData, state: EncodingState) -> RawData:
@@ -133,13 +142,13 @@ F = typing.TypeVar("F", bound=Frame)
 class Subframe(FieldBase[S, F]):
     """Subframe field"""
     def __init__(self, name: str, struct_type: typing.Type[F]):
-        super().__init__(name, f"{struct_type}")
+        super().__init__(name, f"{struct_type}", None)
         self.struct_type = struct_type
 
     def new(self, backend: FrameBackend) -> F:
         return self.struct_type(backend)
 
-    def get(self, frame: 'Frame[S]') -> F:
+    def get(self, frame: S) -> F:
         return self.new(frame.backend)
 
 
@@ -155,7 +164,7 @@ class Structure(typing.Generic[S]):
             cp(frame)
 
     def raw(self, bits: int = None, bytes: int = None, default: RawData = Raw.empty,
-            name: str = None) -> FieldBase[S, RawData]:
+            name: str = None) -> RawField[S]:
         fn = self._get_a_name(name)
         default = default if default else Raw.zeroes(bit_length=bits, byte_length=bytes)
         f = RawField(fn, default)
@@ -164,19 +173,19 @@ class Structure(typing.Generic[S]):
 
     def integer(self, bits: int = None, bytes: int = None, default=0, name: str = None) -> FieldBase[S, int]:
         fn = self._get_a_name(name)
-        f = IntField(fn, FixedLittleEndianCodec(bytes), default)
+        f: FieldBase[S, int] = IntField(fn, FixedLittleEndianCodec(bytes), default)
         self.fields[fn] = f
         return f
 
     def string(self, name: str = None, default="") -> FieldBase[S, str]:
         fn = self._get_a_name(name)
-        f = StringField(fn, default)
+        f: FieldBase[S, str] = StringField(fn, default)
         self.fields[fn] = f
         return f
 
     def struct(self, struct_type: typing.Type[F], name: str = None) -> FieldBase[S, F]:
         fn = self._get_a_name(name)
-        f = Subframe(fn, struct_type)
+        f: FieldBase[S, F] = Subframe(fn, struct_type)
         self.fields[fn] = f
         return f
 

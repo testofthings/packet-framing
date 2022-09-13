@@ -3,7 +3,7 @@ from framing.frames import BaseFrame
 from framing.raw_data import Raw
 
 
-class EthernetII(BaseFrame['EthetnetII']):
+class EthernetII(BaseFrame['EthernetII']):
     fields = Structure['EthernetII']()
 
     destination = fields.raw(bytes=6)

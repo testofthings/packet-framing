@@ -2,7 +2,7 @@ from typing import Dict, Any
 
 from typing_extensions import Self
 
-from framing.base import FrameBackend, FieldBase, S, T, Structure, EncodingState
+from framing.base import Frame, FrameBackend, FieldBase, S, T, EncodingState
 from framing.raw_data import RawData, Raw
 
 
@@ -11,11 +11,12 @@ class EditableBackend(FrameBackend):
         super().__init__()
         self.changes: Dict[FieldBase, Any] = {}
 
-    def get(self, field: FieldBase[S, T], frame: 'Frame[S]') -> T:
+    def get(self, field: FieldBase[S, T], frame: Frame[S]) -> T:
         return self.changes.get(field, field.default_value)
 
-    def set(self, field: FieldBase[S, T], frame: 'Frame[S]', value: T) -> Self:
+    def set(self, field: FieldBase[S, T], frame: Frame[S], value: T) -> Self:
         self.changes[field] = value
+        return self
 
     def copy(self) -> Self:
         n_frame = type(self.frame)(EditableBackend())  # A kludge!
