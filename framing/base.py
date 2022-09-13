@@ -25,7 +25,7 @@ class FieldBase(typing.Generic[S, T]):
         self.field_name = name
         self.type_name = type_name
         self.default_value = default_value
-        self.commit_procedure: Optional[Callable[[Frame[S]], T]] = None
+        self.commit_procedure: Optional[Callable[[S], T]] = None
 
     def get(self, frame: S) -> T:
         return frame.get(self)
@@ -38,7 +38,7 @@ class FieldBase(typing.Generic[S, T]):
         return self.get_byte_length(frame) * 8
 
     def get_byte_length(self, frame: S) -> int:
-        raise -1  # FIXME
+        return -1  # FIXME
 
     def encode(self, value: T, state: EncodingState) -> RawData:
         raise NotImplementedError()
@@ -55,22 +55,17 @@ class FieldBase(typing.Generic[S, T]):
 
 class FrameBackend:
     """Base class for frame backend"""
-    def __init__(self):
-        self.frame: Optional[Frame] = None
-        self.structure: Optional[Structure] = None
-
-    def assign(self, to_frame: 'Frame'):
-        assert self.frame is None, "Can only assign a backend once"
-        self.frame = to_frame
-        self.structure = Structure.get_struct(to_frame)
+    def __init__(self, frame: 'Frame'):
+        self.frame = frame
+        self.structure = Structure.get_struct(frame)
         if not self.structure.built:
-            self.structure.finish_building(to_frame)
+            self.structure.finish_building(frame)
 
     def get(self, field: FieldBase[S, T], frame: 'Frame') -> T:
         raise NotImplementedError()
 
     def set(self, field: FieldBase[S, T], frame: 'Frame', value: T) -> Self:
-        raise NotImplemented("Editing not allowed with this backend")
+        raise NotImplementedError("Editing not allowed with this backend")
 
     def encode(self) -> RawData:
         """Encode the frame into bytes"""
@@ -142,7 +137,7 @@ F = typing.TypeVar("F", bound=Frame)
 class Subframe(FieldBase[S, F]):
     """Subframe field"""
     def __init__(self, name: str, struct_type: typing.Type[F]):
-        super().__init__(name, f"{struct_type}", None)
+        super().__init__(name, f"{struct_type}", struct_type())
         self.struct_type = struct_type
 
     def new(self, backend: FrameBackend) -> F:
@@ -167,13 +162,16 @@ class Structure(typing.Generic[S]):
             name: str = None) -> RawField[S]:
         fn = self._get_a_name(name)
         default = default if default else Raw.zeroes(bit_length=bits, byte_length=bytes)
-        f = RawField(fn, default)
+        f: RawField[S] = RawField(fn, default)
         self.fields[fn] = f
         return f
 
     def integer(self, bits: int = None, bytes: int = None, default=0, name: str = None) -> FieldBase[S, int]:
         fn = self._get_a_name(name)
-        f: FieldBase[S, int] = IntField(fn, FixedLittleEndianCodec(bytes), default)
+        if bytes is not None:
+            f: FieldBase[S, int] = IntField(fn, FixedLittleEndianCodec(bytes), default)
+        else:
+            raise Exception("Only supporting full-byte integers now")
         self.fields[fn] = f
         return f
 
@@ -189,7 +187,7 @@ class Structure(typing.Generic[S]):
         self.fields[fn] = f
         return f
 
-    def at_commit(self, update: Callable[[F], None]):
+    def at_commit(self, update: Callable[[S], None]):
         self.commit_procedures.append(update)
 
     @classmethod
@@ -221,7 +219,7 @@ class Structure(typing.Generic[S]):
         # collect commit procedures from fields
         for f in self.fields.values():
             if f.commit_procedure is not None:
-                def procedure(fr: Frame[S]):
+                def procedure(fr: S):
                     value = f.commit_procedure(fr)
                     fr.set(f, value)
                 self.commit_procedures.append(procedure)

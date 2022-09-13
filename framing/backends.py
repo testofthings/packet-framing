@@ -1,4 +1,5 @@
-from typing import Dict, Any
+import copy
+from typing import Dict, Any, cast
 
 from typing_extensions import Self
 
@@ -7,8 +8,8 @@ from framing.raw_data import RawData, Raw
 
 
 class EditableBackend(FrameBackend):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, frame: Frame):
+        super().__init__(frame)
         self.changes: Dict[FieldBase, Any] = {}
 
     def get(self, field: FieldBase[S, T], frame: Frame[S]) -> T:
@@ -19,8 +20,9 @@ class EditableBackend(FrameBackend):
         return self
 
     def copy(self) -> Self:
-        n_frame = type(self.frame)(EditableBackend())  # A kludge!
-        c = n_frame.backend
+        n_frame = copy.copy(self.frame)
+        c = EditableBackend(n_frame)
+        n_frame.backend = c
         c.changes.update(self.changes)
         return c
 

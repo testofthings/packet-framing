@@ -78,7 +78,7 @@ class MergedData(RawData):
             if off < c_len:
                 return c.octet(off)
             off -= c_len
-        assert "Offset out of range"
+        raise Exception(f"Byte offset out of range: {byte_offset}")
 
 
 class ZeroData(RawData):
