@@ -7,6 +7,10 @@ class IntegerCodec:
         """Encode!"""
         raise NotImplementedError()
 
+    def get_bit_length(self, value: int) -> int:
+        """Get bit length for a value"""
+        raise NotImplementedError()
+
     def get_fixed_bit_length(self) -> int:
         """Get fixed bit length or -1"""
         return -1
@@ -23,6 +27,9 @@ class FixedLittleEndianCodec(IntegerCodec):
             b[i - 1] = v % 256
             v >>= 8
         return Raw.bytes(b)
+
+    def get_bit_length(self, value: int) -> int:
+        return self.length * 8
 
     def get_fixed_bit_length(self) -> int:
         return self.length * 8

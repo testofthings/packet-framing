@@ -45,16 +45,20 @@ class EditableBackend(FrameBackend):
         r = []
         name_space = max([len(n) for n in self.structure.fields.keys()]) + 1
         state = EncodingState()
+        bit_off = 0
         for n, f in self.structure.fields.items():
             v = self.get(f, self.frame)
             ev = f.encode(v, state)
             sv = ev.dump(always_wide=True).split("\n")
+            i_off = bit_off
             for i in range(0, len(sv)):
-                line = indent
+                line = f"{i_off // 8:06x} {indent}"
                 if i == 0:
                     line += n + " " * (name_space - len(n))
                 else:
                     line += " " * name_space
                 line += sv[i]
                 r.append(line)
+                i_off += 16 * 8
+            bit_off += f.get_bit_length(self.frame)
         return "\n".join(r)

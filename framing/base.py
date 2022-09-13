@@ -19,12 +19,37 @@ class EncodingState:
     pass
 
 
+class FieldOffset:
+    def __init__(self, field: Optional['FieldBase'] = None):
+        self.prefix: Optional['FieldOffset'] = None
+        self.fixed_bit_offset = 0
+        self.variable_field: Optional[FieldBase] = field
+
+    def get_offset(self, backend: 'FrameBackend') -> int:
+        off = self.prefix.get_offset(backend) if self.prefix else 0
+        off += self.fixed_bit_offset
+        if self.variable_field:
+            off += self.variable_field.get_bit_length(backend.frame)
+        return off
+
+    def __repr__(self):
+        r = []
+        if self.prefix:
+            r.append(f"{self.prefix}")
+        r.append(f"{self.fixed_bit_offset}")
+        if self.variable_field:
+            r.append(f"{self.variable_field}")
+        return " + ".join(r)
+
+
 class FieldBase(typing.Generic[S, T]):
     """Base class for fields"""
     def __init__(self, name: str, type_name: str, default_value: T):
         self.field_name = name
         self.type_name = type_name
         self.default_value = default_value
+        self.fixed_bit_length = -1
+        self.offset = FieldOffset(self)
         self.commit_procedure: Optional[Callable[[S], T]] = None
 
     def get(self, frame: S) -> T:
@@ -35,10 +60,10 @@ class FieldBase(typing.Generic[S, T]):
         return value
 
     def get_bit_length(self, frame: S) -> int:
-        return self.get_byte_length(frame) * 8
+        raise NotImplementedError()
 
     def get_byte_length(self, frame: S) -> int:
-        return -1  # FIXME
+        return self.get_bit_length(frame) // 8
 
     def encode(self, value: T, state: EncodingState) -> RawData:
         raise NotImplementedError()
@@ -51,6 +76,9 @@ class FieldBase(typing.Generic[S, T]):
     def at_commit(self, procedure: Callable[[S], T]) -> Self:
         self.commit_procedure = procedure
         return self
+
+    def __repr__(self):
+        return f"{self.field_name}: {self.type_name}"
 
 
 class FrameBackend:
@@ -91,7 +119,11 @@ class Frame(typing.Generic[S]):
 class RawField(FieldBase[S, RawData]):
     """Raw data field"""
     def __init__(self, name: str, default_value: RawData):
-        super().__init__(name, "int", default_value)
+        super().__init__(name, "raw", default_value)
+        self.offset.resolver = lambda f: self.get_bit_length(f)  # set to null, if fixed length
+
+    def fixed_length(self, bit_length: int):
+        self.fixed_bit_length = bit_length
 
     def get(self, frame: S) -> RawData:
         return frame.get(self)
@@ -99,7 +131,6 @@ class RawField(FieldBase[S, RawData]):
     def set(self, frame: S, value: RawData) -> RawData:
         frame.set(self, value)
         return value
-
 
     def get_bit_length(self, frame: S) -> int:
         return self.get(frame).bit_length()
@@ -116,6 +147,17 @@ class IntField(FieldBase[S, int]):
     def __init__(self, name: str, codec: IntegerCodec, default_value: int):
         super().__init__(name, "int", default_value)
         self.codec = codec
+        self.fixed_bit_length = codec.get_fixed_bit_length()
+
+    def get_bit_length(self, frame: S) -> int:
+        if self.fixed_bit_length >= 0:
+            return self.fixed_bit_length
+        return self.codec.get_bit_length(self.get(frame))
+
+    def get_byte_length(self, frame: S) -> int:
+        if self.fixed_bit_length >= 0:
+            return self.fixed_bit_length // 8
+        return self.codec.get_bit_length(self.get(frame)) // 8
 
     def encode(self, value: int, state: EncodingState) -> RawData:
         return self.codec.encode(value)
@@ -151,6 +193,7 @@ class Structure(typing.Generic[S]):
     """Structure definition for a frame"""
     def __init__(self):
         self.fields: typing.Dict[str, FieldBase[S]] = {}
+        self.fields_length = FieldOffset()
         self.commit_procedures: List[Callable[[S], None]] = []
         self.built = False
 
@@ -163,6 +206,10 @@ class Structure(typing.Generic[S]):
         fn = self._get_a_name(name)
         default = default if default else Raw.zeroes(bit_length=bits, byte_length=bytes)
         f: RawField[S] = RawField(fn, default)
+        if bits is not None:
+            f.fixed_length(bits)
+        if bytes is not None:
+            f.fixed_length(bytes * 8)
         self.fields[fn] = f
         return f
 
@@ -215,6 +262,23 @@ class Structure(typing.Generic[S]):
             v.field_name = nn
             self.fields[nn] = v
         self.built = True
+
+        # resolve offsets
+        prefix = None
+        prefix_offset = 0
+        for f in self.fields.values():
+            f.offset.prefix = prefix
+            f.offset.fixed_bit_offset += prefix_offset
+            if f.fixed_bit_length < 0:
+                # field length calculated dynamically
+                prefix = f.offset
+                prefix_offset = 0
+            else:
+                # fixed length, just add to offset
+                f.offset.variable_field = None  # not variable
+                prefix_offset += f.fixed_bit_length
+        self.fields_length.prefix = prefix
+        self.fields_length.fixed_bit_offset = prefix_offset
 
         # collect commit procedures from fields
         for f in self.fields.values():
