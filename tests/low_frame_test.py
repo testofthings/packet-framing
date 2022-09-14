@@ -33,12 +33,3 @@ def test_ethernet():
     assert raw.byte_length() == 64
 
     assert Frames.get_byte_length(eth) == 64
-
-    # FIXME: Below shows that types not enforced (they would when all definitions are in the same source file!)
-
-    pcap = BaseFrame(PCAP)
-    pcap.set(EthernetII.type, 55)
-    jee = pcap.get(EthernetII.type)
-    pcap.set(EthernetII.type, "as")
-    jee2 = eth.get(EthernetII.type)
-    eth.set(EthernetII.type, "as")
