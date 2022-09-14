@@ -25,10 +25,10 @@ def test_ethernet():
     assert EthernetII.data.get_bit_length(eth) == 4 * 8
     assert EthernetII.padding.get_bit_length(eth) == 0 * 8
 
-    assert Frames.get_byte_length(eth) == 22
+    assert eth.get_byte_length() == 22
 
     raw = eth.backend.encode()
     assert EthernetII.padding.get_bit_length(eth) == 42 * 8
     assert raw.byte_length() == 64
 
-    assert Frames.get_byte_length(eth) == 64
+    assert eth.get_byte_length() == 64

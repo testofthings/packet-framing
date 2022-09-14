@@ -5,7 +5,7 @@ from typing import Optional, Callable, List, Any
 from typing_extensions import Self
 
 from framing.codecs import IntegerCodec, FixedLittleEndianCodec
-from framing.raw_data import RawData, Raw
+from framing.raw_data import RawStream, Raw
 
 # Frame type
 F = typing.TypeVar("F")
@@ -64,7 +64,10 @@ class FieldBase(typing.Generic[F, T]):
     def get_byte_length(self, frame: 'Frame[F]') -> int:
         return self.get_bit_length(frame) // 8
 
-    def encode(self, value: T, state: EncodingState) -> RawData:
+    def encode(self, value: T, state: EncodingState) -> RawStream:
+        raise NotImplementedError()
+
+    def decode(self, data: RawStream, backend: 'FrameBackend') -> T:
         raise NotImplementedError()
 
     def to_string(self, frame: 'Frame[F]') -> str:
@@ -89,13 +92,13 @@ class FrameBackend:
         if not self.structure.built:
             self.structure.finish_building(frame_type)
 
-    def get(self, field: FieldBase[F, T], frame: 'Frame') -> T:
+    def get(self, field: FieldBase[F, T]) -> T:
         raise NotImplementedError()
 
-    def set(self, field: FieldBase[F, T], frame: 'Frame', value: T) -> Self:
+    def set(self, field: FieldBase[F, T], value: T) -> Self:
         raise NotImplementedError("Editing not allowed with this backend")
 
-    def encode(self) -> RawData:
+    def encode(self) -> RawStream:
         """Encode the frame into bytes"""
         raise NotImplementedError()
 
@@ -107,28 +110,38 @@ class Frame(typing.Generic[F]):
         self.backend = backend_factory(self)
 
     def get(self, field: FieldBase[F, T]) -> T:
-        return self.backend.get(field, self)
+        return self.backend.get(field)
 
     def set(self, field: FieldBase[F, T], value: T) -> Self:
-        self.backend.set(field, self, value)
+        self.backend.set(field, value)
         return self
+
+    def get_bit_length(self) -> int:
+        """Get frame bit length"""
+        st = self.backend.structure
+        return st.fields_length.get_offset(self.backend)
+
+    def get_byte_length(self) -> int:
+        """Get frame byte length"""
+        st = self.backend.structure
+        return st.fields_length.get_offset(self.backend) // 8
 
     def __repr__(self):
         return self.backend.__repr__()
 
 
-class RawField(FieldBase[F, RawData]):
+class RawField(FieldBase[F, RawStream]):
     """Raw data field"""
-    def __init__(self, default_value: RawData):
+    def __init__(self, default_value: RawStream):
         super().__init__("raw", default_value)
 
     def fixed_length(self, bit_length: int):
         self.fixed_bit_length = bit_length
 
-    def get(self, frame: 'Frame[F]') -> RawData:
+    def get(self, frame: 'Frame[F]') -> RawStream:
         return frame.get(self)
 
-    def set(self, frame: 'Frame[F]', value: RawData) -> RawData:
+    def set(self, frame: 'Frame[F]', value: RawStream) -> RawStream:
         frame.set(self, value)
         return value
 
@@ -138,7 +151,7 @@ class RawField(FieldBase[F, RawData]):
     def get_byte_length(self, frame: 'Frame[F]') -> int:
         return self.get(frame).byte_length()
 
-    def encode(self, value: RawData, state: EncodingState) -> RawData:
+    def encode(self, value: RawStream, state: EncodingState) -> RawStream:
         return value
 
 
@@ -159,16 +172,18 @@ class IntField(FieldBase[F, int]):
             return self.fixed_bit_length // 8
         return self.codec.get_bit_length(self.get(frame)) // 8
 
-    def encode(self, value: int, state: EncodingState) -> RawData:
+    def encode(self, value: int, state: EncodingState) -> RawStream:
         return self.codec.encode(value)
 
+    def decode(self, data: RawStream, backend: 'FrameBackend') -> T:
+        pass
 
 class StringField(FieldBase[F, str]):
     """String field"""
     def __init__(self, default_value: str):
         super().__init__("str", default_value)
 
-    def encode(self, value: str, state: EncodingState) -> RawData:
+    def encode(self, value: str, state: EncodingState) -> RawStream:
         return Raw.empty  # FIXME
 
 
@@ -185,7 +200,7 @@ class Structure(typing.Generic[F]):
         for cp in self.commit_procedures:
             cp(frame)
 
-    def raw(self, bits: int = None, bytes: int = None, default: RawData = Raw.empty,
+    def raw(self, bits: int = None, bytes: int = None, default: RawStream = Raw.empty,
             name: str = None) -> RawField[F]:
         fn = self._get_a_name(name)
         default = default if default else Raw.zeroes(bit_length=bits, byte_length=bytes)

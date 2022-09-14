@@ -1,9 +1,9 @@
-from framing.raw_data import RawData, Raw
+from framing.raw_data import RawStream, Raw
 
 
 class IntegerCodec:
     """Base class for integer codecs"""
-    def encode(self, value: int) -> RawData:
+    def encode(self, value: int) -> RawStream:
         """Encode!"""
         raise NotImplementedError()
 
@@ -20,7 +20,7 @@ class FixedLittleEndianCodec(IntegerCodec):
     def __init__(self, byte_length: int):
         self.length = byte_length
 
-    def encode(self, value: int) -> RawData:
+    def encode(self, value: int) -> RawStream:
         b = bytearray(self.length)
         v = value
         for i in range(self.length, 0, -1):

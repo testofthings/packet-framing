@@ -1,5 +1,6 @@
-from framing.backends import EditableBackend, F, FrameBackend
+from framing.backends import ComposingBackend, F, FrameBackend, DissectorBackend
 from framing.base import Frame
+from framing.raw_data import RawStream
 
 
 class Frames:
@@ -7,17 +8,11 @@ class Frames:
     def compose(cls, frame_type: F) -> Frame[F]:
         """Create new frame for composing"""
         def factory(frame):
-            return EditableBackend(frame_type, frame)
+            return ComposingBackend(frame_type, frame)
         return Frame(frame_type, factory)
 
     @classmethod
-    def get_bit_length(cls, frame: Frame) -> int:
-        """Get frame bit length"""
-        st = frame.backend.structure
-        return st.fields_length.get_offset(frame.backend)
-
-    @classmethod
-    def get_byte_length(cls, frame: Frame) -> int:
-        """Get frame byte length"""
-        st = frame.backend.structure
-        return st.fields_length.get_offset(frame.backend) // 8
+    def dissect(cls, frame_type: F, data: RawStream) -> Frame[F]:
+        def factory(frame):
+            return DissectorBackend(frame_type, frame, data)
+        return Frame(frame_type, factory)
