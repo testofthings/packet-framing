@@ -44,8 +44,7 @@ class FieldOffset:
 
 class FieldBase(typing.Generic[S, T]):
     """Base class for fields"""
-    def __init__(self, name: str, type_name: str, default_value: T):
-        self.field_name = name
+    def __init__(self, type_name: str, default_value: T):
         self.type_name = type_name
         self.default_value = default_value
         self.fixed_bit_length = -1
@@ -78,7 +77,7 @@ class FieldBase(typing.Generic[S, T]):
         return self
 
     def __repr__(self):
-        return f"{self.field_name}: {self.type_name}"
+        return self.type_name
 
 
 class FrameBackend:
@@ -118,8 +117,8 @@ class Frame(typing.Generic[S]):
 
 class RawField(FieldBase[S, RawData]):
     """Raw data field"""
-    def __init__(self, name: str, default_value: RawData):
-        super().__init__(name, "raw", default_value)
+    def __init__(self, default_value: RawData):
+        super().__init__("raw", default_value)
         self.offset.resolver = lambda f: self.get_bit_length(f)  # set to null, if fixed length
 
     def fixed_length(self, bit_length: int):
@@ -144,8 +143,8 @@ class RawField(FieldBase[S, RawData]):
 
 class IntField(FieldBase[S, int]):
     """Integer field"""
-    def __init__(self, name: str, codec: IntegerCodec, default_value: int):
-        super().__init__(name, "int", default_value)
+    def __init__(self, codec: IntegerCodec, default_value: int):
+        super().__init__("int", default_value)
         self.codec = codec
         self.fixed_bit_length = codec.get_fixed_bit_length()
 
@@ -165,8 +164,8 @@ class IntField(FieldBase[S, int]):
 
 class StringField(FieldBase[S, str]):
     """String field"""
-    def __init__(self, name: str, default_value: str):
-        super().__init__(name, "str", default_value)
+    def __init__(self, default_value: str):
+        super().__init__("str", default_value)
 
     def encode(self, value: str, state: EncodingState) -> RawData:
         return Raw.empty  # FIXME
@@ -178,8 +177,8 @@ F = typing.TypeVar("F", bound=Frame)
 
 class Subframe(FieldBase[S, F]):
     """Subframe field"""
-    def __init__(self, name: str, struct_type: typing.Type[F]):
-        super().__init__(name, f"{struct_type}", struct_type())
+    def __init__(self, struct_type: typing.Type[F]):
+        super().__init__(f"{struct_type}", struct_type())
         self.struct_type = struct_type
 
     def new(self, backend: FrameBackend) -> F:
@@ -205,7 +204,7 @@ class Structure(typing.Generic[S]):
             name: str = None) -> RawField[S]:
         fn = self._get_a_name(name)
         default = default if default else Raw.zeroes(bit_length=bits, byte_length=bytes)
-        f: RawField[S] = RawField(fn, default)
+        f: RawField[S] = RawField(default)
         if bits is not None:
             f.fixed_length(bits)
         if bytes is not None:
@@ -216,7 +215,7 @@ class Structure(typing.Generic[S]):
     def integer(self, bits: int = None, bytes: int = None, default=0, name: str = None) -> FieldBase[S, int]:
         fn = self._get_a_name(name)
         if bytes is not None:
-            f: FieldBase[S, int] = IntField(fn, FixedLittleEndianCodec(bytes), default)
+            f: FieldBase[S, int] = IntField(FixedLittleEndianCodec(bytes), default)
         else:
             raise Exception("Only supporting full-byte integers now")
         self.fields[fn] = f
@@ -224,13 +223,13 @@ class Structure(typing.Generic[S]):
 
     def string(self, name: str = None, default="") -> FieldBase[S, str]:
         fn = self._get_a_name(name)
-        f: FieldBase[S, str] = StringField(fn, default)
+        f: FieldBase[S, str] = StringField(default)
         self.fields[fn] = f
         return f
 
     def struct(self, struct_type: typing.Type[F], name: str = None) -> FieldBase[S, F]:
         fn = self._get_a_name(name)
-        f: FieldBase[S, F] = Subframe(fn, struct_type)
+        f: FieldBase[S, F] = Subframe(struct_type)
         self.fields[fn] = f
         return f
 
@@ -259,7 +258,6 @@ class Structure(typing.Generic[S]):
         self.fields.clear()
         for n, v in old_names.items():
             nn = i_names[v] if n.startswith("__") else n
-            v.field_name = nn
             self.fields[nn] = v
         self.built = True
 
@@ -290,6 +288,6 @@ class Structure(typing.Generic[S]):
 
     def __repr__(self) -> str:
         r = []
-        for f in self.fields.values():
-            r.append(f"{f.field_name}: {f.type_name}")
+        for n, f in self.fields.items():
+            r.append(f"{n}: {f}")
         return "\n".join(r)
