@@ -3,15 +3,37 @@ from typing import Iterable, List
 
 class RawData:
     """Raw data buffer"""
+
     def bit_length(self) -> int:
-        """Length in bits"""
+        """Length in bits or -1 if a stream"""
         raise NotImplementedError()
 
     def byte_length(self) -> int:
-        """Length in full bytes"""
+        """Length in full bytes or -1 if a stream"""
         return self.bit_length() // 8
 
+    def bits_available(self) -> int:
+        """Number of bits available without waiting"""
+        return self.bit_length()
+
+    def bytes_available(self) -> int:
+        """Number of bytes available without waiting"""
+        return self.byte_length()
+
     def octet(self, byte_offset: int) -> int:
+        """Get octet by offset"""
+        raise NotImplementedError()
+
+    def bit(self, bit_offset: int) -> int:
+        """Get bit by offset"""
+        raise NotImplementedError()
+
+    def tailBits(self, bit_offset: int) -> 'RawData':
+        """Get raw data tail"""
+        raise NotImplementedError()
+
+    def tailBytes(self, byte_offset: int) -> 'RawData':
+        """Get raw data tail"""
         raise NotImplementedError()
 
     def __repr__(self):
@@ -23,6 +45,19 @@ class RawData:
 
     def __bool__(self):
         return self.bit_length() > 0
+
+    def __eq__(self, other):
+        if not isinstance(other, RawData):
+            return False
+        if self.bits_available() != other.bits_available():
+            return False
+        for i in range(0, self.byte_length()):
+            if self.octet(i) != other.octet(i):
+                return False
+        for i in range(self.byte_length() * 8, self.bit_length()):
+            if self.bit(i) != other.bit(i):
+                return False
+        return True
 
     def dump(self, always_wide=False) -> str:
         if self.bit_length() % 8 != 0:
