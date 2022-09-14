@@ -1,6 +1,6 @@
 from framing.backends import ComposingBackend, F, FrameBackend, DissectorBackend
 from framing.base import Frame
-from framing.raw_data import RawStream
+from framing.raw_data import RawData
 
 
 class Frames:
@@ -12,7 +12,7 @@ class Frames:
         return Frame(frame_type, factory)
 
     @classmethod
-    def dissect(cls, frame_type: F, data: RawStream) -> Frame[F]:
+    def dissect(cls, frame_type: F, data: RawData) -> Frame[F]:
         def factory(frame):
             return DissectorBackend(frame_type, frame, data)
         return Frame(frame_type, factory)

@@ -4,7 +4,7 @@ from typing import Dict, Any, cast
 from typing_extensions import Self
 
 from framing.base import Frame, FrameBackend, FieldBase, F, T, EncodingState
-from framing.raw_data import RawStream, Raw
+from framing.raw_data import RawData, Raw
 
 
 class ComposingBackend(FrameBackend):
@@ -33,7 +33,7 @@ class ComposingBackend(FrameBackend):
         c.encode()
         return c.pretty_print()
 
-    def encode(self) -> RawStream:
+    def encode(self) -> RawData:
         self.structure.commit(self.frame)
         f_list = []
         state = EncodingState()
@@ -67,7 +67,7 @@ class ComposingBackend(FrameBackend):
 
 class DissectorBackend(FrameBackend):
     """Backend to dissect frame from raw data"""
-    def __init__(self, frame_type: Any, frame: Frame, data: RawStream):
+    def __init__(self, frame_type: Any, frame: Frame, data: RawData):
         super().__init__(frame_type, frame)
         self.data = data
         self.cache: Dict[FieldBase, Any] = {}
@@ -83,6 +83,6 @@ class DissectorBackend(FrameBackend):
     def set(self, field: FieldBase[F, T], value: T) -> Self:
         raise NotImplementedError("set() not supported")
 
-    def encode(self) -> RawStream:
-        bit_length = self.structure.fields_length.get_offset(self)
-        return self.data.subBlockBits(0, bit_length)
+    def encode(self) -> RawData:
+        bit_length = self.frame.get_bit_length()
+        return self.data.tailBits(bit_length)

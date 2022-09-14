@@ -28,8 +28,20 @@ class RawData:
         """Get bit by offset"""
         raise NotImplementedError()
 
+    def subBlockBits(self, bit_offset: int, bit_length: int) -> 'RawData':
+        """Get sub-block"""
+        if bit_offset % 8 == 0 and bit_length % 8 == 0:
+            return self.subBlock(bit_offset // 8, bit_length // 8)
+        raise NotImplementedError()
+
+    def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
+        """Get sub-block"""
+        raise NotImplementedError()
+
     def tailBits(self, bit_offset: int) -> 'RawData':
         """Get raw data tail"""
+        if bit_offset % 8 == 0:
+            return self.tailBytes(bit_offset // 8)
         raise NotImplementedError()
 
     def tailBytes(self, byte_offset: int) -> 'RawData':
@@ -49,8 +61,8 @@ class RawData:
     def __eq__(self, other):
         if not isinstance(other, RawData):
             return False
-        if self.bits_available() != other.bits_available():
-            return False
+        if self.bit_length() < 0 or other.bit_length() < 0:
+            return False  # streams cannot be compared
         for i in range(0, self.byte_length()):
             if self.octet(i) != other.octet(i):
                 return False
@@ -93,6 +105,18 @@ class ByteData(RawData):
     def octet(self, byte_offset: int) -> int:
         return self.data[byte_offset]
 
+    def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
+        if byte_offset == 0 and byte_length == len(self.data):
+            return self
+        return Raw.bytes(self.data[byte_offset:byte_offset + byte_length])
+
+    def tailBytes(self, byte_offset: int) -> 'RawData':
+        if byte_offset == 0:
+            return self
+        if byte_offset >= len(self.data):
+            return Raw.empty
+        return Raw.bytes(self.data[byte_offset:])
+
 
 class MergedData(RawData):
     def __init__(self, components: List[RawData]):
@@ -114,6 +138,49 @@ class MergedData(RawData):
                 return c.octet(off)
             off -= c_len
         raise Exception(f"Byte offset out of range: {byte_offset}")
+
+    def subBlockBits(self, bit_offset: int, bit_length: int) -> 'RawData':
+        """Get sub-block"""
+        if bit_offset == 0 and bit_length == self.bit_length():
+            return self
+        off = 0
+        end_offset = bit_offset + bit_length
+        if end_offset > self.bit_length():
+            raise EOFError(f"{end_offset} beyond end")
+        nc = []
+        for c in self.components:
+            c_len = c.bit_length()
+            if off >= bit_offset:
+                if off >= end_offset:
+                    return Raw.merge(nc)
+                s = max(0, off - bit_offset)
+                e = min(c_len, end_offset - off)
+                nc.append(c.subBlockBits(s, e))
+            off += c_len
+        return Raw.merge(nc)
+
+    def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
+        """Get sub-block"""
+        return self.subBlockBits(byte_offset * 8, byte_length * 8)
+
+    def tailBytes(self, byte_offset: int) -> 'RawData':
+        return self.tailBits(byte_offset * 8)
+
+    def tailBits(self, bit_offset: int) -> 'RawData':
+        """Get raw data tail"""
+        if bit_offset == 0:
+            return self
+        if bit_offset >= self.bit_length():
+            return Raw.empty
+        off = bit_offset
+        for i, c in enumerate(self.components):
+            c_len = c.bit_length()
+            if off < c_len:
+                nc = [c.tailBits(off)]
+                nc.extend(self.components[i + 1:])
+                return Raw.merge(nc)
+            off -= c_len
+        return Raw.empty
 
 
 class ZeroData(RawData):
@@ -152,5 +219,10 @@ class Raw:
 
     @classmethod
     def merge(cls, components: Iterable[RawData]) -> RawData:
-        return MergedData(list(components))
+        cs = list(components)
+        if not cs:
+            return cls.empty
+        if len(cs) == 1:
+            return cs[0]
+        return MergedData(cs)
 
