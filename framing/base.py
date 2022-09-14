@@ -49,7 +49,7 @@ class FieldBase(typing.Generic[F, T]):
         self.default_value = default_value
         self.fixed_bit_length = -1
         self.offset = FieldOffset(self)
-        self.commit_procedure: Optional[Callable[[F], T]] = None
+        self.commit_procedure: Optional[Callable[[Frame[F]], T]] = None
 
     def get(self, frame: 'Frame[F]') -> T:
         return frame.get(self)
