@@ -197,18 +197,18 @@ class Structure(typing.Generic[F]):
         self.fields[fn] = f
         return f
 
-    def integer(self, bits: int = None, bytes: int = None, default=0, name: str = None) -> FieldBase[F, int]:
+    def integer(self, bits: int = None, bytes: int = None, default=0, name: str = None) -> IntField[F]:
         fn = self._get_a_name(name)
         if bytes is not None:
-            f: FieldBase[F, int] = IntField(FixedLittleEndianCodec(bytes), default)
+            f = IntField(FixedLittleEndianCodec(bytes), default)
         else:
             raise Exception("Only supporting full-byte integers now")
         self.fields[fn] = f
         return f
 
-    def string(self, name: str = None, default="") -> FieldBase[F, str]:
+    def string(self, name: str = None, default="") -> StringField[F]:
         fn = self._get_a_name(name)
-        f: FieldBase[F, str] = StringField(default)
+        f = StringField(default)
         self.fields[fn] = f
         return f
 
