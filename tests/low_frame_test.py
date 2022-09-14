@@ -1,10 +1,11 @@
 from framing.base import *
-from framing.frames import Frames
+from framing.frames import Frames, BaseFrame
 from framing.low_frames import EthernetII
+from framing.pcap_frames import PCAP
 
 
 def test_ethernet():
-    eth = EthernetII()
+    eth = BaseFrame(EthernetII)
 
     eth.set(EthernetII.destination, Raw.hex("01 02 03 04 05 06"))
     eth.set(EthernetII.type, 1066)
@@ -32,3 +33,12 @@ def test_ethernet():
     assert raw.byte_length() == 64
 
     assert Frames.get_byte_length(eth) == 64
+
+    # FIXME: Below shows that types not enforced (they would when all definitions are in the same source file!)
+
+    pcap = BaseFrame(PCAP)
+    pcap.set(EthernetII.type, 55)
+    jee = pcap.get(EthernetII.type)
+    pcap.set(EthernetII.type, "as")
+    jee2 = eth.get(EthernetII.type)
+    eth.set(EthernetII.type, "as")

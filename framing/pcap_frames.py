@@ -4,16 +4,21 @@ from framing.frames import *
 # https://datatracker.ietf.org/doc/id/draft-gharris-opsawg-pcap-00.html
 
 
-class PCAP(BaseFrame['PCAP']):
-    fields = Structure['PCAP']()
+class PCAPType:
+    def __init__(self):
+        fields = Structure(PCAPType)
+        self.fields = fields
+        self.Magic_Number = fields.raw(bytes=4)
+        self.Major_Version = fields.integer(bytes=2)
+        self.Minor_Version = fields.integer(bytes=2)
+        self.Reserved1 = fields.raw(bytes=4)
+        self.Reserved2 = fields.raw(bytes=4)
+        self.SnapLen = fields.integer(bytes=4)
+        self.LinkType = fields.integer(bytes=4)
 
-    Magic_Number = fields.raw(bytes=4)
-    Major_Version = fields.integer(bytes=2)
-    Minor_Version = fields.integer(bytes=2)
-    Reserved1 = fields.raw(bytes=4)
-    Reserved2 = fields.raw(bytes=4)
-    SnapLen = fields.integer(bytes=4)
-    LinkType = fields.integer(bytes=4)
+
+PCAP = PCAPType()
+
 
 
 

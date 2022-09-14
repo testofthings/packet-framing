@@ -3,25 +3,25 @@ from typing import Dict, Any, cast
 
 from typing_extensions import Self
 
-from framing.base import Frame, FrameBackend, FieldBase, S, T, EncodingState
+from framing.base import Frame, FrameBackend, FieldBase, F, T, EncodingState
 from framing.raw_data import RawData, Raw
 
 
 class EditableBackend(FrameBackend):
-    def __init__(self, frame: Frame):
-        super().__init__(frame)
+    def __init__(self, frame_type: Any, frame: Frame):
+        super().__init__(frame_type, frame)
         self.changes: Dict[FieldBase, Any] = {}
 
-    def get(self, field: FieldBase[S, T], frame: Frame[S]) -> T:
+    def get(self, field: FieldBase[F, T], frame: Frame[F]) -> T:
         return self.changes.get(field, field.default_value)
 
-    def set(self, field: FieldBase[S, T], frame: Frame[S], value: T) -> Self:
+    def set(self, field: FieldBase[F, T], frame: Frame[F], value: T) -> Self:
         self.changes[field] = value
         return self
 
     def copy(self) -> Self:
         n_frame = copy.copy(self.frame)
-        c = EditableBackend(n_frame)
+        c = EditableBackend(self.frame_type, n_frame)
         n_frame.backend = c
         c.changes.update(self.changes)
         return c

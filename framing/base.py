@@ -7,8 +7,8 @@ from typing_extensions import Self
 from framing.codecs import IntegerCodec, FixedLittleEndianCodec
 from framing.raw_data import RawData, Raw
 
-# Frame or subclass
-S = typing.TypeVar("S", bound='Frame')
+# Frame type
+F = typing.TypeVar("F")
 
 # Field value type
 T = typing.TypeVar("T")
@@ -42,37 +42,37 @@ class FieldOffset:
         return " + ".join(r)
 
 
-class FieldBase(typing.Generic[S, T]):
+class FieldBase(typing.Generic[F, T]):
     """Base class for fields"""
     def __init__(self, type_name: str, default_value: T):
         self.type_name = type_name
         self.default_value = default_value
         self.fixed_bit_length = -1
         self.offset = FieldOffset(self)
-        self.commit_procedure: Optional[Callable[[S], T]] = None
+        self.commit_procedure: Optional[Callable[[F], T]] = None
 
-    def get(self, frame: S) -> T:
+    def get(self, frame: 'Frame[F]') -> T:
         return frame.get(self)
 
-    def set(self, frame: S, value: T) -> T:
+    def set(self, frame: 'Frame[F]', value: T) -> T:
         frame.set(self, value)
         return value
 
-    def get_bit_length(self, frame: S) -> int:
+    def get_bit_length(self, frame: 'Frame[F]') -> int:
         raise NotImplementedError()
 
-    def get_byte_length(self, frame: S) -> int:
+    def get_byte_length(self, frame: 'Frame[F]') -> int:
         return self.get_bit_length(frame) // 8
 
     def encode(self, value: T, state: EncodingState) -> RawData:
         raise NotImplementedError()
 
-    def to_string(self, frame: S) -> str:
+    def to_string(self, frame: 'Frame[F]') -> str:
         """A string representation of current value, for unit tests"""
         enc = self.encode(self.get(frame), EncodingState())
         return f"{enc}"
 
-    def at_commit(self, procedure: Callable[[S], T]) -> Self:
+    def at_commit(self, procedure: Callable[['Frame[F]'], T]) -> Self:
         self.commit_procedure = procedure
         return self
 
@@ -82,16 +82,17 @@ class FieldBase(typing.Generic[S, T]):
 
 class FrameBackend:
     """Base class for frame backend"""
-    def __init__(self, frame: 'Frame'):
+    def __init__(self, frame_type: F, frame: 'Frame'):
+        self.frame_type = frame_type
         self.frame = frame
-        self.structure = Structure.get_struct(frame)
+        self.structure = Structure.get_struct(frame_type)
         if not self.structure.built:
-            self.structure.finish_building(frame)
+            self.structure.finish_building(frame_type)
 
-    def get(self, field: FieldBase[S, T], frame: 'Frame') -> T:
+    def get(self, field: FieldBase[F, T], frame: 'Frame') -> T:
         raise NotImplementedError()
 
-    def set(self, field: FieldBase[S, T], frame: 'Frame', value: T) -> Self:
+    def set(self, field: FieldBase[F, T], frame: 'Frame', value: T) -> Self:
         raise NotImplementedError("Editing not allowed with this backend")
 
     def encode(self) -> RawData:
@@ -99,15 +100,16 @@ class FrameBackend:
         raise NotImplementedError()
 
 
-class Frame(typing.Generic[S]):
+class Frame(typing.Generic[F]):
     """Base class for frames"""
-    def __init__(self, backend: FrameBackend):
+    def __init__(self, frame_type: F, backend: FrameBackend):
+        self.type = frame_type
         self.backend = backend
 
-    def get(self, field: FieldBase[S, T]) -> T:
+    def get(self, field: FieldBase[F, T]) -> T:
         return self.backend.get(field, self)
 
-    def set(self, field: FieldBase[S, T], value: T) -> Self:
+    def set(self, field: FieldBase[F, T], value: T) -> Self:
         self.backend.set(field, self, value)
         return self
 
@@ -115,45 +117,44 @@ class Frame(typing.Generic[S]):
         return self.backend.__repr__()
 
 
-class RawField(FieldBase[S, RawData]):
+class RawField(FieldBase[F, RawData]):
     """Raw data field"""
     def __init__(self, default_value: RawData):
         super().__init__("raw", default_value)
-        self.offset.resolver = lambda f: self.get_bit_length(f)  # set to null, if fixed length
 
     def fixed_length(self, bit_length: int):
         self.fixed_bit_length = bit_length
 
-    def get(self, frame: S) -> RawData:
+    def get(self, frame: 'Frame[F]') -> RawData:
         return frame.get(self)
 
-    def set(self, frame: S, value: RawData) -> RawData:
+    def set(self, frame: 'Frame[F]', value: RawData) -> RawData:
         frame.set(self, value)
         return value
 
-    def get_bit_length(self, frame: S) -> int:
+    def get_bit_length(self, frame: 'Frame[F]') -> int:
         return self.get(frame).bit_length()
 
-    def get_byte_length(self, frame: S) -> int:
+    def get_byte_length(self, frame: 'Frame[F]') -> int:
         return self.get(frame).byte_length()
 
     def encode(self, value: RawData, state: EncodingState) -> RawData:
         return value
 
 
-class IntField(FieldBase[S, int]):
+class IntField(FieldBase[F, int]):
     """Integer field"""
     def __init__(self, codec: IntegerCodec, default_value: int):
         super().__init__("int", default_value)
         self.codec = codec
         self.fixed_bit_length = codec.get_fixed_bit_length()
 
-    def get_bit_length(self, frame: S) -> int:
+    def get_bit_length(self, frame: 'Frame[F]') -> int:
         if self.fixed_bit_length >= 0:
             return self.fixed_bit_length
         return self.codec.get_bit_length(self.get(frame))
 
-    def get_byte_length(self, frame: S) -> int:
+    def get_byte_length(self, frame: 'Frame[F]') -> int:
         if self.fixed_bit_length >= 0:
             return self.fixed_bit_length // 8
         return self.codec.get_bit_length(self.get(frame)) // 8
@@ -162,7 +163,7 @@ class IntField(FieldBase[S, int]):
         return self.codec.encode(value)
 
 
-class StringField(FieldBase[S, str]):
+class StringField(FieldBase[F, str]):
     """String field"""
     def __init__(self, default_value: str):
         super().__init__("str", default_value)
@@ -171,40 +172,24 @@ class StringField(FieldBase[S, str]):
         return Raw.empty  # FIXME
 
 
-# Type for sub-frames
-F = typing.TypeVar("F", bound=Frame)
-
-
-class Subframe(FieldBase[S, F]):
-    """Subframe field"""
-    def __init__(self, struct_type: typing.Type[F]):
-        super().__init__(f"{struct_type}", struct_type())
-        self.struct_type = struct_type
-
-    def new(self, backend: FrameBackend) -> F:
-        return self.struct_type(backend)
-
-    def get(self, frame: S) -> F:
-        return self.new(frame.backend)
-
-
-class Structure(typing.Generic[S]):
+class Structure(typing.Generic[F]):
     """Structure definition for a frame"""
-    def __init__(self):
-        self.fields: typing.Dict[str, FieldBase[S]] = {}
+    def __init__(self, frame_type: F):
+        self.frame_type = frame_type
+        self.fields: typing.Dict[str, FieldBase] = {}
         self.fields_length = FieldOffset()
-        self.commit_procedures: List[Callable[[S], None]] = []
+        self.commit_procedures: List[Callable[[Frame[F]], None]] = []
         self.built = False
 
-    def commit(self, frame: S):
+    def commit(self, frame: Frame[F]):
         for cp in self.commit_procedures:
             cp(frame)
 
     def raw(self, bits: int = None, bytes: int = None, default: RawData = Raw.empty,
-            name: str = None) -> RawField[S]:
+            name: str = None) -> RawField[F]:
         fn = self._get_a_name(name)
         default = default if default else Raw.zeroes(bit_length=bits, byte_length=bytes)
-        f: RawField[S] = RawField(default)
+        f: RawField[F] = RawField(default)
         if bits is not None:
             f.fixed_length(bits)
         if bytes is not None:
@@ -212,41 +197,35 @@ class Structure(typing.Generic[S]):
         self.fields[fn] = f
         return f
 
-    def integer(self, bits: int = None, bytes: int = None, default=0, name: str = None) -> FieldBase[S, int]:
+    def integer(self, bits: int = None, bytes: int = None, default=0, name: str = None) -> FieldBase[F, int]:
         fn = self._get_a_name(name)
         if bytes is not None:
-            f: FieldBase[S, int] = IntField(FixedLittleEndianCodec(bytes), default)
+            f: FieldBase[F, int] = IntField(FixedLittleEndianCodec(bytes), default)
         else:
             raise Exception("Only supporting full-byte integers now")
         self.fields[fn] = f
         return f
 
-    def string(self, name: str = None, default="") -> FieldBase[S, str]:
+    def string(self, name: str = None, default="") -> FieldBase[F, str]:
         fn = self._get_a_name(name)
-        f: FieldBase[S, str] = StringField(default)
+        f: FieldBase[F, str] = StringField(default)
         self.fields[fn] = f
         return f
 
-    def struct(self, struct_type: typing.Type[F], name: str = None) -> FieldBase[S, F]:
-        fn = self._get_a_name(name)
-        f: FieldBase[S, F] = Subframe(struct_type)
-        self.fields[fn] = f
-        return f
-
-    def at_commit(self, update: Callable[[S], None]):
+    def at_commit(self, update: Callable[[Frame[F]], None]):
         self.commit_procedures.append(update)
 
     @classmethod
-    def get_struct(cls, frame: Frame[S]) -> 'Structure[S]':
-        if hasattr(frame, "fields_"):
-            return getattr(frame, "fields_")  # underscored to avoid naming collision
-        return getattr(frame, "fields")
+    def get_struct(cls, frame_type: F) -> 'Structure[F]':
+        if hasattr(frame_type, "fields_"):
+            return getattr(frame_type, "fields_")  # underscored to avoid naming collision
+        return getattr(frame_type, "fields")
 
     def _get_a_name(self, override: Optional[str]) -> str:
         """Get name or temporary name for a field"""
         return override if override else f"__{len(self.fields)}"
 
-    def finish_building(self, frame: S):
+    def finish_building(self, frame: F):
         # find field names
         i_names: typing.Dict[FieldBase, str] = {}
         for member in inspect.getmembers(frame):
@@ -281,7 +260,7 @@ class Structure(typing.Generic[S]):
         # collect commit procedures from fields
         for f in self.fields.values():
             if f.commit_procedure is not None:
-                def procedure(fr: S):
+                def procedure(fr: Frame[F]):
                     value = f.commit_procedure(fr)
                     fr.set(f, value)
                 self.commit_procedures.append(procedure)

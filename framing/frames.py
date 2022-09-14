@@ -1,10 +1,10 @@
-from framing.base import Frame, S, FrameBackend
-from framing.backends import EditableBackend
+from framing.backends import EditableBackend, F, FrameBackend
+from framing.base import Frame
 
 
-class BaseFrame(Frame[S]):
-    def __init__(self, backend: FrameBackend = None):
-        super().__init__(backend or EditableBackend(self))
+class BaseFrame(Frame[F]):
+    def __init__(self, frame_type: F, backend: FrameBackend = None):
+        super().__init__(frame_type, backend or EditableBackend(frame_type, self))
 
 
 class Frames:
