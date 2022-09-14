@@ -102,9 +102,9 @@ class FrameBackend:
 
 class Frame(typing.Generic[F]):
     """Base class for frames"""
-    def __init__(self, frame_type: F, backend: FrameBackend):
+    def __init__(self, frame_type: F, backend_factory: Callable[['Frame'], FrameBackend]):
         self.type = frame_type
-        self.backend = backend
+        self.backend = backend_factory(self)
 
     def get(self, field: FieldBase[F, T]) -> T:
         return self.backend.get(field, self)

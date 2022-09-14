@@ -1,11 +1,10 @@
 from framing.base import *
-from framing.frames import Frames, BaseFrame
+from framing.frames import Frames
 from framing.low_frames import EthernetII
-from framing.pcap_frames import PCAP
 
 
 def test_ethernet():
-    eth = BaseFrame(EthernetII)
+    eth = Frames.compose(EthernetII)
 
     eth.set(EthernetII.destination, Raw.hex("01 02 03 04 05 06"))
     eth.set(EthernetII.type, 1066)
