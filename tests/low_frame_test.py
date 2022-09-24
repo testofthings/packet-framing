@@ -4,11 +4,11 @@ from framing.low_frames import EthernetII
 
 
 def test_ethernet():
-    eth = Frames.compose(EthernetII)
+    eth = EthernetII(Frames.compose())
 
-    eth.set(EthernetII.destination, Raw.hex("01 02 03 04 05 06"))
-    eth.set(EthernetII.type, 1066)
-    eth.set(EthernetII.data, Raw.hex("55 66 77 88"))
+    EthernetII.destination[eth] = Raw.hex("01 02 03 04 05 06")
+    EthernetII.type[eth] = 1066
+    EthernetII.data[eth] = Raw.hex("55 66 77 88")
 
     check = f"{eth}"
 

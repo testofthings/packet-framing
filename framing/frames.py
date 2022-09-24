@@ -1,3 +1,5 @@
+from typing import Callable
+
 from framing.backends import ComposingBackend, F, FrameBackend, DissectorBackend
 from framing.base import Frame
 from framing.raw_data import RawData
@@ -5,14 +7,10 @@ from framing.raw_data import RawData
 
 class Frames:
     @classmethod
-    def compose(cls, frame_type: F) -> Frame[F]:
+    def compose(cls) -> Callable[['Frame'], FrameBackend]:
         """Create new frame for composing"""
-        def factory(frame):
-            return ComposingBackend(frame_type, frame)
-        return Frame(frame_type, factory)
+        return lambda f: ComposingBackend(f)
 
     @classmethod
-    def dissect(cls, frame_type: F, data: RawData) -> Frame[F]:
-        def factory(frame):
-            return DissectorBackend(frame_type, frame, data)
-        return Frame(frame_type, factory)
+    def dissect(cls, data: RawData) -> Callable[['Frame'], FrameBackend]:
+        return lambda f: DissectorBackend(f, data)

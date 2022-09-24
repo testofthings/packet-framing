@@ -9,8 +9,8 @@ from framing.raw_data import RawData, Raw
 
 class ComposingBackend(FrameBackend):
     """Backend to compose a frame"""
-    def __init__(self, frame_type: Any, frame: Frame):
-        super().__init__(frame_type, frame)
+    def __init__(self, frame: Frame):
+        super().__init__(frame)
         self.changes: Dict[FieldBase, Any] = {}
 
     def get(self, field: FieldBase[F, T]) -> T:
@@ -22,7 +22,7 @@ class ComposingBackend(FrameBackend):
 
     def copy(self) -> Self:
         n_frame = copy.copy(self.frame)
-        c = ComposingBackend(self.frame_type, n_frame)
+        c = ComposingBackend(n_frame)
         n_frame.backend = c
         c.changes.update(self.changes)
         return c
@@ -67,8 +67,8 @@ class ComposingBackend(FrameBackend):
 
 class DissectorBackend(FrameBackend):
     """Backend to dissect frame from raw data"""
-    def __init__(self, frame_type: Any, frame: Frame, data: RawData):
-        super().__init__(frame_type, frame)
+    def __init__(self, frame: Frame, data: RawData):
+        super().__init__(frame)
         self.data = data
         self.cache: Dict[FieldBase, Any] = {}
 

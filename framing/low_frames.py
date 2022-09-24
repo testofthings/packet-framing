@@ -2,21 +2,17 @@ from framing.base import Structure, Frame
 from framing.raw_data import Raw
 
 
-class EthernetIIType:
-    def __init__(self):
-        fields = Structure(self)
-        self.fields = fields
-        self.destination = fields.raw(bytes=6)
-        self.source = fields.raw(bytes=6)
-        self.type = fields.integer(bytes=2)
-        self.data = fields.raw()
-        self.crc_checksum = fields.raw(bytes=4)
-        self.padding = fields.raw()
+class EthernetII(Frame):
+    fields = Structure['EthernetII']()
 
-        def update_padding(frame: Frame[EthernetIIType]):
-            return Raw.zeroes(max(64 - (14 + self.data.get_byte_length(frame) + 4), 0))
+    destination = fields.raw(bytes=6)
+    source = fields.raw(bytes=6)
+    type = fields.integer(bytes=2)
+    data = fields.raw()
+    crc_checksum = fields.raw(bytes=4)
+    padding = fields.raw()
 
-        self.padding.at_commit(update_padding)
+    def update_padding(self):
+        return Raw.zeroes(max(64 - (14 + EthernetII.data.get_byte_length(self) + 4), 0))
 
-
-EthernetII = EthernetIIType()
+    padding.at_commit(update_padding)
