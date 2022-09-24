@@ -5,15 +5,15 @@ from framing.frames import *
 
 
 class PCAPFrame(Frame):
-    fields = Structure['PCAPFrame']()
+    structure = Structure['PCAPFrame']()
 
 
 class PCAP:
-    fields = PCAPFrame.fields
-    Magic_Number = fields.raw(bytes=4)
-    Major_Version = fields.integer(bytes=2)
-    Minor_Version = fields.integer(bytes=2)
-    Reserved1 = fields.raw(bytes=4)
-    Reserved2 = fields.raw(bytes=4)
-    SnapLen = fields.integer(bytes=4)
-    LinkType = fields.integer(bytes=4)
+    structure = PCAPFrame.structure
+    Magic_Number = structure.raw(bytes=4)
+    Major_Version = structure.integer(bytes=2)
+    Minor_Version = structure.integer(bytes=2)
+    Reserved1 = structure.raw(bytes=4)
+    Reserved2 = structure.raw(bytes=4)
+    SnapLen = structure.integer(bytes=4)
+    LinkType = structure.integer(bytes=4)

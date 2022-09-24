@@ -235,9 +235,9 @@ class Structure(typing.Generic[F]):
 
     @classmethod
     def get_struct(cls, frame_type: F) -> 'Structure[F]':
-        if hasattr(frame_type, "fields_"):
-            return getattr(frame_type, "fields_")  # underscored to avoid naming collision
-        return getattr(frame_type, "fields")
+        if hasattr(frame_type, "structure_"):
+            return getattr(frame_type, "structure_")  # underscored to avoid naming collision
+        return getattr(frame_type, "structure")
 
     def _get_a_name(self, override: Optional[str]) -> str:
         """Get name or temporary name for a field"""
