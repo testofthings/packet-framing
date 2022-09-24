@@ -146,10 +146,14 @@ class RawField(FieldBase[F, RawData]):
         return value
 
     def get_bit_length(self, frame: 'Frame[F]') -> int:
-        return self.get(frame).bit_length()
+        if self.fixed_bit_length >= 0:
+            return self.fixed_bit_length
+        # do not know my length without encoding/decoding it
+        v: RawData = frame.get(self)
+        return v.bit_length()
 
     def get_byte_length(self, frame: 'Frame[F]') -> int:
-        return self.get(frame).byte_length()
+        return self.get_bit_length(frame) // 8
 
     def encode(self, value: RawData, state: EncodingState) -> RawData:
         return value
