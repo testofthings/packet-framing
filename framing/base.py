@@ -45,6 +45,7 @@ class FieldOffset:
 class FieldBase(typing.Generic[F, T]):
     """Base class for fields"""
     def __init__(self, type_name: str, default_value: T):
+        self.field_name = "field?"
         self.type_name = type_name
         self.default_value = default_value
         self.fixed_bit_length = -1
@@ -87,7 +88,7 @@ class FieldBase(typing.Generic[F, T]):
         return self
 
     def __repr__(self):
-        return self.type_name
+        return f"{self.field_name}: {self.type_name}"
 
 
 class FrameBackend:
@@ -256,6 +257,7 @@ class Structure(typing.Generic[F]):
         for n, v in old_names.items():
             nn = i_names[v] if n.startswith("__") else n
             self.fields[nn] = v
+            v.field_name = nn
         self.built = True
 
         # resolve offsets
