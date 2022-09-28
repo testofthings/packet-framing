@@ -69,16 +69,35 @@ class DissectorBackend(FrameBackend):
     """Backend to dissect frame from raw data"""
     def __init__(self, frame: Frame, data: RawData):
         super().__init__(frame)
+        self.is_decoding = True
         self.data = data
         self.cache: Dict[FieldBase, Any] = {}
 
     def get(self, field: FieldBase[F, T]) -> T:
         v = self.cache.get(field)
         if v is None:
-            bit_offset = field.offset.get_offset(self)
-            v = field.decode(self.data.tailBits(bit_offset), self)
+            bit_offset = self._field_offset(field)
+            data = self.data.tailBits(bit_offset)
+            if field.decode_length_procedure:
+                f_len = field.decode_length_procedure(self.frame)
+                data = data.subBlockBits(0, f_len)
+            v = field.decode(data, self)
             self.cache[field] = v
         return v
+
+    def _field_offset(self, field: FieldBase) -> int:
+        off = field.offset.fixed_bit_offset
+        prefix = field.offset.prefix
+        if prefix:
+            # resolve prefix dynamic length
+            off += prefix.get_offset(self)
+            if prefix.variable_field:
+                if prefix.variable_field.decode_length_procedure:
+                    f_len = prefix.variable_field.decode_length_procedure(self.frame)
+                    off += f_len
+                else:
+                    off += prefix.variable_field.get_bit_length(self.frame)
+        return off
 
     def set(self, field: FieldBase[F, T], value: T) -> Self:
         raise NotImplementedError("set() not supported")
@@ -86,3 +105,6 @@ class DissectorBackend(FrameBackend):
     def encode(self) -> RawData:
         bit_length = self.frame.get_bit_length()
         return self.data.tailBits(bit_length)
+
+    def input_data(self) -> RawData:
+        return self.data

@@ -26,10 +26,13 @@ class FieldOffset:
         self.variable_field: Optional[FieldBase] = field
 
     def get_offset(self, backend: 'FrameBackend') -> int:
-        off = self.prefix.get_offset(backend) if self.prefix else 0
-        off += self.fixed_bit_offset
-        if self.variable_field:
-            off += self.variable_field.get_bit_length(backend.frame)
+        off = self.fixed_bit_offset
+        prefix = self.prefix
+        if prefix:
+            # resolve prefix dynamic length
+            off += prefix.get_offset(backend)
+            if prefix.variable_field:
+                off += prefix.variable_field.get_bit_length(backend.frame)
         return off
 
     def __repr__(self):
@@ -51,6 +54,7 @@ class FieldBase(typing.Generic[F, T]):
         self.fixed_bit_length = -1
         self.offset = FieldOffset(self)
         self.commit_procedure: Optional[Callable[[F], T]] = None
+        self.decode_length_procedure: Optional[Callable[[F], int]] = None
 
     def get(self, frame: F) -> T:
         return frame.backend.get(self)
@@ -87,6 +91,10 @@ class FieldBase(typing.Generic[F, T]):
         self.commit_procedure = procedure
         return self
 
+    def decode_length(self, procedure: Callable[[F], int]) -> Self:
+        self.decode_length_procedure = procedure
+        return self
+
     def __repr__(self):
         return f"{self.field_name}: {self.type_name}"
 
@@ -96,6 +104,7 @@ class FrameBackend:
     def __init__(self, frame: 'Frame'):
         self.frame = frame
         self.structure = Structure.get_struct(frame)
+        self.is_decoding = False
         if not self.structure.built:
             self.structure.finish_building(frame)
 
@@ -108,6 +117,10 @@ class FrameBackend:
     def encode(self) -> RawData:
         """Encode the frame into bytes"""
         raise NotImplementedError()
+
+    def input_data(self) -> RawData:
+        """Get input data when decoding, empty otherwise"""
+        return Raw.empty
 
 
 class Frame:
@@ -281,7 +294,7 @@ class Structure(typing.Generic[F]):
         def make_procedure(field: FieldBase):
             def procedure(fr: F):
                 value = field.commit_procedure(fr)
-                f.set(fr, value)
+                field.set(fr, value)
             return procedure
         for f in self.fields.values():
             if f.commit_procedure is not None:
