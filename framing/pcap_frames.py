@@ -4,12 +4,9 @@ from framing.frames import *
 # https://datatracker.ietf.org/doc/id/draft-gharris-opsawg-pcap-00.html
 
 
-class PCAPFrame(Frame):
-    structure = Structure['PCAPFrame']()
+class PCAP(Frame):
+    structure = Structure['PCAP']()
 
-
-class PCAP:
-    structure = PCAPFrame.structure
     Magic_Number = structure.raw(bytes=4)
     Major_Version = structure.integer(bytes=2)
     Minor_Version = structure.integer(bytes=2)

@@ -204,6 +204,10 @@ class FileData(ByteData):
         self.file = file
         self.file_path = file_path
 
+    def close(self):
+        """Close the file"""
+        self.file.close()
+
 
 class Raw:
     """Raw data factory"""
