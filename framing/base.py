@@ -155,7 +155,7 @@ class RawField(FieldBase[F, RawData]):
 
     def decode(self, data: RawData, backend: 'FrameBackend') -> RawData:
         if self.fixed_bit_length < 0:
-            raise data  # read it all
+            return data  # read it all
         return data.subBlockBits(0, self.fixed_bit_length)
 
 

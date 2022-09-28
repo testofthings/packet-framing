@@ -61,12 +61,13 @@ class RawData:
     def __eq__(self, other):
         if not isinstance(other, RawData):
             return False
-        if self.bit_length() < 0 or other.bit_length() < 0:
-            return False  # streams cannot be compared
-        for i in range(0, self.byte_length()):
+        blen = self.bit_length()
+        if blen < 0 or other.bit_length() < 0 or (blen != other.bit_length()):
+            return False  # streams cannot be compared or different length
+        for i in range(0, blen // 8):
             if self.octet(i) != other.octet(i):
                 return False
-        for i in range(self.byte_length() * 8, self.bit_length()):
+        for i in range(blen // 8 * 8, blen):
             if self.bit(i) != other.bit(i):
                 return False
         return True
