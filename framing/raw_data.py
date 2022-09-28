@@ -1,4 +1,6 @@
-from typing import Iterable, List
+import mmap
+import pathlib
+from typing import Iterable, List, BinaryIO
 
 
 class RawData:
@@ -94,7 +96,7 @@ class RawData:
 
 class ByteData(RawData):
     """Bytes"""
-    def __init__(self, data: bytes):
+    def __init__(self, data):
         self.data = data
 
     def bit_length(self) -> int:
@@ -196,6 +198,13 @@ class ZeroData(RawData):
         return 0
 
 
+class FileData(ByteData):
+    def __init__(self, file: BinaryIO, file_path: pathlib.Path):
+        super().__init__(mmap.mmap(file.fileno(), 0, mmap.MAP_PRIVATE))
+        self.file = file
+        self.file_path = file_path
+
+
 class Raw:
     """Raw data factory"""
 
@@ -227,3 +236,7 @@ class Raw:
             return cs[0]
         return MergedData(cs)
 
+    @classmethod
+    def file(cls, file_path: pathlib.Path) -> FileData:
+        f = file_path.open("rb")
+        return FileData(f, file_path)

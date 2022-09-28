@@ -71,6 +71,7 @@ class DissectorBackend(FrameBackend):
         super().__init__(frame)
         self.is_decoding = True
         self.data = data
+        self.length_cache: Dict[FieldBase, int] = {}
         self.cache: Dict[FieldBase, Any] = {}
 
     def get(self, field: FieldBase[F, T]) -> T:

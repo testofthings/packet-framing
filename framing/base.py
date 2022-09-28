@@ -156,6 +156,7 @@ class RawField(FieldBase[F, RawData]):
     def get_bit_length(self, frame: F) -> int:
         if self.fixed_bit_length >= 0:
             return self.fixed_bit_length
+
         # do not know my length without encoding/decoding it
         v: RawData = frame.backend.get(self)
         return v.bit_length()
