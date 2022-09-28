@@ -278,12 +278,14 @@ class Structure(typing.Generic[F]):
         self.fields_length.fixed_bit_offset = prefix_offset
 
         # collect commit procedures from fields
+        def make_procedure(field: FieldBase):
+            def procedure(fr: F):
+                value = field.commit_procedure(fr)
+                f.set(fr, value)
+            return procedure
         for f in self.fields.values():
             if f.commit_procedure is not None:
-                def procedure(fr: F):
-                    value = f.commit_procedure(fr)
-                    f.set(fr, value)
-                self.commit_procedures.append(procedure)
+                self.commit_procedures.append(make_procedure(f))
 
     def __repr__(self) -> str:
         r = []
