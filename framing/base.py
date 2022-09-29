@@ -117,7 +117,8 @@ class FrameBackend:
     def set(self, field: FieldBase[F, T], value: T) -> Self:
         raise NotImplementedError("Editing not allowed with this backend")
 
-    def factory(self) -> Callable[['Frame'], 'FrameBackend']:
+    def factory(self, decode: RawData = None) -> Callable[['Frame'], 'FrameBackend']:
+        """Create a fresh backend for given frame"""
         raise NotImplementedError()
 
     def encode(self) -> RawData:
@@ -234,6 +235,8 @@ class SubStructureField(FieldBase[F, FT]):
         enc = value.encode()
         return enc
 
+    def decode(self, data: RawData, backend: 'FrameBackend') -> FT:
+        return self.sub_type(backend.factory(decode=data))
 
 class Structure(typing.Generic[F]):
     """Structure definition for a frame"""

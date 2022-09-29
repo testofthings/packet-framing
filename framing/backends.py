@@ -7,49 +7,9 @@ from framing.base import Frame, FrameBackend, FieldBase, F, T, EncodingState
 from framing.raw_data import RawData, Raw
 
 
-class ComposingBackend(FrameBackend):
-    """Backend to compose a frame"""
+class BackendImplementation(FrameBackend):
     def __init__(self, frame: Frame):
         super().__init__(frame)
-        self.changes: Dict[FieldBase, Any] = {}
-
-    def get(self, field: FieldBase[F, T]) -> T:
-        v = self.changes.get(field)
-        if v is None:
-            v = field.get_default_value(self.frame)
-            self.changes[field] = v
-        return v
-
-    def set(self, field: FieldBase[F, T], value: T) -> Self:
-        self.changes[field] = value
-        return self
-
-    def factory(self) -> Callable[[Frame], FrameBackend]:
-        def f(frame: Frame):
-            return ComposingBackend(frame)
-        return f
-
-    def copy(self) -> Self:
-        n_frame = copy.copy(self.frame)
-        c = ComposingBackend(n_frame)
-        n_frame.backend = c
-        c.changes.update(self.changes)
-        return c
-
-    def __repr__(self):
-        # create a copy to show, so that we do not update state
-        c = self.copy()
-        c.encode()
-        return c.pretty_print()
-
-    def encode(self) -> RawData:
-        self.structure.commit(self.frame)
-        f_list = []
-        state = EncodingState()
-        for f in self.structure.fields.values():
-            v = self.get(f)
-            f_list.append(f.encode(v, state))
-        return Raw.merge(f_list)
 
     def pretty_print(self, indent='') -> str:
         r = []
@@ -81,13 +41,57 @@ class ComposingBackend(FrameBackend):
         return "\n".join(r)
 
 
-class DissectorBackend(FrameBackend):
+class ComposingBackend(BackendImplementation):
+    """Backend to compose a frame"""
+    def __init__(self, frame: Frame):
+        super().__init__(frame)
+        self.changes: Dict[FieldBase, Any] = {}
+
+    def get(self, field: FieldBase[F, T]) -> T:
+        v = self.changes.get(field)
+        if v is None:
+            v = field.get_default_value(self.frame)
+            self.changes[field] = v
+        return v
+
+    def set(self, field: FieldBase[F, T], value: T) -> Self:
+        self.changes[field] = value
+        return self
+
+    def factory(self, decode: RawData = None) -> Callable[[Frame], FrameBackend]:
+        def f(frame: Frame):
+            return ComposingBackend(frame)
+        return f
+
+    def encode(self) -> RawData:
+        self.structure.commit(self.frame)
+        f_list = []
+        state = EncodingState()
+        for f in self.structure.fields.values():
+            v = self.get(f)
+            f_list.append(f.encode(v, state))
+        return Raw.merge(f_list)
+
+    def __repr__(self):
+        # create a copy to show, so that we do not update state
+        c = self.copy()
+        c.encode()
+        return c.pretty_print()
+
+    def copy(self) -> Self:
+        n_frame = copy.copy(self.frame)
+        c = ComposingBackend(n_frame)
+        n_frame.backend = c
+        c.changes.update(self.changes)
+        return c
+
+
+class DissectorBackend(BackendImplementation):
     """Backend to dissect frame from raw data"""
     def __init__(self, frame: Frame, data: RawData):
         super().__init__(frame)
         self.is_decoding = True
         self.data = data
-        self.length_cache: Dict[FieldBase, int] = {}
         self.cache: Dict[FieldBase, Any] = {}
 
     def get(self, field: FieldBase[F, T]) -> T:
@@ -120,9 +124,31 @@ class DissectorBackend(FrameBackend):
     def set(self, field: FieldBase[F, T], value: T) -> Self:
         raise NotImplementedError("set() not supported")
 
+    def factory(self, decode: RawData = None) -> Callable[[Frame], FrameBackend]:
+        def f(frame: Frame):
+            if decode is None:
+                return ComposingBackend(frame)
+            return DissectorBackend(frame, decode)
+        return f
+
     def encode(self) -> RawData:
         bit_length = self.frame.get_bit_length()
         return self.data.tailBits(bit_length)
 
     def input_data(self) -> RawData:
         return self.data
+
+    def __repr__(self):
+        # create a copy to show, so that we do not update state
+        c = self.copy()
+        return c.pretty_print()
+
+    def copy(self) -> Self:
+        # do not read more data for printing
+        limited_data = self.data.subBlockBits(0, self.data.bits_available())
+
+        n_frame = copy.copy(self.frame)
+        c = DissectorBackend(n_frame, limited_data)
+        n_frame.backend = c
+        c.cache.update(self.cache)
+        return c
