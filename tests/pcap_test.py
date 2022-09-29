@@ -25,6 +25,8 @@ def test_pcap():
     assert PacketRecord.Captured_Packet_length[records[1]] == 2
     assert PacketRecord.Captured_Packet_length[records[2]] == 3
 
+    assert PacketRecord.Original_Packet_length[records[2]] == 3
+
 
 def test_pcap_decode():
     b = Raw.file(pathlib.Path("samples/sample-1.pcap"))

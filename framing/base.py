@@ -52,23 +52,11 @@ class Calculator:
 
     def pull(self, backend: 'FrameBackend') -> int:
         """Pull value from source"""
-        raise NotImplementedError()
+        return self.next_step.pull(backend)
 
     def push(self, backend: 'FrameBackend', value: int):
         """Push value to source"""
-        pass
-
-
-class Multiplier(Calculator):
-    def __init__(self, multiplier: int, next_step: Calculator):
-        super().__init__(next_step)
-        self.multiplier = multiplier
-
-    def pull(self, backend: 'FrameBackend') -> int:
-        return self.next_step.pull(backend) * self.multiplier
-
-    def push(self, backend: 'FrameBackend', value: int):
-        self.next_step.push(backend, value // self.multiplier)
+        self.next_step.push(backend, value)
 
 
 class FieldBase(typing.Generic[F, T]):

@@ -1,10 +1,41 @@
 from framing.base import *
 
 
+class Multiplier(Calculator):
+    def __init__(self, multiplier: int, next_step: Calculator):
+        super().__init__(next_step)
+        self.multiplier = multiplier
+
+    def pull(self, backend: 'FrameBackend') -> int:
+        return self.next_step.pull(backend) * self.multiplier
+
+    def push(self, backend: 'FrameBackend', value: int):
+        self.next_step.push(backend, value // self.multiplier)
+
+
+class CopyToField(Calculator):
+    def __init__(self, field: 'IntField', next_step: Calculator):
+        super().__init__(next_step)
+        self.field = field
+
+    def push(self, backend: 'FrameBackend', value: int):
+        backend.set(self.field, value)
+        self.next_step.push(backend, value)
+
+
+class ValueOf:
+    def __init__(self, field: 'IntField'):
+        self.end: Calculator = field
+
+    def copy_to(self, field: 'IntField') -> Self:
+        self.end = CopyToField(field, self.end)
+        return self
+
+
 class ConfigurableField(FieldBase[F, T]):
 
-    def length_by(self, source: Calculator) -> Self:
-        self.length_resolver = Multiplier(8, source)
+    def length_by(self, value: ValueOf) -> Self:
+        self.length_resolver = Multiplier(8, value.end)
         return self
 
     def at_commit(self, procedure: Callable[[F], T]) -> Self:

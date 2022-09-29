@@ -1,6 +1,6 @@
 from framing.base import Frame
 from framing.codecs import IntegerFormat
-from framing.fields import Structure, Sequence
+from framing.fields import Structure, Sequence, ValueOf
 from framing.raw_data import Raw
 
 # https://datatracker.ietf.org/doc/id/draft-gharris-opsawg-pcap-00.html
@@ -27,7 +27,7 @@ class PacketRecord(Frame):
     Timestamp_2 = structure.integer(Int.bytes(4))
     Captured_Packet_length = structure.integer(Int.bytes(4))
     Original_Packet_length = structure.integer(Int.bytes(4))
-    Packet_Data = structure.raw().length_by(Captured_Packet_length)
+    Packet_Data = structure.raw().length_by(ValueOf(Captured_Packet_length).copy_to(Original_Packet_length))
 
 
 class PCAPFile(Frame):
