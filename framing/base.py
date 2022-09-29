@@ -45,6 +45,24 @@ class FieldOffset:
         return " + ".join(r)
 
 
+class Calculator:
+    """Integer value calculator"""
+    def __init__(self, next_step: Optional['Calculator']):
+        self.next_step = next_step
+
+    def pull(self, backend: 'FrameBackend') -> int:
+        raise NotImplementedError()
+
+
+class Multiplier(Calculator):
+    def __init__(self, multiplier: int, next_step: Calculator):
+        super().__init__(next_step)
+        self.multiplier = multiplier
+
+    def pull(self, backend: 'FrameBackend') -> int:
+        return self.next_step.pull(backend) * self.multiplier
+
+
 class FieldBase(typing.Generic[F, T]):
     """Base class for fields"""
     def __init__(self, type_name: str, default_value: T):
@@ -54,6 +72,7 @@ class FieldBase(typing.Generic[F, T]):
         self.fixed_bit_length = -1
         self.offset = FieldOffset(self)
         self.commit_procedure: Optional[Callable[[F], T]] = None
+        self.length_resolver: Optional[Calculator] = None
         self.decode_length_procedure: Optional[Callable[[F], int]] = None
         self.consumed_by: Optional[FieldBase[F, Any]] = None
 
@@ -90,6 +109,10 @@ class FieldBase(typing.Generic[F, T]):
         """A string representation of current value, for unit tests"""
         enc = self.encode(self.get(frame), EncodingState())
         return f"{enc}"
+
+    def length_by(self, field: 'IntField[F]') -> Self:
+        self.length_resolver = Multiplier(8, field)
+        return self
 
     def at_commit(self, procedure: Callable[[F], T]) -> Self:
         self.commit_procedure = procedure
@@ -180,7 +203,7 @@ class RawField(FieldBase[F, RawData]):
         return data.subBlockBits(0, self.fixed_bit_length)
 
 
-class IntField(FieldBase[F, int]):
+class IntField(FieldBase[F, int], Calculator):
     """Integer field"""
     def __init__(self, codec: IntegerCodec, default_value: int):
         super().__init__("int", default_value)
@@ -200,8 +223,11 @@ class IntField(FieldBase[F, int]):
     def encode(self, value: int, state: EncodingState) -> RawData:
         return self.codec.encode(value)
 
-    def decode(self, data: RawData, backend: 'FrameBackend') -> T:
+    def decode(self, data: RawData, backend: 'FrameBackend') -> int:
         return self.codec.decode(data)
+
+    def pull(self, backend: FrameBackend) -> int:
+        return backend.get(self)
 
 
 class StringField(FieldBase[F, str]):

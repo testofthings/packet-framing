@@ -23,6 +23,6 @@ def test_pcap_decode():
     assert FileHeader.SnapLen[pcap_hdr] == 0xffff
 
     records = PCAPFile.Packet_Records[pcap_hdr]
-
+    assert len(records) == 2349
     b.close()
 

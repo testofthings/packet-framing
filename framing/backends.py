@@ -102,6 +102,9 @@ class DissectorBackend(BackendImplementation):
             if field.decode_length_procedure:
                 f_len = field.decode_length_procedure(self.frame)
                 data = data.subBlockBits(0, f_len)
+            if field.length_resolver:
+                f_len = field.length_resolver.pull(self)
+                data = data.subBlockBits(0, f_len)
             v = field.decode(data, self)
             self.cache[field] = v
         return v

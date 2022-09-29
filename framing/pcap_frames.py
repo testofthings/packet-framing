@@ -25,7 +25,7 @@ class PacketRecord(Frame):
     Timestamp_2 = structure.integer(Int.bytes(4))
     Captured_Packet_length = structure.integer(Int.bytes(4))
     Original_Packet_length = structure.integer(Int.bytes(4))
-    Packet_Data = structure.raw()
+    Packet_Data = structure.raw().length_by(Captured_Packet_length)
 
 
 class PCAPFile(Frame):
