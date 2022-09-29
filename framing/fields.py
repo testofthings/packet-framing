@@ -1,3 +1,5 @@
+from typing import Iterator
+
 from framing.base import *
 
 
@@ -152,6 +154,10 @@ class Sequence(ConfigurableField[F, List[FT]]):
             raise NotImplementedError("Only sub-structure sequences supported, now")
             # self.item_fixed_bit_length = self.item_codec.get_fixed_bit_length() if item_codec else -1
         sub.consumed_by = self
+
+    def iterate(self, frame: F) -> Iterator[FT]:
+        """Get item by index"""
+        return frame.backend.iterate(self, self.sub)
 
     def set_repeat(self, frame: F, count: int) -> List[F]:
         """Set value by repeating item given times"""

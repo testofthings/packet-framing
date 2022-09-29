@@ -41,3 +41,18 @@ def test_pcap_decode():
     assert len(records) == 2349
     b.close()
 
+
+def test_pcap_decode_payload():
+    b = Raw.file(pathlib.Path("samples/sample-1.pcap"))
+    pcap = PCAPFile(Frames.dissect(b))
+
+    c = 0
+    off = PCAPFile.File_Header[pcap].get_byte_length()
+    for rec in PCAPFile.Packet_Records.iterate(pcap):
+        c += 1
+        off += rec.get_byte_length()
+    b.close()
+
+    assert c == 2349
+    assert off == 1607365
+

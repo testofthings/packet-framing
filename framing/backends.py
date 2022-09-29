@@ -1,10 +1,10 @@
 import copy
-from typing import Dict, Any, Callable
+from typing import Dict, Any, Callable, List, Iterator, Optional
 
 from typing_extensions import Self
 
 from framing.base import FrameBackend, Frame, EncodingState, FieldBase, F, T
-from framing.fields import Sequence
+from framing.fields import Sequence, FT
 from framing.raw_data import RawData, Raw
 
 
@@ -142,6 +142,25 @@ class DissectorBackend(BackendImplementation):
                 return ComposingBackend(frame)
             return DissectorBackend(frame, decode)
         return f
+
+    def iterate(self, sequence_field: FieldBase, item_field: FieldBase[F, FT]) -> Iterator[FT]:
+        backend = self
+        data = self.data
+
+        class ItemIterator(Iterator[FT]):
+            def __init__(self, offset: int):
+                self.offset = offset
+
+            def __next__(self) -> Optional[FT]:
+                n_data = data.tailBits(self.offset)
+                if n_data.octet(0) < 0:
+                    raise StopIteration()
+                v = item_field.decode(n_data, backend)
+                self.offset += v.get_bit_length()
+                return v
+
+        off = self._field_offset(sequence_field)
+        return ItemIterator(off)
 
     def encode(self) -> RawData:
         bit_length = self.frame.get_bit_length()
