@@ -118,18 +118,6 @@ class FieldBase(typing.Generic[F, T]):
         enc = self.encode(self.get(frame), EncodingState())
         return f"{enc}"
 
-    def length_by(self, field: 'IntField[F]') -> Self:
-        self.length_resolver = Multiplier(8, field)
-        return self
-
-    def at_commit(self, procedure: Callable[[F], T]) -> Self:
-        self.commit_procedure = procedure
-        return self
-
-    def decode_length(self, procedure: Callable[[F], int]) -> Self:
-        self.decode_length_procedure = procedure
-        return self
-
     def __repr__(self):
         return f"{self.field_name}: {self.type_name}"
 

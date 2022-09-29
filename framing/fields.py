@@ -1,7 +1,22 @@
 from framing.base import *
 
 
-class RawField(FieldBase[F, RawData]):
+class ConfigurableField(FieldBase[F, T]):
+
+    def length_by(self, source: Calculator) -> Self:
+        self.length_resolver = Multiplier(8, source)
+        return self
+
+    def at_commit(self, procedure: Callable[[F], T]) -> Self:
+        self.commit_procedure = procedure
+        return self
+
+    def decode_length(self, procedure: Callable[[F], int]) -> Self:
+        self.decode_length_procedure = procedure
+        return self
+
+
+class RawField(ConfigurableField[F, RawData]):
     """Raw data field"""
     def __init__(self, default_value: RawData):
         super().__init__("raw", default_value)
@@ -27,7 +42,7 @@ class RawField(FieldBase[F, RawData]):
         return data.subBlockBits(0, self.fixed_bit_length)
 
 
-class IntField(FieldBase[F, int], Calculator):
+class IntField(ConfigurableField[F, int], Calculator):
     """Integer field"""
     def __init__(self, codec: IntegerCodec, default_value: int):
         super().__init__("int", default_value)
@@ -57,7 +72,7 @@ class IntField(FieldBase[F, int], Calculator):
         backend.set(self, value)
 
 
-class StringField(FieldBase[F, str]):
+class StringField(ConfigurableField[F, str]):
     """String field"""
     def __init__(self, default_value: str):
         super().__init__("str", default_value)
@@ -69,7 +84,7 @@ class StringField(FieldBase[F, str]):
 FT = typing.TypeVar("FT", bound=Frame)
 
 
-class SubStructureField(FieldBase[F, FT]):
+class SubStructureField(ConfigurableField[F, FT]):
     """String field"""
     def __init__(self, sub_type: Type[FT]):
         super().__init__("sub", None)
@@ -94,7 +109,7 @@ class SubStructureField(FieldBase[F, FT]):
         return self.sub_type(backend.factory(decode=data))
 
 
-class Sequence(FieldBase[F, List[FT]]):
+class Sequence(ConfigurableField[F, List[FT]]):
     def __init__(self, sub: FieldBase[F, FT]):
         super().__init__("sequence", [])
         self.sub = sub
