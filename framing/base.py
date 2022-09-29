@@ -1,10 +1,10 @@
 import inspect
-from typing import Optional, Callable, List, Tuple, Type
 import typing
+from typing import Optional, Callable, List, Type
 
 from typing_extensions import Self
 
-from framing.codecs import IntegerCodec, FixedLittleEndianCodec, IntegerFormat
+from framing.codecs import IntegerCodec, IntegerFormat
 from framing.raw_data import Raw, RawData
 
 # Frame type

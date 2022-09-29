@@ -3,7 +3,7 @@ from framing.frames import *
 
 # https://datatracker.ietf.org/doc/id/draft-gharris-opsawg-pcap-00.html
 
-Int = IntegerFormat(little_end=True)  # little endian integers
+Int = IntegerFormat().big_endian()  # big endian integers
 
 
 class FileHeader(Frame):

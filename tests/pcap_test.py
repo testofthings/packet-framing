@@ -16,6 +16,7 @@ def test_pcap_decode():
     pcap = PCAPFile(Frames.dissect(b))
     pcap_hdr = PCAPFile.File_Header[pcap]
     assert FileHeader.Magic_Number[pcap_hdr] == Raw.hex("D4C3B2A1")
-    assert FileHeader.Major_Version[pcap_hdr] == 4
+    assert FileHeader.Major_Version[pcap_hdr] == 2
+    assert FileHeader.Minor_Version[pcap_hdr] == 4
     b.close()
 
