@@ -96,29 +96,27 @@ class RawData:
 
 class ByteData(RawData):
     """Bytes"""
-    def __init__(self, data):
+    def __init__(self, data, byte_start: int, byte_length: int):
         self.data = data
+        self.start = byte_start
+        self.length = byte_length
 
     def bit_length(self) -> int:
-        return len(self.data) * 8
+        return self.length * 8
 
     def byte_length(self) -> int:
-        return len(self.data)
+        return self.length
 
     def octet(self, byte_offset: int) -> int:
-        return self.data[byte_offset]
+        if byte_offset < self.length:
+            return self.data[self.start + byte_offset]
+        return -1
 
     def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
-        if byte_offset == 0 and byte_length == len(self.data):
-            return self
-        return Raw.bytes(self.data[byte_offset:byte_offset + byte_length])
+        return ByteData(self.data, self.start + byte_offset, byte_length)
 
     def tailBytes(self, byte_offset: int) -> 'RawData':
-        if byte_offset == 0:
-            return self
-        if byte_offset >= len(self.data):
-            return Raw.empty
-        return Raw.bytes(self.data[byte_offset:])
+        return ByteData(self.data, self.start + byte_offset, self.length - byte_offset)
 
 
 class MergedData(RawData):
@@ -200,7 +198,8 @@ class ZeroData(RawData):
 
 class FileData(ByteData):
     def __init__(self, file: BinaryIO, file_path: pathlib.Path):
-        super().__init__(mmap.mmap(file.fileno(), 0, mmap.MAP_PRIVATE))
+        b = mmap.mmap(file.fileno(), 0, mmap.MAP_PRIVATE)
+        super().__init__(b, 0, len(b))
         self.file = file
         self.file_path = file_path
 
@@ -216,15 +215,16 @@ class Raw:
 
     @classmethod
     def bytes(cls, data: bytes) -> RawData:
-        return ByteData(data)
+        return ByteData(data, 0, len(data))
 
     @classmethod
     def string(cls, value: str, encoding='ascii'):
-        return ByteData(value.encode(encoding))
+        return cls.bytes(value.encode(encoding))
 
     @classmethod
     def hex(cls, hex_string: str) -> RawData:
-        return ByteData(bytes.fromhex(hex_string))
+        b = bytes.fromhex(hex_string)
+        return ByteData(b, 0, len(b))
 
     @classmethod
     def zeroes(cls, byte_length: int = None, bit_length: int = None) -> RawData:

@@ -34,4 +34,5 @@ if __name__ == "__main__":
             print(f"{Frames.dump(rec, bit_offset=offset, width=wid, indent='  ')}")
             offset += rec.get_bit_length()
 
+        print(f"Total length: {offset // 8} bytes")
 
