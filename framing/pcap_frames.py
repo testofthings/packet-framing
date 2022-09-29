@@ -3,26 +3,28 @@ from framing.frames import *
 
 # https://datatracker.ietf.org/doc/id/draft-gharris-opsawg-pcap-00.html
 
+Int = IntegerFormat(little_end=True)  # little endian integers
+
 
 class FileHeader(Frame):
     structure = Structure['FileHeader']()
 
-    Magic_Number = structure.raw(bytes=4)
-    Major_Version = structure.integer(bytes=2)
-    Minor_Version = structure.integer(bytes=2)
+    Magic_Number = structure.raw(bytes=4, default=Raw.hex("D4C3B2A1"))
+    Major_Version = structure.integer(Int.bytes(2), default=2)
+    Minor_Version = structure.integer(Int.bytes(2), default=1)
     Reserved1 = structure.raw(bytes=4)
     Reserved2 = structure.raw(bytes=4)
-    SnapLen = structure.integer(bytes=4)
-    LinkType = structure.integer(bytes=4)
+    SnapLen = structure.integer(Int.bytes(4))
+    LinkType = structure.integer(Int.bytes(4))
 
 
 class PacketRecord(Frame):
     structure = Structure['PacketRecord']()
 
-    Timestamp_Sec = structure.integer(bytes=4)
-    Timestamp_S = structure.integer(bytes=4)
-    Captured_Packet_length = structure.integer(bytes=4)
-    Original_Packet_length = structure.integer(bytes=4)
+    Timestamp_Sec = structure.integer(Int.bytes(4))
+    Timestamp_S = structure.integer(Int.bytes(4))
+    Captured_Packet_length = structure.integer(Int.bytes(4))
+    Original_Packet_length = structure.integer(Int.bytes(4))
     Packet_Data = structure.raw()
 
 

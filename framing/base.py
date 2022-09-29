@@ -4,7 +4,7 @@ import typing
 
 from typing_extensions import Self
 
-from framing.codecs import IntegerCodec, FixedLittleEndianCodec
+from framing.codecs import IntegerCodec, FixedLittleEndianCodec, IntegerFormat
 from framing.raw_data import Raw, RawData
 
 # Frame type
@@ -238,6 +238,7 @@ class SubStructureField(FieldBase[F, FT]):
     def decode(self, data: RawData, backend: 'FrameBackend') -> FT:
         return self.sub_type(backend.factory(decode=data))
 
+
 class Structure(typing.Generic[F]):
     """Structure definition for a frame"""
     def __init__(self):
@@ -262,12 +263,10 @@ class Structure(typing.Generic[F]):
         self.fields[fn] = f
         return f
 
-    def integer(self, bits: int = None, bytes: int = None, default=0, name: str = None) -> IntField[F]:
+    def integer(self, int_format: IntegerFormat, default=0, name: str = None) -> IntField[F]:
         fn = self._get_a_name(name)
-        if bytes is not None:
-            f = IntField(FixedLittleEndianCodec(bytes), default)
-        else:
-            raise Exception("Only supporting full-byte integers now")
+        codec = int_format.create_codec()
+        f = IntField(codec, default)
         self.fields[fn] = f
         return f
 

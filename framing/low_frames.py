@@ -1,4 +1,5 @@
 from framing.base import Structure, Frame
+from framing.codecs import IntegerFormat
 from framing.raw_data import Raw
 
 
@@ -7,7 +8,7 @@ class EthernetII(Frame):
 
     destination = structure.raw(bytes=6)
     source = structure.raw(bytes=6)
-    type = structure.integer(bytes=2)
+    type = structure.integer(IntegerFormat(bytes=2))
     data = structure.raw()
     padding = structure.raw()
     crc_checksum = structure.raw(bytes=4)

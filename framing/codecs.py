@@ -1,3 +1,5 @@
+from typing_extensions import Self
+
 from framing.raw_data import RawData, Raw
 
 
@@ -46,9 +48,30 @@ class FixedLittleEndianCodec(IntegerCodec):
         return self.length * 8
 
 
-class IntegerCodecs:
-    """Codec factory"""
+class IntegerFormat:
+    """Codec formatter"""
+    def __init__(self, bits=0, bytes=0, little_end: bool = False):
+        self.bit_length = bits or (bytes * 8) or 16
+        self.little_end = little_end
 
-    @classmethod
-    def bits(cls, bits: int) -> IntegerCodec:
-        return IntegerCodec()
+    def bits(self, bits: int) -> Self:
+        self.bit_length = bits
+        return self
+
+    def bytes(self, bytes: int) -> Self:
+        self.bit_length = bytes * 8
+        return self
+
+    def little_end(self, flag=True) -> Self:
+        self.little_end = flag
+        return self
+
+    def big_end(self, flag=True) -> Self:
+        self.little_end = not flag
+        return self
+
+    def create_codec(self) -> IntegerCodec:
+        if self.bit_length % 8 != 0:
+            raise NotImplementedError("Only full-byte integers supported now")
+        return FixedLittleEndianCodec(byte_length=self.bit_length // 8)
+
