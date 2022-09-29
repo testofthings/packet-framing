@@ -7,8 +7,10 @@ from framing.raw_data import Raw
 
 def test_pcap():
     pcap = PCAPFile(Frames.compose())
-    as_str = f"{pcap}"
     pcap_hdr = PCAPFile.File_Header[pcap]
+    assert FileHeader.Magic_Number[pcap_hdr] == Raw.hex("D4C3B2A1")
+    assert FileHeader.Major_Version[pcap_hdr] == 2
+    assert FileHeader.Minor_Version[pcap_hdr] == 4
 
 
 def test_pcap_decode():
@@ -18,5 +20,6 @@ def test_pcap_decode():
     assert FileHeader.Magic_Number[pcap_hdr] == Raw.hex("D4C3B2A1")
     assert FileHeader.Major_Version[pcap_hdr] == 2
     assert FileHeader.Minor_Version[pcap_hdr] == 4
+    assert FileHeader.SnapLen[pcap_hdr] == 0xffff
     b.close()
 
