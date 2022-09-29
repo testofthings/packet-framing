@@ -88,7 +88,7 @@ class RawData:
             for i in range(0, wid):
                 octet = self.octet(off + i)
                 h_line.append(f"{octet:02x}")
-                c_line.append(chr(octet) if 32 < octet < 128 else ".")
+                c_line.append(chr(octet) if 32 < octet < 127 else ".")
             line = " ".join(h_line) + " " + "".join(c_line)
             r.append(line)
         return "\n".join(r)
@@ -217,6 +217,10 @@ class Raw:
     @classmethod
     def bytes(cls, data: bytes) -> RawData:
         return ByteData(data)
+
+    @classmethod
+    def string(cls, value: str, encoding='ascii'):
+        return ByteData(value.encode(encoding))
 
     @classmethod
     def hex(cls, hex_string: str) -> RawData:

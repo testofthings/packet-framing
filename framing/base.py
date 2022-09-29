@@ -51,7 +51,12 @@ class Calculator:
         self.next_step = next_step
 
     def pull(self, backend: 'FrameBackend') -> int:
+        """Pull value from source"""
         raise NotImplementedError()
+
+    def push(self, backend: 'FrameBackend', value: int):
+        """Push value to source"""
+        pass
 
 
 class Multiplier(Calculator):
@@ -61,6 +66,9 @@ class Multiplier(Calculator):
 
     def pull(self, backend: 'FrameBackend') -> int:
         return self.next_step.pull(backend) * self.multiplier
+
+    def push(self, backend: 'FrameBackend', value: int):
+        self.next_step.push(backend, value // self.multiplier)
 
 
 class FieldBase(typing.Generic[F, T]):
@@ -229,6 +237,9 @@ class IntField(FieldBase[F, int], Calculator):
     def pull(self, backend: FrameBackend) -> int:
         return backend.get(self)
 
+    def push(self, backend: 'FrameBackend', value: int):
+        backend.set(self, value)
+
 
 class StringField(FieldBase[F, str]):
     """String field"""
@@ -364,7 +375,16 @@ class Structure(typing.Generic[F]):
                 value = field.commit_procedure(fr)
                 field.set(fr, value)
             return procedure
+
+        def make_push_length(field: FieldBase):
+            def procedure(fr: F):
+                value = field.get_bit_length(fr)
+                field.length_resolver.push(fr.backend, value)
+            return procedure
+
         for f in self.fields.values():
+            if f.length_resolver is not None:
+                self.commit_procedures.append(make_push_length(f))
             if f.commit_procedure is not None:
                 self.commit_procedures.append(make_procedure(f))
 

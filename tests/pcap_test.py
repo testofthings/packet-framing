@@ -1,7 +1,7 @@
 import pathlib
 
 from framing.frames import Frames
-from framing.pcap_frames import PCAPFile, FileHeader
+from framing.pcap_frames import PCAPFile, FileHeader, PacketRecord
 from framing.raw_data import Raw
 
 
@@ -14,6 +14,16 @@ def test_pcap():
 
     records = PCAPFile.Packet_Records.set_repeat(pcap, 3)
     assert len(records) == 3
+
+    PacketRecord.Packet_Data[records[0]] = Raw.string("This")
+    PacketRecord.Packet_Data[records[1]] = Raw.string("is")
+    PacketRecord.Packet_Data[records[2]] = Raw.string("fun")
+
+    enc = pcap.encode()
+
+    assert PacketRecord.Captured_Packet_length[records[0]] == 4
+    assert PacketRecord.Captured_Packet_length[records[1]] == 2
+    assert PacketRecord.Captured_Packet_length[records[2]] == 3
 
 
 def test_pcap_decode():
