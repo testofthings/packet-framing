@@ -1,5 +1,5 @@
 import inspect
-from typing import Optional, Callable, List, Tuple
+from typing import Optional, Callable, List, Tuple, Type
 import typing
 
 from typing_extensions import Self
@@ -59,6 +59,9 @@ class FieldBase(typing.Generic[F, T]):
     def get(self, frame: F) -> T:
         return frame.backend.get(self)
 
+    def get_default_value(self, frame: F) -> T:
+        return self.default_value
+
     def __getitem__(self, frame: F) -> T:
         return frame.backend.get(self)
 
@@ -70,11 +73,11 @@ class FieldBase(typing.Generic[F, T]):
         frame.backend.set(self, value)
         return frame
 
-    def get_bit_length(self, frame: F) -> int:
+    def get_bit_length(self, frame: F, value: Optional[T] = None) -> int:
         raise NotImplementedError()
 
-    def get_byte_length(self, frame: F) -> int:
-        return self.get_bit_length(frame) // 8
+    def get_byte_length(self, frame: F, value: Optional[T] = None) -> int:
+        return self.get_bit_length(frame, value) // 8
 
     def encode(self, value: T, state: EncodingState) -> RawData:
         raise NotImplementedError()
@@ -113,6 +116,9 @@ class FrameBackend:
 
     def set(self, field: FieldBase[F, T], value: T) -> Self:
         raise NotImplementedError("Editing not allowed with this backend")
+
+    def factory(self) -> Callable[['Frame'], 'FrameBackend']:
+        raise NotImplementedError()
 
     def encode(self) -> RawData:
         """Encode the frame into bytes"""
@@ -153,16 +159,14 @@ class RawField(FieldBase[F, RawData]):
     def fixed_length(self, bit_length: int):
         self.fixed_bit_length = bit_length
 
-    def get_bit_length(self, frame: F) -> int:
+    def get_bit_length(self, frame: F, value: Optional[RawData] = None) -> int:
         if self.fixed_bit_length >= 0:
             return self.fixed_bit_length
-
+        if value is not None:
+            return value.bit_length()
         # do not know my length without encoding/decoding it
         v: RawData = frame.backend.get(self)
         return v.bit_length()
-
-    def get_byte_length(self, frame: F) -> int:
-        return self.get_bit_length(frame) // 8
 
     def encode(self, value: RawData, state: EncodingState) -> RawData:
         return value
@@ -180,12 +184,12 @@ class IntField(FieldBase[F, int]):
         self.codec = codec
         self.fixed_bit_length = codec.get_fixed_bit_length()
 
-    def get_bit_length(self, frame: F) -> int:
+    def get_bit_length(self, frame: F, value: Optional[int] = None) -> int:
         if self.fixed_bit_length >= 0:
             return self.fixed_bit_length
         return self.codec.get_bit_length(self.get(frame))
 
-    def get_byte_length(self, frame: F) -> int:
+    def get_byte_length(self, frame: F, value: Optional[int] = None) -> int:
         if self.fixed_bit_length >= 0:
             return self.fixed_bit_length // 8
         return self.codec.get_bit_length(self.get(frame)) // 8
@@ -204,6 +208,31 @@ class StringField(FieldBase[F, str]):
 
     def encode(self, value: str, state: EncodingState) -> RawData:
         return Raw.empty  # FIXME
+
+
+FT = typing.TypeVar("FT", bound=Frame)
+
+
+class SubStructureField(FieldBase[F, FT]):
+    """String field"""
+    def __init__(self, sub_type: Type[FT]):
+        super().__init__("sub", None)
+        self.sub_type = sub_type
+        self.sub_structure = Structure.get_struct(sub_type)
+
+    def get_default_value(self, frame: F) -> FT:
+        return self.sub_type(frame.backend.factory())
+
+    def get_bit_length(self, frame: F, value: Optional[FT] = None) -> int:
+        if value is not None:
+            return value.get_bit_length()
+        # must resolve value
+        value = frame.backend.get(self)
+        return value.get_bit_length()
+
+    def encode(self, value: FT, state: EncodingState) -> RawData:
+        enc = value.encode()
+        return enc
 
 
 class Structure(typing.Generic[F]):
@@ -242,6 +271,12 @@ class Structure(typing.Generic[F]):
     def string(self, name: str = None, default="") -> StringField[F]:
         fn = self._get_a_name(name)
         f = StringField(default)
+        self.fields[fn] = f
+        return f
+
+    def sub(self, sub_frame: Type[FT], name: str = None) -> SubStructureField[F, FT]:
+        fn = self._get_a_name(name)
+        f = SubStructureField(sub_frame)
         self.fields[fn] = f
         return f
 

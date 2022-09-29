@@ -1,5 +1,5 @@
 import copy
-from typing import Dict, Any, cast
+from typing import Dict, Any, cast, Callable
 
 from typing_extensions import Self
 
@@ -14,11 +14,20 @@ class ComposingBackend(FrameBackend):
         self.changes: Dict[FieldBase, Any] = {}
 
     def get(self, field: FieldBase[F, T]) -> T:
-        return self.changes.get(field, field.default_value)
+        v = self.changes.get(field)
+        if v is None:
+            v = field.get_default_value(self.frame)
+            self.changes[field] = v
+        return v
 
     def set(self, field: FieldBase[F, T], value: T) -> Self:
         self.changes[field] = value
         return self
+
+    def factory(self) -> Callable[[Frame], FrameBackend]:
+        def f(frame: Frame):
+            return ComposingBackend(frame)
+        return f
 
     def copy(self) -> Self:
         n_frame = copy.copy(self.frame)
@@ -48,10 +57,17 @@ class ComposingBackend(FrameBackend):
         state = EncodingState()
         bit_off = 0
         for n, f in self.structure.fields.items():
+            i_off = bit_off
             v = self.get(f)
+            if isinstance(v, Frame):
+                line = f"{i_off // 8:06x} {indent}"
+                line += n + " " * (name_space - len(n))
+                r.append(line)
+                v_s = f"{v}"
+                r.extend([f"{s[:6]}  {s[6:]}" for s in v_s.split("\n")])
+                continue
             ev = f.encode(v, state)
             sv = ev.dump(always_wide=True).split("\n")
-            i_off = bit_off
             for i in range(0, len(sv)):
                 line = f"{i_off // 8:06x} {indent}"
                 if i == 0:
@@ -61,7 +77,7 @@ class ComposingBackend(FrameBackend):
                 line += sv[i]
                 r.append(line)
                 i_off += 16 * 8
-            bit_off += f.get_bit_length(self.frame)
+            bit_off += f.get_bit_length(self.frame, value=v)
         return "\n".join(r)
 
 
@@ -97,6 +113,7 @@ class DissectorBackend(FrameBackend):
                     f_len = prefix.variable_field.decode_length_procedure(self.frame)
                     off += f_len
                 else:
+                    # NOTE: We could check if value is cached and provide it
                     off += prefix.variable_field.get_bit_length(self.frame)
         return off
 
