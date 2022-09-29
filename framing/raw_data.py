@@ -195,7 +195,7 @@ class ZeroData(RawData):
         return self.length
 
     def octet(self, byte_offset: int) -> int:
-        return 0
+        return 0 if byte_offset < self.length // 8 else -1
 
 
 class FileData(ByteData):

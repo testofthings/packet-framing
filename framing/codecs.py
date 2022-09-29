@@ -1,25 +1,51 @@
+import typing
 from typing_extensions import Self
 
 from framing.raw_data import RawData, Raw
 
 
-class IntegerCodec:
+V = typing.TypeVar("V")
+
+
+class ValueCodec(typing.Generic[V]):
     """Base class for integer codecs"""
-    def encode(self, value: int) -> RawData:
+    def encode(self, value: V) -> RawData:
         """Encode!"""
         raise NotImplementedError()
 
-    def decode(self, data: RawData) -> int:
+    def decode(self, data: RawData) -> V:
         """Decode!"""
         raise NotImplementedError()
 
-    def get_bit_length(self, value: int) -> int:
+    def get_bit_length(self, value: V) -> int:
         """Get bit length for a value"""
         raise NotImplementedError()
 
     def get_fixed_bit_length(self) -> int:
         """Get fixed bit length or -1"""
         return -1
+
+
+class RawCodec(ValueCodec[RawData]):
+    def __init__(self, fixed_bit_length=-1):
+        self.fixed_bit_length = fixed_bit_length
+
+    def encode(self, value: RawData) -> RawData:
+        return value
+
+    def decode(self, data: RawData) -> RawData:
+        return data
+
+    def get_bit_length(self, value: RawData) -> int:
+        return value.bit_length()
+
+    def get_fixed_bit_length(self) -> int:
+        return self.fixed_bit_length
+
+
+class IntegerCodec(ValueCodec[int]):
+    """Base class for integer codecs"""
+    pass
 
 
 class FixedByteIntegerCodec(IntegerCodec):

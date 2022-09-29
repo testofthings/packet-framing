@@ -1,10 +1,10 @@
 import inspect
 import typing
-from typing import Optional, Callable, List, Type
+from typing import Optional, Callable, List, Type, Any
 
 from typing_extensions import Self
 
-from framing.codecs import IntegerCodec, IntegerFormat
+from framing.codecs import IntegerCodec, IntegerFormat, ValueCodec
 from framing.raw_data import Raw, RawData
 
 # Frame type
@@ -55,6 +55,7 @@ class FieldBase(typing.Generic[F, T]):
         self.offset = FieldOffset(self)
         self.commit_procedure: Optional[Callable[[F], T]] = None
         self.decode_length_procedure: Optional[Callable[[F], int]] = None
+        self.consumed_by: Optional[FieldBase[F, Any]] = None
 
     def get(self, frame: F) -> T:
         return frame.backend.get(self)
@@ -146,6 +147,7 @@ class Frame:
         return st.fields_length.get_offset(self.backend) // 8
 
     def encode(self) -> RawData:
+        """Encode the frame into bytes"""
         return self.backend.encode()
 
     def __repr__(self):
@@ -306,6 +308,8 @@ class Structure(typing.Generic[F]):
         old_names = self.fields.copy()
         self.fields.clear()
         for n, v in old_names.items():
+            if v.consumed_by:
+                v = v.consumed_by  # wrapped by another field
             nn = i_names[v] if n.startswith("__") else n
             self.fields[nn] = v
             v.field_name = nn
@@ -343,3 +347,59 @@ class Structure(typing.Generic[F]):
         for n, f in self.fields.items():
             r.append(f"{n}: {f}")
         return "\n".join(r)
+
+
+class Sequence(FieldBase[F, List[FT]]):
+    def __init__(self, sub: FieldBase[F, FT]):
+        super().__init__("sequence", [])
+        self.sub = sub
+        if isinstance(sub, SubStructureField):
+            self.item_type = sub.sub_type
+            self.item_codec = None
+            self.item_fixed_bit_length = -1  # Note: Structure should support this!
+        else:
+            raise NotImplementedError("Only sub-structure sequences supported, now")
+            # self.item_fixed_bit_length = self.item_codec.get_fixed_bit_length() if item_codec else -1
+        sub.consumed_by = self
+
+    def get_default_value(self, frame: F) -> List[FT]:
+        return []
+
+    def get_bit_length(self, frame: F, value: Optional[List[FT]] = None) -> int:
+        if value is not None:
+            if self.item_fixed_bit_length >= 0:
+                return self.item_fixed_bit_length * len(value)
+        else:
+            # must resolve value
+            value = frame.backend.get(self)
+        bit_l = 0
+        for v in value:
+            if isinstance(v, Frame):
+                bit_l += v.get_bit_length()
+            else:
+                bit_l += self.item_codec.get_bit_length(v)
+        return bit_l
+
+    def encode(self, value: List[FT], state: EncodingState) -> RawData:
+        r = []
+        for v in value:
+            if isinstance(v, Frame):
+                r.append(v.encode())
+            else:
+                r.append(self.item_codec.encode(v))
+        return Raw.merge(r)
+
+    def decode(self, data: RawData, backend: 'FrameBackend') -> List[FT]:
+        r = []
+        while True:
+            if data.octet(0) < 0:
+                break  # no more data to read
+            if self.item_codec:
+                v = self.item_codec.decode(data)
+                v_len = self.item_codec.get_bit_length(v)
+            else:
+                v = self.item_type(backend.factory(data))
+                v_len = v.get_bit_length()
+            r.append(v)
+            data = data.tailBits(v_len)
+        return r

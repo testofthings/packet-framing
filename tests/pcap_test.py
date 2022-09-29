@@ -21,5 +21,8 @@ def test_pcap_decode():
     assert FileHeader.Major_Version[pcap_hdr] == 2
     assert FileHeader.Minor_Version[pcap_hdr] == 4
     assert FileHeader.SnapLen[pcap_hdr] == 0xffff
+
+    records = PCAPFile.Packet_Records[pcap_hdr]
+
     b.close()
 

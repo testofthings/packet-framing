@@ -32,7 +32,7 @@ class PCAPFile(Frame):
     structure = Structure['PCAPFile']()
 
     File_Header = structure.sub(FileHeader)
-    # Packet_Records = Sequence(structure.sub(PacketRecord))
+    Packet_Records = Sequence(structure.sub(PacketRecord))
 
 
 
