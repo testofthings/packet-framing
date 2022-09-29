@@ -388,6 +388,18 @@ class Sequence(FieldBase[F, List[FT]]):
             # self.item_fixed_bit_length = self.item_codec.get_fixed_bit_length() if item_codec else -1
         sub.consumed_by = self
 
+    def set_repeat(self, frame: F, count: int) -> List[F]:
+        """Set value by repeating item given times"""
+        v = []
+        if self.item_codec:
+            v = [self.item_codec.default_value()] * count
+        else:
+            factory = frame.backend.factory()
+            for _ in range(0, count):
+                v.append(self.item_type(factory))
+        self.set(frame, v)
+        return v
+
     def get_default_value(self, frame: F) -> List[FT]:
         return []
 

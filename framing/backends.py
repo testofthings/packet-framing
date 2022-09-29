@@ -3,7 +3,7 @@ from typing import Dict, Any, cast, Callable
 
 from typing_extensions import Self
 
-from framing.base import Frame, FrameBackend, FieldBase, F, T, EncodingState
+from framing.base import Frame, FrameBackend, FieldBase, F, T, EncodingState, Sequence
 from framing.raw_data import RawData, Raw
 
 
@@ -19,6 +19,14 @@ class BackendImplementation(FrameBackend):
         for n, f in self.structure.fields.items():
             i_off = bit_off
             v = self.get(f)
+            if isinstance(f, Sequence):
+                for num, i in enumerate(v):
+                    line = f"{i_off // 8:06x} {indent}"
+                    line += n + " " * (name_space - len(n)) + f"{num}/{len(v)}"
+                    r.append(line)
+                    v_s = f"{i}"
+                    r.extend([f"{s[:6]}  {s[6:]}" for s in v_s.split("\n")])
+                continue
             if isinstance(v, Frame):
                 line = f"{i_off // 8:06x} {indent}"
                 line += n + " " * (name_space - len(n))

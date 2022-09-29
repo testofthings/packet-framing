@@ -12,6 +12,9 @@ def test_pcap():
     assert FileHeader.Major_Version[pcap_hdr] == 2
     assert FileHeader.Minor_Version[pcap_hdr] == 4
 
+    records = PCAPFile.Packet_Records.set_repeat(pcap, 3)
+    assert len(records) == 3
+
 
 def test_pcap_decode():
     b = Raw.file(pathlib.Path("samples/sample-1.pcap"))

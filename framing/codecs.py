@@ -9,6 +9,10 @@ V = typing.TypeVar("V")
 
 class ValueCodec(typing.Generic[V]):
     """Base class for integer codecs"""
+    def default_value(self) -> V:
+        """Default value"""
+        raise NotImplementedError()
+
     def encode(self, value: V) -> RawData:
         """Encode!"""
         raise NotImplementedError()
@@ -30,6 +34,9 @@ class RawCodec(ValueCodec[RawData]):
     def __init__(self, fixed_bit_length=-1):
         self.fixed_bit_length = fixed_bit_length
 
+    def default_value(self) -> RawData:
+        return Raw.empty
+
     def encode(self, value: RawData) -> RawData:
         return value
 
@@ -45,7 +52,8 @@ class RawCodec(ValueCodec[RawData]):
 
 class IntegerCodec(ValueCodec[int]):
     """Base class for integer codecs"""
-    pass
+    def default_value(self) -> int:
+        return 0
 
 
 class FixedByteIntegerCodec(IntegerCodec):
