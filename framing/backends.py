@@ -16,12 +16,11 @@ class BackendImplementation(FrameBackend):
         if copy_to_avoid_update:
             return self.copy(commit=True).dump(bit_offset, indent, width, copy_to_avoid_update=False)
         r = []
-        name_space = max(20, width - 7 - len(indent) - 67)
 
-        def prefix(offset: int, name: str) -> str:
+        def prefix(offset: int, name: str, data="") -> str:
             s = f"{offset // 8:06x} {indent} "
-            s_len = max(0, name_space - len(name))
-            return s + name + " " * s_len
+            s_len = max(0, width - 8 - len(indent) - len(name) - len(data))
+            return s + name + " " * s_len + f"{data}"
 
         state = EncodingState()
         bit_off = bit_offset
@@ -43,10 +42,9 @@ class BackendImplementation(FrameBackend):
             sv = ev.dump(always_wide=True).split("\n")
             for i in range(0, len(sv)):
                 if i == 0:
-                    line = prefix(i_off, n)
+                    line = prefix(i_off, n, sv[i])
                 else:
-                    line = prefix(i_off, "")
-                line += sv[i]
+                    line = prefix(i_off, "", sv[i])
                 r.append(line)
                 i_off += 16 * 8
             bit_off += f.get_bit_length(self.frame, value=v)
