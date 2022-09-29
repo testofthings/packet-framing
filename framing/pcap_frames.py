@@ -1,5 +1,7 @@
-from framing.base import *
-from framing.frames import *
+from framing.base import Frame
+from framing.codecs import IntegerFormat
+from framing.fields import Structure, Sequence
+from framing.raw_data import Raw
 
 # https://datatracker.ietf.org/doc/id/draft-gharris-opsawg-pcap-00.html
 

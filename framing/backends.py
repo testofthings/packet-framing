@@ -1,9 +1,9 @@
 import copy
-from typing import Dict, Any, cast, Callable
+from typing import Dict, Any, cast, Callable, Sequence
 
 from typing_extensions import Self
 
-from framing.base import Frame, FrameBackend, FieldBase, F, T, EncodingState, Sequence
+from framing.base import FrameBackend, Frame, EncodingState, FieldBase, F, T
 from framing.raw_data import RawData, Raw
 
 

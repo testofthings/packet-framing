@@ -1,4 +1,5 @@
-from framing.base import Structure, Frame
+from framing.base import Frame
+from framing.fields import Structure
 from framing.codecs import IntegerFormat
 from framing.raw_data import Raw
 
