@@ -1,5 +1,5 @@
 import copy
-from typing import Dict, Any, Callable, List, Iterator, Optional
+from typing import Dict, Any, Callable, Iterator, Optional
 
 from typing_extensions import Self
 
@@ -12,42 +12,52 @@ class BackendImplementation(FrameBackend):
     def __init__(self, frame: Frame):
         super().__init__(frame)
 
-    def pretty_print(self, indent='') -> str:
+    def dump(self, bit_offset=0, indent='', width=80, copy_to_avoid_update=False) -> str:
+        if copy_to_avoid_update:
+            return self.copy(commit=True).dump(bit_offset, indent, width, copy_to_avoid_update=False)
         r = []
-        name_space = max([len(n) for n in self.structure.fields.keys()]) + 1
+        name_space = max(20, width - 7 - len(indent) - 67)
+
+        def prefix(offset: int, name: str) -> str:
+            s = f"{offset // 8:06x} {indent} "
+            s_len = max(0, name_space - len(name))
+            return s + name + " " * s_len
+
         state = EncodingState()
-        bit_off = 0
+        bit_off = bit_offset
         for n, f in self.structure.fields.items():
             i_off = bit_off
             v = self.get(f)
             if isinstance(f, Sequence):
                 for num, i in enumerate(v):
-                    line = f"{i_off // 8:06x} {indent}"
-                    line += n + " " * (name_space - len(n)) + f"{num}/{len(v)}"
-                    r.append(line)
-                    v_s = f"{i}"
-                    r.extend([f"{s[:6]}  {s[6:]}" for s in v_s.split("\n")])
+                    r.append(prefix(i_off, "{num}/{len(v)}"))
+                    v_s = i.backend.dump(bit_offset=bit_off, indent=indent + '  ', width=width)
+                    r.append(v_s)
                 continue
             if isinstance(v, Frame):
-                line = f"{i_off // 8:06x} {indent}"
-                line += n + " " * (name_space - len(n))
-                r.append(line)
-                v_s = f"{v}"
-                r.extend([f"{s[:6]}  {s[6:]}" for s in v_s.split("\n")])
+                r.append(prefix(i_off, n))
+                v_s = v.backend.dump(bit_offset=bit_off, indent=indent + '  ', width=width)
+                r.append(v_s)
                 continue
             ev = f.encode(v, state)
             sv = ev.dump(always_wide=True).split("\n")
             for i in range(0, len(sv)):
-                line = f"{i_off // 8:06x} {indent}"
                 if i == 0:
-                    line += n + " " * (name_space - len(n))
+                    line = prefix(i_off, n)
                 else:
-                    line += " " * name_space
+                    line = prefix(i_off, "")
                 line += sv[i]
                 r.append(line)
                 i_off += 16 * 8
             bit_off += f.get_bit_length(self.frame, value=v)
         return "\n".join(r)
+
+    def copy(self, commit=False) -> Self:
+        raise NotImplementedError()
+
+    def __repr__(self):
+        # create a copy to show, so that we do not update state
+        return self.dump(copy_to_avoid_update=True)
 
 
 class ComposingBackend(BackendImplementation):
@@ -81,17 +91,13 @@ class ComposingBackend(BackendImplementation):
             f_list.append(f.encode(v, state))
         return Raw.merge(f_list)
 
-    def __repr__(self):
-        # create a copy to show, so that we do not update state
-        c = self.copy()
-        c.encode()
-        return c.pretty_print()
-
-    def copy(self) -> Self:
+    def copy(self, commit=False) -> Self:
         n_frame = copy.copy(self.frame)
         c = ComposingBackend(n_frame)
         n_frame.backend = c
         c.changes.update(self.changes)
+        if commit:
+            c.encode()
         return c
 
 
@@ -169,12 +175,7 @@ class DissectorBackend(BackendImplementation):
     def input_data(self) -> RawData:
         return self.data
 
-    def __repr__(self):
-        # create a copy to show, so that we do not update state
-        c = self.copy()
-        return c.pretty_print()
-
-    def copy(self) -> Self:
+    def copy(self, commit=False) -> Self:
         # do not read more data for printing
         limited_data = self.data.subBlockBits(0, self.data.bits_available())
 

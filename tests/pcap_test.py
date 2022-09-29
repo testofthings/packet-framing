@@ -15,6 +15,8 @@ def test_pcap():
     records = PCAPFile.Packet_Records.set_repeat(pcap, 3)
     assert len(records) == 3
 
+    as_s = Frames.dump(pcap, width=80)
+
     PacketRecord.Packet_Data[records[0]] = Raw.string("This")
     PacketRecord.Packet_Data[records[1]] = Raw.string("is")
     PacketRecord.Packet_Data[records[2]] = Raw.string("fun")

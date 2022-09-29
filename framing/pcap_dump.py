@@ -1,5 +1,6 @@
 import argparse
 import logging
+import os
 import pathlib
 
 from framing.frames import Frames
@@ -14,13 +15,23 @@ if __name__ == "__main__":
     args = parser.parse_args()
     logging.basicConfig(format='%(message)s', level=getattr(logging, args.log_level or 'INFO'))
 
+    try:
+        wid, _ = os.get_terminal_size(0)
+    except OSError:
+        wid = 80
+
+    offset = 0
     for f_name in args.files:
         raw_data = Raw.file(pathlib.Path(f_name))
         pcap = PCAPFile(Frames.dissect(raw_data))
-        print(f"{PCAPFile.File_Header[pcap]}")
+
+        hdr = PCAPFile.File_Header[pcap]
+        print(f"{Frames.dump(hdr, bit_offset=offset, width=wid)}")
+        offset += hdr.get_bit_length()
 
         for i, rec in enumerate(PCAPFile.Packet_Records.iterate(pcap)):
             print(f"=== #{i} ===")
-            print(f"{rec}")
+            print(f"{Frames.dump(rec, bit_offset=offset, width=wid, indent='  ')}")
+            offset += rec.get_bit_length()
 
 

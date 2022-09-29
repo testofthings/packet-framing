@@ -16,9 +16,5 @@ class Frames:
         return lambda f: DissectorBackend(f, data)
 
     @classmethod
-    def repeat(cls, context: Frame, sub_type: Type[F], count: int) -> List[F]:
-        v = []
-        factory = context.backend.factory()
-        for _ in range(0, count):
-            v.append(sub_type(factory))
-        return v
+    def dump(cls, frame: Frame, bit_offset=80, indent='', width=0, copy_to_avoid_update=False) -> str:
+        return frame.backend.dump(bit_offset, indent, width, copy_to_avoid_update)

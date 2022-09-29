@@ -141,6 +141,8 @@ class FrameBackend:
         """Get input data when decoding, empty otherwise"""
         return Raw.empty
 
+    def dump(self, bit_offset=0, indent='', width=0, copy_to_avoid_update=False) -> str:
+        raise NotImplementedError()
 
 class Frame:
     """Base class for frames"""
