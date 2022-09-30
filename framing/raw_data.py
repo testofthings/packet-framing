@@ -121,7 +121,7 @@ class ByteData(RawData):
         return ByteData(self.data, self.start + byte_offset, self.length - byte_offset)
 
 
-class MergedData(RawData):
+class RawDataSequence(RawData):
     def __init__(self, components: List[RawData]):
         self.components = components
         self.length = sum([c.bit_length() for c in components])
@@ -155,12 +155,12 @@ class MergedData(RawData):
             c_len = c.bit_length()
             if off >= bit_offset:
                 if off >= end_offset:
-                    return Raw.merge(nc)
+                    return Raw.sequence(nc)
                 s = max(0, off - bit_offset)
                 e = min(c_len, end_offset - off)
                 nc.append(c.subBlockBits(s, e))
             off += c_len
-        return Raw.merge(nc)
+        return Raw.sequence(nc)
 
     def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
         """Get sub-block"""
@@ -181,7 +181,7 @@ class MergedData(RawData):
             if off < c_len:
                 nc = [c.tailBits(off)]
                 nc.extend(self.components[i + 1:])
-                return Raw.merge(nc)
+                return Raw.sequence(nc)
             off -= c_len
         return Raw.empty
 
@@ -238,13 +238,13 @@ class Raw:
         return cls.empty
 
     @classmethod
-    def merge(cls, components: Iterable[RawData]) -> RawData:
+    def sequence(cls, components: Iterable[RawData]) -> RawData:
         cs = list(components)
         if not cs:
             return cls.empty
         if len(cs) == 1:
             return cs[0]
-        return MergedData(cs)
+        return RawDataSequence(cs)
 
     @classmethod
     def file(cls, file_path: pathlib.Path) -> FileData:

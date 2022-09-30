@@ -199,7 +199,7 @@ class Sequence(ConfigurableField[F, List[FT]]):
                 r.append(v.encode())
             else:
                 r.append(self.item_codec.encode(v))
-        return Raw.merge(r)
+        return Raw.sequence(r)
 
     def decode(self, data: RawData, backend: FrameBackend) -> List[FT]:
         r = []

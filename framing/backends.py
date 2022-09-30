@@ -135,7 +135,7 @@ class ComposingBackend(BackendImplementation):
         for f in self.structure.fields.values():
             v = self.get(f)
             f_list.append(f.encode(v, state))
-        return Raw.merge(f_list)
+        return Raw.sequence(f_list)
 
     def copy(self, commit=False) -> Self:
         n_frame = copy.copy(self.frame)
