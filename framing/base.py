@@ -96,6 +96,10 @@ class FieldBase(typing.Generic[F, T]):
     def get_byte_length(self, frame: F, value: Optional[T] = None) -> int:
         return self.get_bit_length(frame, value) // 8
 
+    def as_frame(self, frame: F) -> 'Frame':
+        """Return value as frame, use type information when available"""
+        return frame.backend.get_as_frame(self)
+
     def encode(self, value: T, state: EncodingState) -> RawData:
         raise NotImplementedError()
 
@@ -131,6 +135,10 @@ class FrameBackend:
 
     def iterate(self, sequence_field: FieldBase, item_field: FieldBase[F, T]) -> typing.Iterator[T]:
         """Iterate sequence field values without storing them"""
+        raise NotImplementedError()
+
+    def get_as_frame(self, field: FieldBase[F, T]) -> 'Frame':
+        """Get field value as frame, use type information when available"""
         raise NotImplementedError()
 
     def factory(self, decode: RawData = None) -> Callable[['Frame'], 'FrameBackend']:

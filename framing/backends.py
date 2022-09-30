@@ -4,7 +4,7 @@ from typing import Dict, Any, Callable, Iterator, Optional
 from typing_extensions import Self
 
 from framing.base import FrameBackend, Frame, EncodingState, FieldBase, F, T
-from framing.fields import Sequence, FT
+from framing.fields import Sequence, FT, Structure
 from framing.raw_data import RawData, Raw
 
 
@@ -56,6 +56,11 @@ class BackendImplementation(FrameBackend):
     def __repr__(self):
         # create a copy to show, so that we do not update state
         return self.dump(copy_to_avoid_update=True)
+
+
+class RawFrame(Frame):
+    structure = Structure['RawFrame']()
+    data = structure.raw()
 
 
 class ComposingBackend(BackendImplementation):
@@ -196,6 +201,12 @@ class DissectorBackend(BackendImplementation):
 
         off = self._field_offset(sequence_field)
         return ItemIterator(off)
+
+    def get_as_frame(self, field: FieldBase[F, T]) -> Frame:
+        bit_offset = self._field_offset(field)
+        bit_len = field.get_bit_length(self.frame)
+        data = self.data.subBlockBits(bit_offset, bit_len)
+        return RawFrame(self.factory(data))
 
     def encode(self) -> RawData:
         bit_length = self.frame.get_bit_length()
