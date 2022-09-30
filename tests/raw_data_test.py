@@ -1,6 +1,37 @@
 import pathlib
 
-from framing.raw_data import Raw
+from framing.raw_data import Raw, ByteData
+
+
+def test_bits():
+    b = Raw.hex("13ad")
+    assert b.bit(0) == 0
+    assert b.bit(1) == 0
+    assert b.bit(2) == 0
+    assert b.bit(3) == 1
+    assert b.bit(4) == 0
+    assert b.bit(5) == 0
+    assert b.bit(6) == 1
+    assert b.bit(7) == 1
+    assert b.bit(12) == 1
+    assert b.bit(14) == 0
+    assert b.bit(15) == 1
+
+
+def test_bit_alignment():
+    b = Raw.hex("13ad15")
+    bb = b.subBlockBits(4, 16)
+    assert bb.octet(0) == 0x3a
+    assert bb.octet(1) == 0xd1
+    assert bb == Raw.hex("3ad1")
+
+    bb = bb.subBlockBits(4, 8)
+    assert isinstance(bb, ByteData)
+    assert bb.octet(0) == 0xad
+    assert bb == Raw.hex("ad")
+
+    bb = b.tailBits(17)
+    assert f"{bb}" == "0010101"
 
 
 def test_merged_data():
