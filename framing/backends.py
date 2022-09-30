@@ -112,9 +112,15 @@ class DissectorBackend(BackendImplementation):
         if v is None:
             bit_offset = self._field_offset(field)
             data = self.data.tailBits(bit_offset)
+            # FIXME: Nuke length procedure?
             if field.decode_length_procedure:
                 f_len = field.decode_length_procedure(self.frame)
                 data = data.subBlockBits(0, f_len)
+            if field.fixed_bit_length < 0 and field.offset.min_tail_length:
+                data_len = data.bit_length()
+                if data_len >= field.offset.min_tail_length:
+                    # limit data length to leave space for the tail
+                    data = data.subBlockBits(0, data_len - field.offset.min_tail_length)
             if field.length_resolver:
                 f_len = field.length_resolver.pull(self)
                 data = data.subBlockBits(0, f_len)

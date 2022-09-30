@@ -24,6 +24,7 @@ class FieldOffset:
         self.prefix: Optional['FieldOffset'] = None
         self.fixed_bit_offset = 0
         self.variable_field: Optional[FieldBase] = field
+        self.min_tail_length = 0
 
     def get_offset(self, backend: 'FrameBackend') -> int:
         off = self.fixed_bit_offset
@@ -223,6 +224,12 @@ class FrameStructure(typing.Generic[F]):
                 prefix_offset += f.fixed_bit_length
         self.fields_length.prefix = prefix
         self.fields_length.fixed_bit_offset = prefix_offset
+        # ...set minimum tail bit length
+        min_tail = 0
+        for f in reversed(self.fields.values()):
+            f.offset.min_tail_length = min_tail
+            if f.fixed_bit_length >= 0:
+                min_tail += f.fixed_bit_length
 
         # collect commit procedures from fields
         def make_procedure(field: FieldBase):
