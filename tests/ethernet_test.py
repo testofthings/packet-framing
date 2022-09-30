@@ -1,6 +1,6 @@
 from framing.base import *
 from framing.frames import Frames
-from framing.low_frames import EthernetII
+from framing.ethernet_frames import EthernetII
 
 
 def test_ethernet():

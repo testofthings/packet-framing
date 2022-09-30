@@ -1,7 +1,7 @@
 from framing.base import Frame, LayerMapping
 from framing.codecs import IntegerFormat
 from framing.fields import Structure, Sequence, ValueOf
-from framing.low_frames import EthernetII
+from framing.ethernet_frames import EthernetII
 from framing.raw_data import Raw
 
 # https://datatracker.ietf.org/doc/id/draft-gharris-opsawg-pcap-00.html
