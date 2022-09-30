@@ -14,7 +14,5 @@ class EthernetII(Frame):
     padding = structure.raw()
     crc_checksum = structure.raw(bytes=4)
 
-    def update_padding(self):
-        return Raw.zeroes(max(64 - (14 + EthernetII.data.get_byte_length(self) + 4), 0))
-
-    padding.at_commit(update_padding)
+    # use padding field to meet minimum frame length 64 octets
+    padding.at_commit(lambda f: Raw.zeroes(max(64 - (14 + EthernetII.data.get_byte_length(f) + 4), 0)))
