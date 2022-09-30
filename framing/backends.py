@@ -129,6 +129,7 @@ class ComposingBackend(BackendImplementation):
 
     def encode(self) -> RawData:
         self.structure.commit(self.frame)
+        self.known_bit_length = -1
         f_list = []
         state = EncodingState()
         for f in self.structure.fields.values():
@@ -152,10 +153,11 @@ class DissectorBackend(BackendImplementation):
         super().__init__(frame)
         self.is_decoding = True
         self.data = data
-        self.cache: Dict[FieldBase, Any] = {}
+        self.post_offset: Dict[FieldBase, int] = {}  # NOTE: Post offsets for variable-length fields
+        self.value_cache: Dict[FieldBase, Any] = {}
 
     def get(self, field: FieldBase[F, T]) -> T:
-        v = self.cache.get(field)
+        v = self.value_cache.get(field)
         if v is None:
             bit_offset = self.get_bit_offset(field.offset)
             data = self.data.tailBits(bit_offset)
@@ -172,14 +174,14 @@ class DissectorBackend(BackendImplementation):
                 f_len = field.length_resolver.pull(self)
                 data = data.subBlockBits(0, f_len)
             v = field.decode(data, self)
-            self.cache[field] = v
+            self.value_cache[field] = v
         return v
 
     def set(self, field: FieldBase[F, T], value: T) -> Self:
         raise NotImplementedError("set() not supported")
 
     def get_item(self, sequence_field: FieldBase, item_field: FieldBase[F, FT], index: int):
-        v = self.cache.get(sequence_field)
+        v = self.value_cache.get(sequence_field)
         if v is not None:
             return v[index]
 
@@ -202,12 +204,16 @@ class DissectorBackend(BackendImplementation):
             # resolve prefix dynamic length
             off += self.get_bit_offset(prefix)
             if prefix.variable_field:
+                cached = self.post_offset.get(prefix.variable_field)
+                if cached is not None:
+                    return cached
                 if prefix.variable_field.decode_length_procedure:
                     f_len = prefix.variable_field.decode_length_procedure(self.frame)
                     off += f_len
                 else:
                     # NOTE: We could check if value is cached and provide it
                     off += prefix.variable_field.get_bit_length(self.frame)
+                self.post_offset[prefix.variable_field] = off
         return off
 
     def resolve_bit_length(self, field: FieldBase[F, T]) -> int:
@@ -222,10 +228,10 @@ class DissectorBackend(BackendImplementation):
             # Length resolver
             b_len = field.length_resolver.pull(self)
         if b_len == -1 and field.offset.min_tail_length > 0:
-            data_len = self.data.bit_length()
-            if data_len >= field.offset.min_tail_length:
-                # limit data length to leave space for the tail
-                b_len = data_len - field.offset.min_tail_length
+            # limit data length to leave space for the tail
+            off = self.get_bit_offset(field.offset)
+            tail_len = self.data.bit_length() - off
+            b_len = max(tail_len - field.offset.min_tail_length, 0)
         return b_len
 
     def factory(self, decode: RawData = None) -> Callable[[Frame], FrameBackend]:
@@ -240,7 +246,7 @@ class DissectorBackend(BackendImplementation):
         return f
 
     def iterate(self, sequence_field: FieldBase, item_field: FieldBase[F, FT]) -> Iterator[FT]:
-        v = self.cache.get(sequence_field)
+        v = self.value_cache.get(sequence_field)
         if v is not None:
             return v.__iter__()  # already value in memory (we do not store it here)
 
@@ -293,5 +299,5 @@ class DissectorBackend(BackendImplementation):
         n_frame = copy.copy(self.frame)
         c = DissectorBackend(n_frame, limited_data)
         n_frame.backend = c
-        c.cache.update(self.cache)
+        c.value_cache.update(self.value_cache)
         return c
