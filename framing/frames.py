@@ -2,6 +2,7 @@ from typing import Callable, Type, List
 
 from framing.backends import ComposingBackend, F, FrameBackend, DissectorBackend
 from framing.base import Frame, F
+from framing.fields import Structure
 from framing.raw_data import RawData
 
 
@@ -18,3 +19,5 @@ class Frames:
     @classmethod
     def dump(cls, frame: Frame, bit_offset=80, indent='', width=0, copy_to_avoid_update=False) -> str:
         return frame.backend.dump(bit_offset, indent, width, copy_to_avoid_update)
+
+

@@ -38,4 +38,7 @@ class PCAPFile(Frame):
     Packet_Records = Sequence(structure.sub(PacketRecord))
 
 
-
+# Define ARP payload type mappings
+PCAP_Payloads = LayerMapping(PacketRecord.Packet_Data).by(PCAPFile.File_Header / FileHeader.LinkType, {
+    1: EthernetII,
+})

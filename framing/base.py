@@ -1,6 +1,6 @@
 import inspect
 import typing
-from typing import Optional, Callable, List, Type, Any
+from typing import Optional, Callable, List, Type, Any, Dict
 
 from typing_extensions import Self
 
@@ -60,7 +60,13 @@ class Calculator:
         self.next_step.push(backend, value)
 
 
-class FieldBase(typing.Generic[F, T]):
+class FieldPointer(typing.Generic[F, T]):
+    """Path pointing to a field"""
+    def get(self, frame: F) -> T:
+        raise NotImplementedError()
+
+
+class FieldBase(FieldPointer[F, T]):
     """Base class for fields"""
     def __init__(self, type_name: str, default_value: T):
         self.field_name = "field?"
@@ -111,6 +117,9 @@ class FieldBase(typing.Generic[F, T]):
         enc = self.encode(self.get(frame), EncodingState())
         return f"{enc}"
 
+    def __truediv__(self, other: 'FieldBase[Any, T]') -> 'FieldPath':
+        return FieldPath(self) / other
+
     def __repr__(self):
         return f"{self.field_name}: {self.type_name}"
 
@@ -123,12 +132,17 @@ class FrameBackend:
         self.is_decoding = False
         if not self.structure.built:
             self.structure.finish_building(frame)
+        self.parent: Optional[FrameBackend] = None
 
     def get(self, field: FieldBase[F, T]) -> T:
         raise NotImplementedError()
 
     def set(self, field: FieldBase[F, T], value: T) -> Self:
         raise NotImplementedError("Editing not allowed with this backend")
+
+    def resolve_bit_length(self, field: FieldBase[F, T]) -> int:
+        """Resolve bit length without encoding, return -1 if not available"""
+        return -1
 
     def get_item(self, sequence_field: FieldBase, item_field: FieldBase[F, T], index: int):
         raise NotImplementedError()
@@ -153,8 +167,13 @@ class FrameBackend:
         """Get input data when decoding, empty otherwise"""
         return Raw.empty
 
+    def add_mapping(self, mapping: 'LayerMapping') -> Self:
+        """All layer mappings"""
+        return self
+
     def dump(self, bit_offset=0, indent='', width=0, copy_to_avoid_update=False) -> str:
         raise NotImplementedError()
+
 
 class Frame:
     """Base class for frames"""
@@ -196,6 +215,10 @@ class FrameStructure(typing.Generic[F]):
         if hasattr(frame_type, "structure_"):
             return getattr(frame_type, "structure_")  # underscored to avoid naming collision
         return getattr(frame_type, "structure")
+
+    def is_field_here(self, field: FieldBase) -> bool:
+        f = self.fields.get(field.field_name)
+        return f == field
 
     def _get_a_name(self, override: Optional[str]) -> str:
         """Get name or temporary name for a field"""
@@ -266,3 +289,49 @@ class FrameStructure(typing.Generic[F]):
         for n, f in self.fields.items():
             r.append(f"{n}: {f}")
         return "\n".join(r)
+
+
+class FieldPath(FieldPointer[F, T]):
+    def __init__(self, start: FieldBase[F, T]):
+        self.path = [start]
+
+    def __truediv__(self, other: FieldBase[Any, T]) -> 'FieldPath':
+        self.path.append(other)
+        return self
+
+    def get(self, frame: F) -> T:
+        if frame.backend.structure.is_field_here(self.path[0]):
+            # resolve path
+            v = frame
+            for i, p in enumerate(self.path):
+                v = p.get(v)
+                if (i < len(self.path) - 1) and not isinstance(v, Frame):
+                    raise Exception(f"Bad field {p.field_name} in path: " + "/".join([p.field_name for p in self.path]))
+            return v
+        elif frame.backend.parent:
+            return self.get(frame.backend.parent.frame)
+        return None
+
+
+class LayerMapping:
+    """Map lower layer selector into upper layer payload"""
+    def __init__(self, payload: FieldBase):
+        self._mappings: Dict[FieldBase, Dict[FieldPointer, Dict]] = {
+            payload: {}
+        }
+        self._payload = payload
+
+    def by(self, type_field: FieldPointer[Any, T], mappings: typing.Dict[T, Type[Frame]]) -> Self:
+        """Add mappings for defined payload"""
+        mp = self._mappings[self._payload]
+        mp.setdefault(type_field, {}).update(mappings)
+        return self
+
+    def get_mappings(self, payload: FieldBase) -> Dict[FieldPointer, Dict[Any, Type[Frame]]]:
+        """Get mappings for a payload, if any"""
+        return self._mappings.get(payload) or {}
+
+    def add_to(self, frame: F) -> F:
+        """Add mappings to a frame"""
+        frame.backend.add_mapping(self)
+        return frame

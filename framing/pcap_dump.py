@@ -4,7 +4,7 @@ import os
 import pathlib
 
 from framing.frames import Frames
-from framing.pcap_frames import PCAPFile
+from framing.pcap_frames import PCAPFile, PCAP_Payloads
 from framing.raw_data import Raw
 
 if __name__ == "__main__":
@@ -24,13 +24,14 @@ if __name__ == "__main__":
     for f_name in args.files:
         raw_data = Raw.file(pathlib.Path(f_name))
         pcap = PCAPFile(Frames.dissect(raw_data))
+        PCAP_Payloads.add_to(pcap)
 
         hdr = PCAPFile.File_Header[pcap]
         print(f"{Frames.dump(hdr, bit_offset=offset, width=wid)}")
         offset += hdr.get_bit_length()
 
         for i, rec in enumerate(PCAPFile.Packet_Records.iterate(pcap)):
-            print(f"=== #{i} ===")
+            print(f"=== #{i + 1} ===")
             print(f"{Frames.dump(rec, bit_offset=offset, width=wid, indent='  ')}")
             offset += rec.get_bit_length()
 

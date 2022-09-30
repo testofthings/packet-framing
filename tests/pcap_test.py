@@ -62,8 +62,12 @@ def test_pcap_decode_payload():
 def test_pcap_layering():
     b = Raw.file(pathlib.Path("samples/sample-1.pcap"))
     pcap = PCAPFile(Frames.dissect(b))
-    PCAP_Payloads.use_in(pcap)
+    PCAP_Payloads.add_to(pcap)
 
     rec = pcap.Packet_Records.get_item(pcap, 1)
+    payload = PacketRecord.Packet_Data.as_frame(rec)
+
+    assert payload.get_byte_length() == 66
+    assert payload.get_bit_length() == 66 * 8
 
     b.close()

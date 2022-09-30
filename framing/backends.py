@@ -1,9 +1,9 @@
 import copy
-from typing import Dict, Any, Callable, Iterator, Optional
+from typing import Dict, Any, Callable, Iterator, Optional, List
 
 from typing_extensions import Self
 
-from framing.base import FrameBackend, Frame, EncodingState, FieldBase, F, T
+from framing.base import FrameBackend, Frame, EncodingState, FieldBase, F, T, LayerMapping
 from framing.fields import Sequence, FT, Structure
 from framing.raw_data import RawData, Raw
 
@@ -11,6 +11,24 @@ from framing.raw_data import RawData, Raw
 class BackendImplementation(FrameBackend):
     def __init__(self, frame: Frame):
         super().__init__(frame)
+        self.mappings: List[LayerMapping] = []
+
+    def add_mapping(self, mapping: 'LayerMapping') -> Self:
+        self.mappings.append(mapping)
+        return self
+
+    def resolve_bit_length(self, field: FieldBase[F, T]) -> int:
+        b_len = -1
+        if field.fixed_bit_length >= 0:
+            # Fixed-length field
+            b_len = field.fixed_bit_length
+        elif field.decode_length_procedure:
+            # Length procedure (FIXME: Nuke these?)
+            b_len = field.decode_length_procedure(self.frame)
+        elif field.length_resolver:
+            # Length resolver
+            b_len = field.length_resolver.pull(self)
+        return b_len
 
     def dump(self, bit_offset=0, indent='', width=80, copy_to_avoid_update=False) -> str:
         if copy_to_avoid_update:
@@ -26,7 +44,9 @@ class BackendImplementation(FrameBackend):
         bit_off = bit_offset
         for n, f in self.structure.fields.items():
             i_off = bit_off
-            v = self.get(f)
+            v = self.get_as_frame(f)
+            if isinstance(v, RawFrame):
+                v = self.get(f)
             if isinstance(f, Sequence):
                 for num, i in enumerate(v):
                     r.append(prefix(i_off, "{num}/{len(v)}"))
@@ -86,7 +106,10 @@ class ComposingBackend(BackendImplementation):
 
     def factory(self, decode: RawData = None) -> Callable[[Frame], FrameBackend]:
         def f(frame: Frame):
-            return ComposingBackend(frame)
+            b = ComposingBackend(frame)
+            b.mappings = self.mappings
+            b.parent = self
+            return b
         return f
 
     def encode(self) -> RawData:
@@ -172,11 +195,24 @@ class DissectorBackend(BackendImplementation):
             bit_offset += v_len
             i += 1
 
+    def resolve_bit_length(self, field: FieldBase[F, T]) -> int:
+        b_len = super().resolve_bit_length(field)
+        if b_len == -1 and field.offset.min_tail_length > 0:
+            data_len = self.data.bit_length()
+            if data_len >= field.offset.min_tail_length:
+                # limit data length to leave space for the tail
+                b_len = data_len - field.offset.min_tail_length
+        return b_len
+
     def factory(self, decode: RawData = None) -> Callable[[Frame], FrameBackend]:
         def f(frame: Frame):
             if decode is None:
-                return ComposingBackend(frame)
-            return DissectorBackend(frame, decode)
+                b = ComposingBackend(frame)
+            else:
+                b = DissectorBackend(frame, decode)
+            b.mappings = self.mappings
+            b.parent = self
+            return b
         return f
 
     def iterate(self, sequence_field: FieldBase, item_field: FieldBase[F, FT]) -> Iterator[FT]:
@@ -204,8 +240,19 @@ class DissectorBackend(BackendImplementation):
 
     def get_as_frame(self, field: FieldBase[F, T]) -> Frame:
         bit_offset = self._field_offset(field)
-        bit_len = field.get_bit_length(self.frame)
-        data = self.data.subBlockBits(bit_offset, bit_len)
+        bit_len = self.resolve_bit_length(field)
+        if bit_len >= 0:
+            data = self.data.subBlockBits(bit_offset, bit_len)
+        else:
+            data = self.data.tailBits(bit_offset)
+        for m in self.mappings:
+            for f_ptr, mm in m.get_mappings(field).items():
+                value = f_ptr.get(self.frame)
+                if value is None or value not in mm:
+                    continue
+                f_type = mm[value]
+                return f_type(self.factory(data))
+        # No explicit frame type found...
         return RawFrame(self.factory(data))
 
     def encode(self) -> RawData:

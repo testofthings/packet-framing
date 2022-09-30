@@ -58,13 +58,13 @@ class RawField(ConfigurableField[F, RawData]):
         self.fixed_bit_length = bit_length
 
     def get_bit_length(self, frame: F, value: Optional[RawData] = None) -> int:
-        if self.fixed_bit_length >= 0:
-            return self.fixed_bit_length
         if value is not None:
             return value.bit_length()
-        # do not know my length without encoding/decoding it
-        v: RawData = frame.backend.get(self)
-        return v.bit_length()
+        b_len = frame.backend.resolve_bit_length(self)
+        if b_len < 0:
+            v = frame.backend.get(self)
+            b_len = v.bit_length()
+        return b_len
 
     def encode(self, value: RawData, state: EncodingState) -> RawData:
         return value
@@ -83,9 +83,13 @@ class IntField(ConfigurableField[F, int], Calculator):
         self.fixed_bit_length = codec.get_fixed_bit_length()
 
     def get_bit_length(self, frame: F, value: Optional[int] = None) -> int:
-        if self.fixed_bit_length >= 0:
-            return self.fixed_bit_length
-        return self.codec.get_bit_length(self.get(frame))
+        b_len = self.codec.get_fixed_bit_length()
+        if b_len < 0:
+            b_len = frame.backend.resolve_bit_length(self)
+        if b_len < 0:
+            v = self.get(frame) if value is None else value
+            b_len = self.codec.get_bit_length(v)
+        return b_len
 
     def get_byte_length(self, frame: F, value: Optional[int] = None) -> int:
         if self.fixed_bit_length >= 0:
@@ -105,15 +109,6 @@ class IntField(ConfigurableField[F, int], Calculator):
         backend.set(self, value)
 
 
-class StringField(ConfigurableField[F, str]):
-    """String field"""
-    def __init__(self, default_value: str):
-        super().__init__("str", default_value)
-
-    def encode(self, value: str, state: EncodingState) -> RawData:
-        return Raw.empty  # FIXME
-
-
 FT = typing.TypeVar("FT", bound=Frame)
 
 
@@ -130,9 +125,12 @@ class SubStructureField(ConfigurableField[F, FT]):
     def get_bit_length(self, frame: F, value: Optional[FT] = None) -> int:
         if value is not None:
             return value.get_bit_length()
-        # must resolve value
-        value = frame.backend.get(self)
-        return value.get_bit_length()
+        b_len = frame.backend.resolve_bit_length(self)
+        if b_len < 0:
+            # must resolve value
+            value = frame.backend.get(self)
+            b_len = value.get_bit_length()
+        return b_len
 
     def encode(self, value: FT, state: EncodingState) -> RawData:
         enc = value.encode()
@@ -181,16 +179,18 @@ class Sequence(ConfigurableField[F, List[FT]]):
         if value is not None:
             if self.item_fixed_bit_length >= 0:
                 return self.item_fixed_bit_length * len(value)
-        else:
-            # must resolve value
-            value = frame.backend.get(self)
-        bit_l = 0
+        b_len = frame.backend.resolve_bit_length(self)
+        if b_len >= 0:
+            return b_len
+        # must resolve value
+        value = frame.backend.get(self)
+        b_len = 0
         for v in value:
             if isinstance(v, Frame):
-                bit_l += v.get_bit_length()
+                b_len += v.get_bit_length()
             else:
-                bit_l += self.item_codec.get_bit_length(v)
-        return bit_l
+                b_len += self.item_codec.get_bit_length(v)
+        return b_len
 
     def encode(self, value: List[FT], state: EncodingState) -> RawData:
         r = []
@@ -236,12 +236,6 @@ class Structure(FrameStructure[F]):
         fn = self._get_a_name(name)
         codec = int_format.create_codec()
         f = IntField(codec, default)
-        self.fields[fn] = f
-        return f
-
-    def string(self, name: str = None, default="") -> StringField[F]:
-        fn = self._get_a_name(name)
-        f = StringField(default)
         self.fields[fn] = f
         return f
 
