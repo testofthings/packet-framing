@@ -26,16 +26,6 @@ class FieldOffset:
         self.variable_field: Optional[FieldBase] = field
         self.min_tail_length = 0
 
-    def get_offset(self, backend: 'FrameBackend') -> int:
-        off = self.fixed_bit_offset
-        prefix = self.prefix
-        if prefix:
-            # resolve prefix dynamic length
-            off += prefix.get_offset(backend)
-            if prefix.variable_field:
-                off += prefix.variable_field.get_bit_length(backend.frame)
-        return off
-
     def __repr__(self):
         r = []
         if self.prefix:
@@ -140,6 +130,9 @@ class FrameBackend:
     def set(self, field: FieldBase[F, T], value: T) -> Self:
         raise NotImplementedError("Editing not allowed with this backend")
 
+    def get_bit_offset(self, offset: FieldOffset) -> int:
+        raise NotImplementedError()
+
     def resolve_bit_length(self, field: FieldBase[F, T]) -> int:
         """Resolve bit length without encoding, return -1 if not available"""
         return -1
@@ -157,6 +150,10 @@ class FrameBackend:
 
     def factory(self, decode: RawData = None) -> Callable[['Frame'], 'FrameBackend']:
         """Create a fresh backend for given frame"""
+        raise NotImplementedError()
+
+    def get_bit_length(self) -> int:
+        """Get frame bit length"""
         raise NotImplementedError()
 
     def encode(self) -> RawData:
@@ -182,13 +179,11 @@ class Frame:
 
     def get_bit_length(self) -> int:
         """Get frame bit length"""
-        st = self.backend.structure
-        return st.fields_length.get_offset(self.backend)
+        return self.backend.get_bit_length()
 
     def get_byte_length(self) -> int:
         """Get frame byte length"""
-        st = self.backend.structure
-        return st.fields_length.get_offset(self.backend) // 8
+        return self.backend.get_bit_length() // 8
 
     def encode(self) -> RawData:
         """Encode the frame into bytes"""
