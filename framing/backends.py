@@ -75,6 +75,10 @@ class ComposingBackend(BackendImplementation):
         self.changes[field] = value
         return self
 
+    def get_item(self, sequence_field: FieldBase, item_field: FieldBase[F, FT], index: int):
+        val = self.get(sequence_field)
+        return val[index]
+
     def factory(self, decode: RawData = None) -> Callable[[Frame], FrameBackend]:
         def f(frame: Frame):
             return ComposingBackend(frame)
@@ -146,6 +150,23 @@ class DissectorBackend(BackendImplementation):
     def set(self, field: FieldBase[F, T], value: T) -> Self:
         raise NotImplementedError("set() not supported")
 
+    def get_item(self, sequence_field: FieldBase, item_field: FieldBase[F, FT], index: int):
+        v = self.cache.get(sequence_field)
+        if v is not None:
+            return v[index]
+
+        bit_offset = self._field_offset(sequence_field)
+        data = self.data.tailBits(bit_offset)
+        i = 0
+        while True:
+            v = item_field.decode(data, self)
+            if i == index:
+                return v
+            v_len = v.get_bit_length()
+            data = data.tailBits(v_len)
+            bit_offset += v_len
+            i += 1
+
     def factory(self, decode: RawData = None) -> Callable[[Frame], FrameBackend]:
         def f(frame: Frame):
             if decode is None:
@@ -154,6 +175,10 @@ class DissectorBackend(BackendImplementation):
         return f
 
     def iterate(self, sequence_field: FieldBase, item_field: FieldBase[F, FT]) -> Iterator[FT]:
+        v = self.cache.get(sequence_field)
+        if v is not None:
+            return v.__iter__()  # already value in memory (we do not store it here)
+
         backend = self
         data = self.data
 

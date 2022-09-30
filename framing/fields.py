@@ -159,6 +159,9 @@ class Sequence(ConfigurableField[F, List[FT]]):
         """Get item by index"""
         return frame.backend.iterate(self, self.sub)
 
+    def get_item(self, frame: F, index: int) -> FT:
+        return frame.backend.get_item(self, self.sub, index)
+
     def set_repeat(self, frame: F, count: int) -> List[F]:
         """Set value by repeating item given times"""
         v = []

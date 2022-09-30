@@ -126,6 +126,9 @@ class FrameBackend:
     def set(self, field: FieldBase[F, T], value: T) -> Self:
         raise NotImplementedError("Editing not allowed with this backend")
 
+    def get_item(self, sequence_field: FieldBase, item_field: FieldBase[F, T], index: int):
+        raise NotImplementedError()
+
     def iterate(self, sequence_field: FieldBase, item_field: FieldBase[F, T]) -> typing.Iterator[T]:
         """Iterate sequence field values without storing them"""
         raise NotImplementedError()

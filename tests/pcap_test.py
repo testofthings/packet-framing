@@ -1,7 +1,7 @@
 import pathlib
 
 from framing.frames import Frames
-from framing.pcap_frames import PCAPFile, FileHeader, PacketRecord
+from framing.pcap_frames import PCAPFile, FileHeader, PacketRecord, PCAP_Payloads
 from framing.raw_data import Raw
 
 
@@ -58,3 +58,12 @@ def test_pcap_decode_payload():
     assert c == 2349
     assert off == 1607365
 
+
+def test_pcap_layering():
+    b = Raw.file(pathlib.Path("samples/sample-1.pcap"))
+    pcap = PCAPFile(Frames.dissect(b))
+    PCAP_Payloads.use_in(pcap)
+
+    rec = pcap.Packet_Records.get_item(pcap, 1)
+
+    b.close()
