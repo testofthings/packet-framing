@@ -59,6 +59,7 @@ class IntegerCodec(ValueCodec[int]):
 class FixedByteIntegerCodec(IntegerCodec):
     def __init__(self, byte_length: int, little_end=False):
         self.length = byte_length
+        self.little_end = little_end
         if little_end:
             self.lo_index = byte_length - 1
             self.hi_index = 0
@@ -90,6 +91,33 @@ class FixedByteIntegerCodec(IntegerCodec):
         return self.length * 8
 
 
+class FixedBitIntegerCodec(IntegerCodec):
+    def __init__(self, bit_length: int, little_end=False):
+        self.byte_codec = FixedByteIntegerCodec((bit_length + 7) // 8, little_end)
+        self.length = bit_length
+
+    def encode(self, value: int) -> RawData:
+        b = self.byte_codec.encode(value)
+        if self.byte_codec.little_end:
+            r = b.tailBits(8 - self.length % 8)
+        else:
+            r = b.subBlockBits(0, self.length)
+        return r
+
+    def decode(self, data: RawData) -> int:
+        if self.byte_codec.little_end:
+            b = Raw.zeroes(bit_length=8 - self.length % 8) + data
+        else:
+            b = data + Raw.zeroes(bit_length=8 - self.length % 8)
+        return self.byte_codec.decode(b)
+
+    def get_bit_length(self, value: int) -> int:
+        return self.length
+
+    def get_fixed_bit_length(self) -> int:
+        return self.length // 8
+
+
 class IntegerFormat:
     """Codec formatter"""
     def __init__(self, bits=0, bytes=0, big_end: bool = False):
@@ -114,6 +142,7 @@ class IntegerFormat:
 
     def create_codec(self) -> IntegerCodec:
         if self.bit_length % 8 != 0:
-            raise NotImplementedError("Only full-byte integers supported now")
-        return FixedByteIntegerCodec(byte_length=self.bit_length // 8, little_end=self.little_end)
+            return FixedBitIntegerCodec(bit_length=self.bit_length, little_end=self.little_end)
+        else:
+            return FixedByteIntegerCodec(byte_length=self.bit_length // 8, little_end=self.little_end)
 

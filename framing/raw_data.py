@@ -76,6 +76,9 @@ class RawData:
                 return False
         return True
 
+    def __add__(self, other: 'RawData') -> 'RawData':
+        return Raw.sequence([self, other])
+
     def dump(self, always_wide=False) -> str:
         if self.bit_length() % 8 != 0:
             return f"{self.bit_length()} bits"  # Not implemented, yet
@@ -125,7 +128,13 @@ class ByteData(RawData):
 
 class RawDataSequence(RawData):
     def __init__(self, components: List[RawData]):
-        self.components = components
+        cs = []
+        for c in components:
+            if isinstance(c, RawDataSequence):
+                cs.extend(c.components)
+            else:
+                cs.append(c)
+        self.components = cs
         self.length = sum([c.bit_length() for c in components])
         assert self.length % 8 == 0, "Not supporting merging of bit-data blocks"
 
@@ -198,6 +207,9 @@ class ZeroData(RawData):
 
     def octet(self, byte_offset: int) -> int:
         return 0 if byte_offset < self.length // 8 else -1
+
+    def bit(self, bit_offset: int) -> int:
+        return 0 if bit_offset < self.length else -1
 
 
 class BitAlignedData(RawData):
@@ -274,6 +286,18 @@ class Raw:
     def hex(cls, hex_string: str) -> RawData:
         b = bytes.fromhex(hex_string)
         return ByteData(b, 0, len(b))
+
+    @classmethod
+    def bits(cls, bit_string: str) -> RawData:
+        bit_l = len(bit_string)
+        b = bytearray((bit_l + 7) // 8)
+        for i, s in enumerate(bit_string):
+            b[i // 8] <<= 1
+            b[i // 8] += int(s)
+        if bit_l % 8 != 0:
+            b[-1] <<= (8 - bit_l % 8)
+        r = ByteData(b, 0, len(b)).subBlockBits(0, bit_l)
+        return r
 
     @classmethod
     def zeroes(cls, byte_length: int = None, bit_length: int = None) -> RawData:
