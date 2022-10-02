@@ -50,6 +50,10 @@ def test_merged_data():
     b2 = b.tailBytes(10)
     assert b2 == Raw.empty
 
+    b = Raw.sequence([Raw.hex("10"), Raw.bits("1"), Raw.hex("10")])
+    assert b.octet(0) == 0x10
+    assert b.octet(1) == 0x88
+
 
 def test_file():
     b = Raw.file(pathlib.Path("samples/hello-world.txt"))

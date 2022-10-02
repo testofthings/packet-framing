@@ -136,7 +136,6 @@ class RawDataSequence(RawData):
                 cs.append(c)
         self.components = cs
         self.length = sum([c.bit_length() for c in components])
-        assert self.length % 8 == 0, "Not supporting merging of bit-data blocks"
 
     def bit_length(self) -> int:
         return self.length
@@ -145,13 +144,36 @@ class RawDataSequence(RawData):
         return self.length // 8
 
     def octet(self, byte_offset: int) -> int:
-        off = byte_offset
-        for c in self.components:
-            c_len = c.byte_length()
+        off = byte_offset * 8
+        for ci, c in enumerate(self.components):
+            c_len = c.bit_length()
             if off < c_len:
-                return c.octet(off)
+                if off % 8 == 0 and off + 8 <= c_len:
+                    return c.octet(off // 8)
+                # octet must be collected bit-by-bit (slow!)
+                v = 0
+                for i in range(0, 8):
+                    if off >= c_len:
+                        # next component buffer
+                        off = 0
+                        ci += 1
+                        c = self.components[ci]
+                        c_len = c.bit_length()
+                    v <<= 1
+                    v |= c.bit(off)
+                    off += 1
+                return v
             off -= c_len
         raise Exception(f"Byte offset out of range: {byte_offset}")
+
+    def bit(self, bit_offset: int) -> int:
+        off = bit_offset
+        for c in self.components:
+            c_len = c.bit_length()
+            if off < c_len:
+                return c.bit(off)
+            off -= c_len
+        raise Exception(f"Bit offset out of range: {bit_offset}")
 
     def subBlockBits(self, bit_offset: int, bit_length: int) -> 'RawData':
         """Get sub-block"""
@@ -289,6 +311,7 @@ class Raw:
 
     @classmethod
     def bits(cls, bit_string: str) -> RawData:
+        bit_string = "".join(bit_string.split())  # remove whitespace
         bit_l = len(bit_string)
         b = bytearray((bit_l + 7) // 8)
         for i, s in enumerate(bit_string):
