@@ -41,11 +41,11 @@ class Calculator:
     def __init__(self, next_step: Optional['Calculator']):
         self.next_step = next_step
 
-    def pull(self, backend: 'FrameBackend') -> int:
+    def pull(self, backend: 'FrameBackend') -> float:
         """Pull value from source"""
         return self.next_step.pull(backend)
 
-    def push(self, backend: 'FrameBackend', value: int):
+    def push(self, backend: 'FrameBackend', value: float):
         """Push value to source"""
         self.next_step.push(backend, value)
 
@@ -64,6 +64,7 @@ class FieldBase(FieldPointer[F, T]):
         self.default_value = default_value
         self.fixed_bit_length = -1
         self.offset = FieldOffset(self)
+        self.structure: Optional['Sturcture'] = None  # set by structure herself
         self.commit_procedure: Optional[Callable[[F], T]] = None
         self.length_resolver: Optional[Calculator] = None
         self.decode_length_procedure: Optional[Callable[[F], int]] = None

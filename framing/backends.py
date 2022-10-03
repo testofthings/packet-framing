@@ -178,7 +178,7 @@ class DissectorBackend(BackendImplementation):
                     # limit data length to leave space for the tail
                     data = data.subBlockBits(0, data_len - field.offset.min_tail_length)
             if field.length_resolver:
-                f_len = field.length_resolver.pull(self)
+                f_len = int(field.length_resolver.pull(self))
                 data = data.subBlockBits(0, f_len)
             v = field.decode(data, self)
             self.value_cache[field] = v

@@ -1,18 +1,19 @@
+import math
 from typing import Iterator
 
 from framing.base import *
 
 
 class Multiplier(Calculator):
-    def __init__(self, multiplier: int, next_step: Calculator):
+    def __init__(self, multiplier: float, next_step: Calculator):
         super().__init__(next_step)
         self.multiplier = multiplier
 
-    def pull(self, backend: 'FrameBackend') -> int:
+    def pull(self, backend: 'FrameBackend') -> float:
         return self.next_step.pull(backend) * self.multiplier
 
-    def push(self, backend: 'FrameBackend', value: int):
-        self.next_step.push(backend, value // self.multiplier)
+    def push(self, backend: 'FrameBackend', value: float):
+        self.next_step.push(backend, value / self.multiplier)
 
 
 class CopyToField(Calculator):
@@ -20,14 +21,22 @@ class CopyToField(Calculator):
         super().__init__(next_step)
         self.field = field
 
-    def push(self, backend: 'FrameBackend', value: int):
-        backend.set(self.field, value)
+    def push(self, backend: 'FrameBackend', value: float):
+        backend.set(self.field, int(value))
         self.next_step.push(backend, value)
 
 
 class ValueOf:
     def __init__(self, field: 'IntField'):
         self.end: Calculator = field
+
+    def __mul__(self, value: float) -> 'ValueOf':
+        self.end = Multiplier(value, self.end)
+        return self
+
+    def __truediv__(self, value: float) -> 'ValueOf':
+        self.end = Multiplier(1 / value, self.end)
+        return self
 
     def copy_to(self, field: 'IntField') -> Self:
         self.end = CopyToField(field, self.end)
@@ -38,6 +47,18 @@ class ConfigurableField(FieldBase[F, T]):
 
     def length_by(self, value: ValueOf) -> Self:
         self.length_resolver = Multiplier(8, value.end)
+        return self
+
+    def end_offset_by(self, value: ValueOf) -> Self:
+        calc = Multiplier(8, value.end)
+        field = self
+
+        def procedure(frame: F):
+            f_off = frame.backend.get_bit_offset(field.offset)
+            f_len = field.get_bit_length(frame)
+            calc.push(frame.backend, max(0, f_off + f_len))
+
+        self.structure.commit_procedures.append(procedure)
         return self
 
     def at_commit(self, procedure: Callable[[F], T]) -> Self:
@@ -102,11 +123,11 @@ class IntField(ConfigurableField[F, int], Calculator):
     def decode(self, data: RawData, backend: FrameBackend) -> int:
         return self.codec.decode(data)
 
-    def pull(self, backend: FrameBackend) -> int:
+    def pull(self, backend: FrameBackend) -> float:
         return backend.get(self)
 
-    def push(self, backend: FrameBackend, value: int):
-        backend.set(self, value)
+    def push(self, backend: FrameBackend, value: float):
+        backend.set(self, int(value))
 
 
 FT = typing.TypeVar("FT", bound=Frame)
@@ -144,6 +165,7 @@ class Sequence(ConfigurableField[F, List[FT]]):
     def __init__(self, sub: FieldBase[F, FT]):
         super().__init__("sequence", [])
         self.sub = sub
+        self.structure = sub.structure
         if isinstance(sub, SubStructureField):
             self.item_type = sub.sub_type
             self.item_codec = None
@@ -225,6 +247,7 @@ class Structure(FrameStructure[F]):
         fn = self._get_a_name(name)
         default = default if default else Raw.zeroes(bit_length=bits, byte_length=bytes)
         f: RawField[F] = RawField(default)
+        f.structure = self
         if bits is not None:
             f.fixed_length(bits)
         if bytes is not None:
@@ -236,12 +259,14 @@ class Structure(FrameStructure[F]):
         fn = self._get_a_name(name)
         codec = int_format.create_codec()
         f = IntField(codec, default)
+        f.structure = self
         self.fields[fn] = f
         return f
 
     def sub(self, sub_frame: Type[FT], name: str = None) -> SubStructureField[F, FT]:
         fn = self._get_a_name(name)
         f = SubStructureField(sub_frame)
+        f.structure = self
         self.fields[fn] = f
         return f
 

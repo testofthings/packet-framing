@@ -115,7 +115,7 @@ class FixedBitIntegerCodec(IntegerCodec):
         return self.length
 
     def get_fixed_bit_length(self) -> int:
-        return self.length // 8
+        return self.length
 
 
 class IntegerFormat:
