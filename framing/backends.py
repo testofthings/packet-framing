@@ -42,12 +42,12 @@ class BackendImplementation(FrameBackend):
                 v = self.get(f)
             if isinstance(f, Sequence):
                 for num, i in enumerate(v):
-                    r.append(format_line(i_off, "{num}/{len(v)}"))
+                    r.append(format_line(i_off, f"{num}/{len(v)}"))
                     v_s = i.backend.dump(bit_offset=bit_off, indent=indent + '  ', width=width)
                     r.append(v_s)
                 continue
             if isinstance(v, Frame):
-                r.append(format_line(i_off, n))
+                r.append(format_line(i_off, f"{n} ({v.backend.structure.structure_name})"))
                 v_s = v.backend.dump(bit_offset=bit_off, indent=indent + '  ', width=width)
                 r.append(v_s)
                 continue

@@ -195,6 +195,7 @@ class Frame:
 class FrameStructure(typing.Generic[F]):
     """Frame structure definition"""
     def __init__(self):
+        self.structure_name = "Unnamed"
         self.fields: typing.Dict[str, FieldBase] = {}
         self.fields_length = FieldOffset()
         self.commit_procedures: List[typing.Tuple[Optional[FieldBase], Callable[[F], None]]] = []
@@ -220,6 +221,7 @@ class FrameStructure(typing.Generic[F]):
 
     def finish_building(self, frame: F):
         # find field names
+        self.structure_name = type(frame).__name__
         i_names: typing.Dict[FieldBase, str] = {}
         for member in inspect.getmembers(frame):
             name, v = member
