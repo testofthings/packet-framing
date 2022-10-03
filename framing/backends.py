@@ -52,14 +52,21 @@ class BackendImplementation(FrameBackend):
                 r.append(v_s)
                 continue
             ev = f.encode(v, state)
-            sv = ev.dump(always_wide=True).split("\n")
-            for i in range(0, len(sv)):
-                if i == 0:
-                    line = prefix(i_off, n, sv[i])
-                else:
-                    line = prefix(i_off, "", sv[i])
-                r.append(line)
-                i_off += 16 * 8
+            if ev.bit_length() == 0:
+                r.append(prefix(i_off, n, "()" + " " * 18))
+            elif ev.bit_length() % 8 == 0:
+                # full octets - 'dump' view
+                sv = ev.dump(always_wide=True).split("\n")
+                for i in range(0, len(sv)):
+                    if i == 0:
+                        line = prefix(i_off, n, sv[i])
+                    else:
+                        line = prefix(i_off, "", sv[i])
+                    r.append(line)
+                    i_off += 16 * 8
+            else:
+                # bit-length, just show the bits
+                r.append(prefix(i_off, n, f"b{ev.dump()}" + " " * 18))
             bit_off += f.get_bit_length(self.frame, value=v)
         return "\n".join(r)
 

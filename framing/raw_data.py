@@ -53,11 +53,7 @@ class RawData:
         raise NotImplementedError()
 
     def __repr__(self):
-        if self.bit_length() == 0:
-            return "()"
-        if self.bit_length() % 8 != 0:
-            return "".join([f"{self.bit(i)}" for i in range(0, self.bit_length())])
-        return " ".join([f"{self.octet(o):02x}" for o in range(0, self.byte_length())])
+        return self.dump()
 
     def __bool__(self):
         return self.bit_length() > 0
@@ -80,8 +76,14 @@ class RawData:
         return Raw.sequence([self, other])
 
     def dump(self, always_wide=False) -> str:
+        if self.bit_length() == 0:
+            return "()"
         if self.bit_length() % 8 != 0:
-            return f"{self.bit_length()} bits"  # Not implemented, yet
+            bl = self.bit_length()
+            def div(i: int):
+                return i < bl - 1 and (bl - i - 1) % 4 == 0
+
+            return "".join([f"{self.bit(i)}" + (" " if div(i) else "") for i in range(0, bl)])
         lines = (self.byte_length() + 15) // 16
         r = []
         show_wid = 16 if lines > 1 else self.byte_length()
