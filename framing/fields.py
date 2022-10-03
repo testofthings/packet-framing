@@ -26,6 +26,20 @@ class CopyToField(Calculator):
         self.next_step.push(backend, value)
 
 
+class AddFieldOffset(Calculator):
+    def __init__(self, field: FieldBase, next_step: Calculator):
+        super().__init__(next_step)
+        self.field = field
+
+    def push(self, backend: 'FrameBackend', value: float):
+        off = backend.get_bit_offset(self.field.offset)
+        self.next_step.push(backend, value + off)
+
+    def pull(self, backend: 'FrameBackend') -> float:
+        off = backend.get_bit_offset(self.field.offset)
+        return self.next_step.pull(backend) - off
+
+
 class ValueOf:
     def __init__(self, field: 'IntField'):
         self.end: Calculator = field
@@ -47,22 +61,36 @@ class ConfigurableField(FieldBase[F, T]):
 
     def length_by(self, value: ValueOf) -> Self:
         self.length_resolver = Multiplier(8, value.end)
+        field = self
+
+        def procedure(frame: F):
+            f_len = field.get_bit_length(frame)
+            field.length_resolver.push(frame.backend, f_len)
+        # call at commit to push length
+        self.structure.commit_procedures.append((self, procedure))
         return self
 
     def end_offset_by(self, value: ValueOf) -> Self:
         calc = Multiplier(8, value.end)
+        calc = AddFieldOffset(self, calc)
+        self.length_resolver = calc
         field = self
 
         def procedure(frame: F):
-            f_off = frame.backend.get_bit_offset(field.offset)
             f_len = field.get_bit_length(frame)
-            calc.push(frame.backend, max(0, f_off + f_len))
-
+            field.length_resolver.push(frame.backend, f_len)
+        # call at commit to push length
         self.structure.commit_procedures.append((self, procedure))
         return self
 
     def at_commit(self, procedure: Callable[[F], T]) -> Self:
-        self.commit_procedure = procedure
+        field = self
+
+        def commit_proc(frame: F):
+            value = procedure(frame)
+            frame.backend.set(field, value)
+
+        self.structure.commit_procedures.append((self, commit_proc))
         return self
 
 

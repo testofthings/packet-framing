@@ -65,7 +65,6 @@ class FieldBase(FieldPointer[F, T]):
         self.fixed_bit_length = -1
         self.offset = FieldOffset(self)
         self.structure: Optional['Sturcture'] = None  # set by structure herself
-        self.commit_procedure: Optional[Callable[[F], T]] = None
         self.length_resolver: Optional[Calculator] = None
         self.consumed_by: Optional[FieldBase[F, Any]] = None
 
@@ -259,25 +258,6 @@ class FrameStructure(typing.Generic[F]):
             f.offset.min_tail_length = min_tail
             if f.fixed_bit_length >= 0:
                 min_tail += f.fixed_bit_length
-
-        # collect commit procedures from fields
-        def make_procedure(field: FieldBase):
-            def procedure(fr: F):
-                value = field.commit_procedure(fr)
-                field.set(fr, value)
-            return procedure
-
-        def make_push_length(field: FieldBase):
-            def procedure(fr: F):
-                value = field.get_bit_length(fr)
-                field.length_resolver.push(fr.backend, value)
-            return procedure
-
-        for f in self.fields.values():
-            if f.length_resolver is not None:
-                self.commit_procedures.append((f, make_push_length(f)))
-            if f.commit_procedure is not None:
-                self.commit_procedures.append((f, make_procedure(f)))
 
     def __repr__(self) -> str:
         r = []
