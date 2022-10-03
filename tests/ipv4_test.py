@@ -1,5 +1,5 @@
 from framing.frames import Frames
-from framing.ipv4_frames import IPv4
+from framing.frame_types.ipv4_frames import IPv4
 from framing.raw_data import Raw
 
 

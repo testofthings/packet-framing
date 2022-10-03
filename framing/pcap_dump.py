@@ -3,9 +3,9 @@ import logging
 import os
 import pathlib
 
-from framing.ethernet_frames import Ethernet_Payloads
+from framing.frame_types.ethernet_frames import Ethernet_Payloads
 from framing.frames import Frames
-from framing.pcap_frames import PCAPFile, PCAP_Payloads
+from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads
 from framing.raw_data import Raw
 
 if __name__ == "__main__":

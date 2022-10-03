@@ -1,7 +1,7 @@
 from framing.base import Frame, LayerMapping
 from framing.fields import Structure
 from framing.codecs import IntegerFormat
-from framing.ipv4_frames import IPv4
+from framing.frame_types.ipv4_frames import IPv4
 from framing.raw_data import Raw
 
 

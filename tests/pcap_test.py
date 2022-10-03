@@ -1,7 +1,7 @@
 import pathlib
 
 from framing.frames import Frames
-from framing.pcap_frames import PCAPFile, FileHeader, PacketRecord, PCAP_Payloads
+from framing.frame_types.pcap_frames import PCAPFile, FileHeader, PacketRecord, PCAP_Payloads
 from framing.raw_data import Raw
 
 
