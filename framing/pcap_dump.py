@@ -3,6 +3,7 @@ import logging
 import os
 import pathlib
 
+from framing.ethernet_frames import Ethernet_Payloads
 from framing.frames import Frames
 from framing.pcap_frames import PCAPFile, PCAP_Payloads
 from framing.raw_data import Raw
@@ -25,6 +26,7 @@ if __name__ == "__main__":
         raw_data = Raw.file(pathlib.Path(f_name))
         pcap = PCAPFile(Frames.dissect(raw_data))
         PCAP_Payloads.add_to(pcap)
+        Ethernet_Payloads.add_to(pcap)
 
         hdr = PCAPFile.File_Header[pcap]
         print(f"{Frames.dump(hdr, bit_offset=offset, width=wid)}")

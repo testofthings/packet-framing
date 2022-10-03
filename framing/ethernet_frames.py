@@ -1,6 +1,7 @@
-from framing.base import Frame
+from framing.base import Frame, LayerMapping
 from framing.fields import Structure
 from framing.codecs import IntegerFormat
+from framing.ipv4_frames import IPv4
 from framing.raw_data import Raw
 
 
@@ -16,3 +17,9 @@ class EthernetII(Frame):
 
     # use padding field to meet minimum frame length 64 octets
     padding.at_commit(lambda f: Raw.zeroes(max(64 - (14 + EthernetII.data.get_byte_length(f) + 4), 0)))
+
+
+# Define Ethernet payload type mappings
+Ethernet_Payloads = LayerMapping(EthernetII.data).by(EthernetII.type, {
+    0x0800: IPv4,
+})
