@@ -143,7 +143,7 @@ class FrameBackend:
         """Iterate sequence field values without storing them"""
         raise NotImplementedError()
 
-    def get_as_frame(self, field: FieldBase[F, T]) -> 'Frame':
+    def get_as_frame(self, field: FieldBase[F, T], optional=False) -> 'Optional[Frame]':
         """Get field value as frame, use type information when available"""
         raise NotImplementedError()
 

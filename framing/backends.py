@@ -1,5 +1,5 @@
 import copy
-from typing import Dict, Any, Callable, Iterator, Optional, List
+from typing import Dict, Any, Callable, Iterator, Optional, List, cast
 
 from typing_extensions import Self
 
@@ -37,9 +37,7 @@ class BackendImplementation(FrameBackend):
         bit_off = bit_offset
         for n, f in self.structure.fields.items():
             i_off = bit_off
-            v = self.get_as_frame(f)
-            if isinstance(v, RawFrame):
-                v = self.get(f)
+            v = self.get(f)
             if isinstance(f, Sequence):
                 for num, i in enumerate(v):
                     r.append(format_line(i_off, f"{num}/{len(v)}"))
@@ -105,8 +103,10 @@ class ComposingBackend(BackendImplementation):
         val = self.get(sequence_field)
         return val[index]
 
-    def get_as_frame(self, field: FieldBase[F, T]) -> Frame:
+    def get_as_frame(self, field: FieldBase[F, T], optional=False) -> Optional[Frame]:
         # FIXME: Not implemented
+        if optional:
+            return None
         return RawFrame(self.factory())
 
     def factory(self, decode: RawData = None) -> Callable[[Frame], FrameBackend]:
@@ -149,6 +149,7 @@ class ComposingBackend(BackendImplementation):
         n_frame = copy.copy(self.frame)
         c = ComposingBackend(n_frame)
         n_frame.backend = c
+        # c.mappings = self.mappings  # Note: does not work without parent pointer
         c.changes.update(self.changes)
         if commit:
             c.encode()
@@ -167,6 +168,7 @@ class DissectorBackend(BackendImplementation):
     def get(self, field: FieldBase[F, T]) -> T:
         v = self.value_cache.get(field)
         if v is None:
+            layer = self.map_layer(field)  # FIXME: Only raw value fields!
             bit_offset = self.get_bit_offset(field.offset)
             data = self.data.tailBits(bit_offset)
             if field.fixed_bit_length < 0 and field.offset.min_tail_length:
@@ -177,9 +179,33 @@ class DissectorBackend(BackendImplementation):
             if field.length_resolver:
                 f_len = int(field.length_resolver.pull(self))
                 data = data.subBlockBits(0, f_len)
-            v = field.decode(data, self)
+            if layer:
+                # override field to decode as payload frame
+                v = self.decode_as_frame(field, layer, data)
+            else:
+                v = field.decode(data, self)
             self.value_cache[field] = v
         return v
+
+    def map_layer(self, field: FieldBase) -> Optional[LayerMapping]:
+        """Get layer mappings for a raw field, if any"""
+        for m in self.mappings:
+            mm = m.get_mappings(field)
+            if mm:
+                return m
+        return None
+
+    def decode_as_frame(self, field: FieldBase, mapping: LayerMapping, data: RawData) -> Frame:
+        """Decore raw field as a frame with given mappings"""
+        f_map = mapping.get_mappings(field)
+        for f_ptr, mm in f_map.items():
+            value = f_ptr.get(self.frame)
+            if value in mm:
+                f_type = mm[value]
+                v = f_type(self.factory(data))
+                return v
+        # just raw frame
+        return RawFrame(self.factory(data))
 
     def set(self, field: FieldBase[F, T], value: T) -> Self:
         raise NotImplementedError("set() not supported")
@@ -223,7 +249,10 @@ class DissectorBackend(BackendImplementation):
         elif field.length_resolver:
             # Length resolver
             b_len = field.length_resolver.pull(self)
-        if b_len == -1 and field.offset.min_tail_length > 0:
+        elif self.map_layer(field):
+            # Frame payload, which determines length - FIXME: We should not call map_layer many times!!!
+            pass
+        elif field.offset.min_tail_length > 0:
             # limit data length to leave space for the tail
             off = self.get_bit_offset(field.offset)
             tail_len = self.data.bit_length() - off
@@ -264,22 +293,18 @@ class DissectorBackend(BackendImplementation):
         off = self.get_bit_offset(sequence_field.offset)
         return ItemIterator(off)
 
-    def get_as_frame(self, field: FieldBase[F, T]) -> Frame:
-        bit_offset = self.get_bit_offset(field.offset)
-        bit_len = self.resolve_bit_length(field)
-        if bit_len >= 0:
-            data = self.data.subBlockBits(bit_offset, bit_len)
-        else:
-            data = self.data.tailBits(bit_offset)
-        for m in self.mappings:
-            for f_ptr, mm in m.get_mappings(field).items():
-                value = f_ptr.get(self.frame)
-                if value is None or value not in mm:
-                    continue
-                f_type = mm[value]
-                return f_type(self.factory(data))
-        # No explicit frame type found...
-        return RawFrame(self.factory(data))
+    def get_as_frame(self, field: FieldBase[F, T], optional=False) -> Optional[Frame]:
+        v = self.get(field)
+        if isinstance(v, Frame):
+            return v
+        if optional:
+            return None
+        if not isinstance(v, RawData):
+            # need raw data for a raw frame
+            off = self.get_bit_offset(field.offset)
+            b_len = self.resolve_bit_length(field)
+            v = self.data.subBlockBits(off, b_len)
+        return RawFrame(self.factory(v))
 
     def encode(self) -> RawData:
         bit_length = self.frame.get_bit_length()

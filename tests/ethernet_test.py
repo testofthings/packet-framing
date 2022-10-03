@@ -1,6 +1,9 @@
+import pathlib
+
 from framing.base import *
+from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads, PacketRecord
 from framing.frames import Frames
-from framing.frame_types.ethernet_frames import EthernetII
+from framing.frame_types.ethernet_frames import EthernetII, Ethernet_Payloads
 
 
 def test_ethernet():
@@ -32,3 +35,19 @@ def test_ethernet():
     assert raw.byte_length() == 64
 
     assert eth.get_byte_length() == 64
+
+
+def test_decode_eth_and_ip():
+    b = Raw.file(pathlib.Path("samples/sample-2.pcap"))
+    pcap = PCAPFile(Frames.dissect(b))
+    PCAP_Payloads.add_to(pcap)
+    Ethernet_Payloads.add_to(pcap)
+
+    rec = PCAPFile.Packet_Records.get_item(pcap, 0)
+    eth = PacketRecord.Packet_Data.as_frame(rec)
+    ip = EthernetII.data.as_frame(eth)
+    assert ip.get_bit_length() == 0x34 * 8
+
+    pad = EthernetII.padding[eth]
+    assert EthernetII.padding[eth] == Raw.empty
+    assert eth.get_bit_length() == 528

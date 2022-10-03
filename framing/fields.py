@@ -141,12 +141,20 @@ class RawField(ConfigurableField[F, RawData]):
     def fixed_length(self, bit_length: int):
         self.fixed_bit_length = bit_length
 
+    def get(self, frame: F) -> RawData:
+        v = frame.backend.get(self)
+        if isinstance(v, Frame):
+            # payload can be a frame
+            return v.encode()
+        return v
+
     def get_bit_length(self, frame: F, value: Optional[RawData] = None) -> int:
         if value is not None:
             return value.bit_length()
         b_len = frame.backend.resolve_bit_length(self)
         if b_len < 0:
-            v = frame.backend.get(self)
+            # must resolve value to know the length
+            v = self.get(frame)
             b_len = v.bit_length()
         return b_len
 
