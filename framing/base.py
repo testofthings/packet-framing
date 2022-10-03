@@ -199,12 +199,12 @@ class FrameStructure(typing.Generic[F]):
     def __init__(self):
         self.fields: typing.Dict[str, FieldBase] = {}
         self.fields_length = FieldOffset()
-        self.commit_procedures: List[Callable[[F], None]] = []
+        self.commit_procedures: List[typing.Tuple[Optional[FieldBase], Callable[[F], None]]] = []
         self.built = False
 
     def commit(self, frame: F):
         for cp in self.commit_procedures:
-            cp(frame)
+            cp[1](frame)
 
     @classmethod
     def get_struct(cls, frame_type: F) -> 'FrameStructure[F]':
@@ -276,9 +276,9 @@ class FrameStructure(typing.Generic[F]):
 
         for f in self.fields.values():
             if f.length_resolver is not None:
-                self.commit_procedures.append(make_push_length(f))
+                self.commit_procedures.append((f, make_push_length(f)))
             if f.commit_procedure is not None:
-                self.commit_procedures.append(make_procedure(f))
+                self.commit_procedures.append((f, make_procedure(f)))
 
     def __repr__(self) -> str:
         r = []

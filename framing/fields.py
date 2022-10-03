@@ -58,7 +58,7 @@ class ConfigurableField(FieldBase[F, T]):
             f_len = field.get_bit_length(frame)
             calc.push(frame.backend, max(0, f_off + f_len))
 
-        self.structure.commit_procedures.append(procedure)
+        self.structure.commit_procedures.append((self, procedure))
         return self
 
     def at_commit(self, procedure: Callable[[F], T]) -> Self:
@@ -271,4 +271,4 @@ class Structure(FrameStructure[F]):
         return f
 
     def at_commit(self, update: Callable[[F], None]):
-        self.commit_procedures.append(update)
+        self.commit_procedures.append((None, update))
