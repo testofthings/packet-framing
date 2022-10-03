@@ -65,10 +65,6 @@ class ConfigurableField(FieldBase[F, T]):
         self.commit_procedure = procedure
         return self
 
-    def decode_length(self, procedure: Callable[[F], int]) -> Self:
-        self.decode_length_procedure = procedure
-        return self
-
 
 class RawField(ConfigurableField[F, RawData]):
     """Raw data field"""

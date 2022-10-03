@@ -67,7 +67,6 @@ class FieldBase(FieldPointer[F, T]):
         self.structure: Optional['Sturcture'] = None  # set by structure herself
         self.commit_procedure: Optional[Callable[[F], T]] = None
         self.length_resolver: Optional[Calculator] = None
-        self.decode_length_procedure: Optional[Callable[[F], int]] = None
         self.consumed_by: Optional[FieldBase[F, Any]] = None
 
     def get(self, frame: F) -> T:

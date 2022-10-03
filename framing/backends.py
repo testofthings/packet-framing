@@ -169,9 +169,6 @@ class DissectorBackend(BackendImplementation):
             bit_offset = self.get_bit_offset(field.offset)
             data = self.data.tailBits(bit_offset)
             # FIXME: Nuke length procedure?
-            if field.decode_length_procedure:
-                f_len = field.decode_length_procedure(self.frame)
-                data = data.subBlockBits(0, f_len)
             if field.fixed_bit_length < 0 and field.offset.min_tail_length:
                 data_len = data.bit_length()
                 if data_len >= field.offset.min_tail_length:
@@ -214,12 +211,7 @@ class DissectorBackend(BackendImplementation):
                 cached = self.post_offset.get(prefix.variable_field)
                 if cached is not None:
                     return cached
-                if prefix.variable_field.decode_length_procedure:
-                    f_len = prefix.variable_field.decode_length_procedure(self.frame)
-                    off += f_len
-                else:
-                    # NOTE: We could check if value is cached and provide it
-                    off += prefix.variable_field.get_bit_length(self.frame)
+                off += prefix.variable_field.get_bit_length(self.frame)
                 self.post_offset[prefix.variable_field] = off
         return off
 
@@ -228,9 +220,6 @@ class DissectorBackend(BackendImplementation):
         if field.fixed_bit_length >= 0:
             # Fixed-length field
             b_len = field.fixed_bit_length
-        elif field.decode_length_procedure:
-            # Length procedure (FIXME: Nuke these?)
-            b_len = field.decode_length_procedure(self.frame)
         elif field.length_resolver:
             # Length resolver
             b_len = field.length_resolver.pull(self)
