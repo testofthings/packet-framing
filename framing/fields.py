@@ -5,6 +5,7 @@ from framing.base import *
 
 
 class Multiplier(Calculator):
+    """Multiply (or divide) the value"""
     def __init__(self, multiplier: float, next_step: Calculator):
         super().__init__(next_step)
         self.multiplier = multiplier
@@ -17,6 +18,7 @@ class Multiplier(Calculator):
 
 
 class CopyToField(Calculator):
+    """Copy value to other field on push"""
     def __init__(self, field: 'IntField', next_step: Calculator):
         super().__init__(next_step)
         self.field = field
@@ -27,6 +29,7 @@ class CopyToField(Calculator):
 
 
 class AddFieldOffset(Calculator):
+    """Add field offset to value on push, subtract on pull"""
     def __init__(self, field: FieldBase, next_step: Calculator):
         super().__init__(next_step)
         self.field = field
@@ -40,7 +43,30 @@ class AddFieldOffset(Calculator):
         return self.next_step.pull(backend) - off
 
 
+class FieldOffsetValue(Calculator):
+    """Get field offset value"""
+    def __init__(self, field: FieldBase):
+        super().__init__(None)
+        self.field = field
+
+    def pull(self, backend: 'FrameBackend') -> float:
+        return backend.get_bit_offset(self.field.offset)
+
+
+class PaddingValue(Calculator):
+    """Get padding value, next step calculates padded length"""
+    def __init__(self, target_length: int, next_step: Calculator):
+        super().__init__(next_step)
+        self.target_length = target_length * 8  # target_length in bytes
+
+    def pull(self, backend: 'FrameBackend') -> float:
+        value = self.next_step.pull(backend)
+        len_v = max(0, self.target_length - int(value))
+        return len_v
+
+
 class ValueOf:
+    """Get value from the given field"""
     def __init__(self, field: 'IntField'):
         self.end: Calculator = field
 
@@ -80,6 +106,19 @@ class ConfigurableField(FieldBase[F, T]):
             f_len = field.get_bit_length(frame)
             field.length_resolver.push(frame.backend, f_len)
         # call at commit to push length
+        self.structure.commit_procedures.append((self, procedure))
+        return self
+
+    def pad_to(self, min_offset: int):
+        calc = FieldOffsetValue(self)
+        calc = PaddingValue(min_offset, calc)
+        self.length_resolver = calc
+        field = self
+
+        def procedure(frame: F):
+            pad_to = int(calc.pull(frame.backend))
+            frame.backend.set(field, Raw.zeroes(bit_length=pad_to))
+
         self.structure.commit_procedures.append((self, procedure))
         return self
 
