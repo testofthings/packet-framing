@@ -47,8 +47,9 @@ class BackendImplementation(FrameBackend):
                     r.append(v_s)
                 continue
             if isinstance(v, Frame):
-                r.append(format_line(i_off, f"{n} ({v.backend.structure.structure_name})"))
-                v_s = v.backend.dump(bit_offset=bit_off, indent=indent + '  ', width=width)
+                be = v.backend
+                r.append(format_line(i_off, f"{n} ({be.structure.structure_name})"))
+                v_s = be.dump(bit_offset=bit_off, indent=indent + '  ', width=width, copy_to_avoid_update=True)
                 r.append(v_s)
                 continue
             ev = f.encode(v, state)
@@ -168,7 +169,6 @@ class DissectorBackend(BackendImplementation):
         if v is None:
             bit_offset = self.get_bit_offset(field.offset)
             data = self.data.tailBits(bit_offset)
-            # FIXME: Nuke length procedure?
             if field.fixed_bit_length < 0 and field.offset.min_tail_length:
                 data_len = data.bit_length()
                 if data_len >= field.offset.min_tail_length:
@@ -283,7 +283,7 @@ class DissectorBackend(BackendImplementation):
 
     def encode(self) -> RawData:
         bit_length = self.frame.get_bit_length()
-        return self.data.tailBits(bit_length)
+        return self.data.subBlockBits(0, bit_length)
 
     def input_data(self) -> RawData:
         return self.data
@@ -295,5 +295,6 @@ class DissectorBackend(BackendImplementation):
         n_frame = copy.copy(self.frame)
         c = DissectorBackend(n_frame, limited_data)
         n_frame.backend = c
+        # c.mappings = self.mappings  # Note: does not work without parent pointer
         c.value_cache.update(self.value_cache)
         return c
