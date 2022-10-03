@@ -235,6 +235,18 @@ class ZeroData(RawData):
     def bit(self, bit_offset: int) -> int:
         return 0 if bit_offset < self.length else -1
 
+    def subBlockBits(self, bit_offset: int, bit_length: int) -> 'RawData':
+        return ZeroData(bit_length)
+
+    def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
+        return ZeroData(byte_length * 8)
+
+    def tailBits(self, bit_offset: int) -> 'RawData':
+        return ZeroData(self.length - bit_offset)
+
+    def tailBytes(self, byte_offset: int) -> 'RawData':
+        return ZeroData(self.length - byte_offset * 8)
+
 
 class BitAlignedData(RawData):
     def __init__(self, data: RawData, bit_offset: int, bit_length=-1):
