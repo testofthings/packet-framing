@@ -20,10 +20,6 @@ class IPv4(Frame):
     Source_IP = structure.raw(bits=32)
     Destination_IP = structure.raw(bits=32)
 
-    Options = structure.raw()
+    Options = structure.raw().end_offset_by(ValueOf(IHL) * 4)
 
-    Payload = structure.raw()
-
-    Destination_IP.end_offset_by(ValueOf(IHL) * 4)
-    Payload.end_offset_by(ValueOf(Total_Length))
-
+    Payload = structure.raw().end_offset_by(ValueOf(Total_Length))

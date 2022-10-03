@@ -14,3 +14,11 @@ def test_ipv4():
     assert IPv4.Options[ip] == Raw.empty
     assert IPv4.Payload[ip] == Raw.empty
 
+    # NOTE: Missing option structures and padding logic
+    IPv4.Options[ip] = Raw.hex("01020304")
+    ip.encode()
+    assert IPv4.Version[ip] == 4
+    assert IPv4.IHL[ip] == 6
+    assert IPv4.Total_Length[ip] == 24
+    assert IPv4.Options[ip] == Raw.hex("01020304")
+    assert IPv4.Payload[ip] == Raw.empty
