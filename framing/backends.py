@@ -206,11 +206,11 @@ class DissectorBackend(BackendImplementation):
         prefix = offset.prefix
         if prefix:
             # resolve prefix dynamic length
+            cached = self.post_offset.get(prefix.variable_field) if prefix.variable_field else None
+            if cached is not None:
+                return off + cached
             off += self.get_bit_offset(prefix)
             if prefix.variable_field:
-                cached = self.post_offset.get(prefix.variable_field)
-                if cached is not None:
-                    return cached
                 off += prefix.variable_field.get_bit_length(self.frame)
                 self.post_offset[prefix.variable_field] = off
         return off

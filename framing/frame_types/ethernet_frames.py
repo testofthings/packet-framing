@@ -12,12 +12,8 @@ class EthernetII(Frame):
     source = structure.raw(bytes=6)
     type = structure.integer(IntegerFormat(bytes=2))
     data = structure.raw()
-    padding = structure.raw()
+    padding = structure.raw().pad_to(min_offset=60)
     crc_checksum = structure.raw(bytes=4)
-
-    # use padding field to meet minimum frame length 64 octets
-    padding.at_commit(lambda f: Raw.zeroes(max(64 - (14 + EthernetII.data.get_byte_length(f) + 4), 0)))
-
 
 # Define Ethernet payload type mappings
 Ethernet_Payloads = LayerMapping(EthernetII.data).by(EthernetII.type, {
