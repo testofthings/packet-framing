@@ -28,7 +28,7 @@ class BackendImplementation(FrameBackend):
             return self.copy(commit=True).dump(bit_offset, indent, width, copy_to_avoid_update=False)
         r = []
 
-        def prefix(offset: int, name: str, data="") -> str:
+        def format_line(offset: int, name: str, data="") -> str:
             s = f"{offset // 8:06x} {indent} "
             s_len = max(0, width - 8 - len(indent) - len(name) - len(data))
             return s + name + " " * s_len + f"{data}"
@@ -42,31 +42,31 @@ class BackendImplementation(FrameBackend):
                 v = self.get(f)
             if isinstance(f, Sequence):
                 for num, i in enumerate(v):
-                    r.append(prefix(i_off, "{num}/{len(v)}"))
+                    r.append(format_line(i_off, "{num}/{len(v)}"))
                     v_s = i.backend.dump(bit_offset=bit_off, indent=indent + '  ', width=width)
                     r.append(v_s)
                 continue
             if isinstance(v, Frame):
-                r.append(prefix(i_off, n))
+                r.append(format_line(i_off, n))
                 v_s = v.backend.dump(bit_offset=bit_off, indent=indent + '  ', width=width)
                 r.append(v_s)
                 continue
             ev = f.encode(v, state)
             if ev.bit_length() == 0:
-                r.append(prefix(i_off, n, "()" + " " * 18))
+                r.append(format_line(i_off, n, "()" + " " * 18))
             elif ev.bit_length() % 8 == 0:
                 # full octets - 'dump' view
-                sv = ev.dump(always_wide=True).split("\n")
+                sv = ev.dump(center_line=True).split("\n")
                 for i in range(0, len(sv)):
                     if i == 0:
-                        line = prefix(i_off, n, sv[i])
+                        line = format_line(i_off, n, sv[i])
                     else:
-                        line = prefix(i_off, "", sv[i])
+                        line = format_line(i_off, "", sv[i])
                     r.append(line)
                     i_off += 16 * 8
             else:
                 # bit-length, just show the bits
-                r.append(prefix(i_off, n, f"b{ev.dump()}" + " " * 18))
+                r.append(format_line(i_off, n, f"b{ev.dump()}" + " " * 18))
             bit_off += f.get_bit_length(self.frame, value=v)
         return "\n".join(r)
 

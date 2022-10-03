@@ -31,7 +31,7 @@ def test_bit_alignment():
     assert bb == Raw.hex("ad")
 
     bb = b.tailBits(17)
-    assert f"{bb}" == "0010101"
+    assert f"{bb}" == "001 0101"
 
 
 def test_merged_data():

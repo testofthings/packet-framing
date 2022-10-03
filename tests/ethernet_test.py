@@ -12,10 +12,10 @@ def test_ethernet():
 
     check = f"{eth}"
 
-    assert EthernetII.destination.to_string(eth) == "01 02 03 04 05 06"
-    assert EthernetII.source.to_string(eth) == "00 00 00 00 00 00"
-    assert EthernetII.type.to_string(eth) == "04 2a"
-    assert EthernetII.data.to_string(eth) == "55 66 77 88"
+    assert EthernetII.destination.to_string(eth) == "01 02 03 04 05 06  ......"
+    assert EthernetII.source.to_string(eth) == "00 00 00 00 00 00  ......"
+    assert EthernetII.type.to_string(eth) == "04 2a  .*"
+    assert EthernetII.data.to_string(eth) == "55 66 77 88  Ufw."
     assert EthernetII.padding.to_string(eth) == "()"
 
     assert EthernetII.destination.get_bit_length(eth) == 6 * 8
