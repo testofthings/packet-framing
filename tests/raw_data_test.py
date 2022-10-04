@@ -16,6 +16,8 @@ def test_bits():
     assert b.bit(12) == 1
     assert b.bit(14) == 0
     assert b.bit(15) == 1
+    assert b.bit(16) == -1
+    assert b.bit(152323) == -1
 
 
 def test_bit_alignment():
@@ -50,9 +52,17 @@ def test_merged_data():
     b2 = b.tailBytes(10)
     assert b2 == Raw.empty
 
+    assert b.subBlockBits(5, 0) == Raw.empty
+    assert b.subBlockBits(5, 5) == Raw.empty
+    assert b.subBlockBits(10, 0) == Raw.empty
+    assert b.subBlockBits(10, 2) == Raw.empty
+    assert b.tailBits(5 * 8) == Raw.empty
+    assert b.tailBits(15 * 8) == Raw.empty
+
     b = Raw.sequence([Raw.hex("10"), Raw.bits("1"), Raw.hex("10")])
     assert b.octet(0) == 0x10
     assert b.octet(1) == 0x88
+
 
 
 def test_file():
