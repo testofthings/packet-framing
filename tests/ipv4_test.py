@@ -51,6 +51,6 @@ def test_decode_ip():
     assert BackendImplementation.list_resolved_fields(ip) == []
     a = ip.get_bit_length()
     # FIXME: No need to resolve IHL!
-    assert BackendImplementation.list_resolved_fields(ip) == [IPv4.IHL, IPv4.Total_Length]
+    assert BackendImplementation.list_resolved_fields(ip) == [IPv4.Total_Length]
     a = IPv4.Payload[ip]
     assert BackendImplementation.list_resolved_fields(ip) == [IPv4.IHL, IPv4.Payload, IPv4.Total_Length]

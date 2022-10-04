@@ -31,8 +31,8 @@ class FieldOffset:
         if self.prefix:
             r.append(f"{self.prefix}")
         r.append(f"{self.fixed_bit_offset}")
-        if self.variable_field:
-            r.append(f"{self.variable_field}")
+        if self.field:
+            r.append(self.field.field_name)
         return " + ".join(r)
 
 
@@ -65,6 +65,7 @@ class Field(FieldPointer[F, T]):
         self.fixed_bit_length = -1
         self.offset = FieldOffset(self)
         self.structure: Optional['Sturcture'] = None  # set by structure herself
+        self.end_offset_resolver: Optional[Calculator] = None
         self.length_resolver: Optional[Calculator] = None
         self.consumed_by: Optional[Field[F, Any]] = None
 

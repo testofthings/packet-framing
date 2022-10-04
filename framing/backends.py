@@ -130,12 +130,13 @@ class ComposingBackend(BackendImplementation):
 
     def get_bit_offset(self, offset: FieldOffset) -> int:
         prefix = offset.prefix
-        off = 0
         if prefix:
             # get offset of the prefix
-            off += self.get_bit_offset(prefix)
+            off = self.get_bit_offset(prefix)
             # add prefix variable length to it
             off += prefix.field.get_bit_length(self.frame)
+        else:
+            off = 0
         off += offset.fixed_bit_offset
         return off
 
@@ -173,7 +174,7 @@ class DissectorBackend(BackendImplementation):
         super().__init__(frame)
         self.is_decoding = True
         self.data = data
-        self.offset_cache: Dict[Field, int] = {}  # NOTE: Post offsets for variable-length fields
+        self.end_offset_cache: Dict[Field, int] = {}
 
     def get(self, field: Field[F, T]) -> T:
         v = self.field_values.get(field)
@@ -186,7 +187,10 @@ class DissectorBackend(BackendImplementation):
                 if data_len >= field.offset.min_tail_length:
                     # limit data length to leave space for the tail
                     data = data.subBlockBits(0, data_len - field.offset.min_tail_length)
-            if field.length_resolver:
+            if field.end_offset_resolver:
+                end_offset = int(field.end_offset_resolver.pull(self))
+                data = data.subBlockBits(0, end_offset - bit_offset)
+            elif field.length_resolver:
                 f_len = int(field.length_resolver.pull(self))
                 data = data.subBlockBits(0, f_len)
             if layer:
@@ -238,18 +242,22 @@ class DissectorBackend(BackendImplementation):
             i += 1
 
     def get_bit_offset(self, offset: FieldOffset) -> int:
-        cached = self.offset_cache.get(offset.field)
-        if cached:
-            return cached  # cached offset
         prefix = offset.prefix
-        off = 0
         if prefix:
             # get offset of the prefix
-            off += self.get_bit_offset(prefix)
-            # add prefix variable length to it
-            off += prefix.field.get_bit_length(self.frame)
+            off = self.end_offset_cache.get(prefix.field)
+            if off is None:
+                # not found from the cache
+                if prefix.field.end_offset_resolver:
+                    off = int(prefix.field.end_offset_resolver.pull(self))
+                else:
+                    # prefix offset + variable length
+                    off = self.get_bit_offset(prefix)
+                    off += prefix.field.get_bit_length(self.frame)
+                self.end_offset_cache[prefix.field] = off  # cache for next call
+        else:
+            off = 0
         off += offset.fixed_bit_offset
-        self.offset_cache[offset.field] = off  # cache for next call
         return off
 
     def resolve_bit_length(self, field: Field[F, T]) -> int:

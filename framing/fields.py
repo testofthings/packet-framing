@@ -28,21 +28,6 @@ class CopyToField(Calculator):
         self.next_step.push(backend, value)
 
 
-class AddFieldOffset(Calculator):
-    """Add field offset to value on push, subtract on pull"""
-    def __init__(self, field: Field, next_step: Calculator):
-        super().__init__(next_step)
-        self.field = field
-
-    def push(self, backend: 'FrameBackend', value: float):
-        off = backend.get_bit_offset(self.field.offset)
-        self.next_step.push(backend, value + off)
-
-    def pull(self, backend: 'FrameBackend') -> float:
-        off = backend.get_bit_offset(self.field.offset)
-        return self.next_step.pull(backend) - off
-
-
 class FieldOffsetValue(Calculator):
     """Get field offset value"""
     def __init__(self, field: Field):
@@ -98,13 +83,13 @@ class ConfigurableField(Field[F, T]):
 
     def end_offset_by(self, value: ValueOf) -> Self:
         calc = Multiplier(8, value.end)
-        calc = AddFieldOffset(self, calc)
-        self.length_resolver = calc
+        self.end_offset_resolver = calc
         field = self
 
         def procedure(frame: F):
+            f_off = frame.backend.get_bit_offset(field.offset)
             f_len = field.get_bit_length(frame)
-            field.length_resolver.push(frame.backend, f_len)
+            field.end_offset_resolver.push(frame.backend, f_off + f_len)
         # call at commit to push length
         self.structure.commit_procedures.append((self, procedure))
         return self
