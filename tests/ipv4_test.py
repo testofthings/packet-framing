@@ -1,5 +1,6 @@
 import pathlib
 
+from framing.backends import BackendImplementation
 from framing.frame_types.ethernet_frames import EthernetII
 from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads, PacketRecord
 from framing.frames import Frames
@@ -44,3 +45,12 @@ def test_decode_ip():
     assert IPv4.Total_Length[ip] == 0x34
     assert IPv4.Options[ip] == Raw.empty
     assert ip.get_bit_length() == 0x34 * 8
+
+    # check which fields gets decoded
+    ip = IPv4(Frames.dissect(raw_ip))
+    assert BackendImplementation.list_resolved_fields(ip) == []
+    a = ip.get_bit_length()
+    # FIXME: No need to resolve IHL!
+    assert BackendImplementation.list_resolved_fields(ip) == [IPv4.IHL, IPv4.Total_Length]
+    a = IPv4.Payload[ip]
+    assert BackendImplementation.list_resolved_fields(ip) == [IPv4.IHL, IPv4.Payload, IPv4.Total_Length]

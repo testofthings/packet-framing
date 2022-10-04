@@ -15,6 +15,12 @@ class BackendImplementation(FrameBackend):
         self.known_bit_length = -1
         self.field_values: Dict[FieldBase, Any] = {}
 
+    @classmethod
+    def list_resolved_fields(cls, frame: Frame) -> List[FieldBase]:
+        """List resolved fields for unit tests"""
+        be = cast(BackendImplementation, frame.backend)
+        return sorted(be.field_values.keys())
+
     def get_bit_length(self) -> int:
         if self.known_bit_length < 0:
             self.known_bit_length = self.get_bit_offset(self.structure.fields_length)

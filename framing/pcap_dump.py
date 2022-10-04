@@ -2,6 +2,7 @@ import argparse
 import logging
 import os
 import pathlib
+from typing import Dict
 
 from framing.frame_types.ethernet_frames import Ethernet_Payloads
 from framing.frames import Frames

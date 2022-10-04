@@ -112,6 +112,8 @@ class FieldBase(FieldPointer[F, T]):
     def __repr__(self):
         return f"{self.field_name}: {self.type_name}"
 
+    def __lt__(self, other: 'FieldBase') -> bool:
+        return self.field_name < other.field_name
 
 class FrameBackend:
     """Base class for frame backend"""
