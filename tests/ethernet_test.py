@@ -24,14 +24,14 @@ def test_ethernet():
     assert EthernetII.destination.get_bit_length(eth) == 6 * 8
     assert EthernetII.source.get_bit_length(eth) == 6 * 8
     assert EthernetII.type.get_bit_length(eth) == 2 * 8
-    assert EthernetII.crc_checksum.get_bit_length(eth) == 4 * 8
+    # assert EthernetII.crc_checksum.get_bit_length(eth) == 4 * 8
     assert EthernetII.data.get_bit_length(eth) == 4 * 8
     assert EthernetII.padding.get_bit_length(eth) == 0 * 8
 
-    assert eth.get_byte_length() == 22
+    assert eth.get_byte_length() == 18
 
     raw = eth.backend.encode()
-    assert EthernetII.padding.get_bit_length(eth) == 42 * 8
+    assert EthernetII.padding.get_bit_length(eth) == 46 * 8
     assert raw.byte_length() == 64
 
     assert eth.get_byte_length() == 64

@@ -11,7 +11,7 @@ class EthernetII(Frame):
     source = structure.raw(bytes=6)
     type = structure.integer(IntegerFormat(bytes=2))
     data = structure.raw()
-    padding = structure.raw().pad_to(min_offset=60)
+    padding = structure.raw().pad_to(min_offset=64)
     # this may be missing, merged into padding, when present
     # crc_checksum = structure.raw(bytes=4)
 
