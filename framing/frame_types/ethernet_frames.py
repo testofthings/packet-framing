@@ -12,7 +12,8 @@ class EthernetII(Frame):
     type = structure.integer(IntegerFormat(bytes=2))
     data = structure.raw()
     padding = structure.raw().pad_to(min_offset=60)
-    crc_checksum = structure.raw(bytes=4)
+    # this may be missing, merged into padding, when present
+    # crc_checksum = structure.raw(bytes=4)
 
 
 # Define Ethernet payload type mappings
