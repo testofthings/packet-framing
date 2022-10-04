@@ -288,7 +288,6 @@ class DissectorBackend(BackendImplementation):
                 b = ComposingBackend(frame, self.mappings)
             else:
                 b = DissectorBackend(frame, self.mappings, decode)
-            b.mappings = self.mappings
             b.parent = self
             return b
         return f
