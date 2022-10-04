@@ -13,6 +13,7 @@ class BackendImplementation(FrameBackend):
         super().__init__(frame)
         self.mappings: List[LayerMapping] = []
         self.known_bit_length = -1
+        self.field_values: Dict[FieldBase, Any] = {}
 
     def get_bit_length(self) -> int:
         if self.known_bit_length < 0:
@@ -91,17 +92,16 @@ class ComposingBackend(BackendImplementation):
     """Backend to compose a frame"""
     def __init__(self, frame: Frame):
         super().__init__(frame)
-        self.changes: Dict[FieldBase, Any] = {}
 
     def get(self, field: FieldBase[F, T]) -> T:
-        v = self.changes.get(field)
+        v = self.field_values.get(field)
         if v is None:
             v = field.get_default_value(self.frame)
-            self.changes[field] = v
+            self.field_values[field] = v
         return v
 
     def set(self, field: FieldBase[F, T], value: T) -> Self:
-        self.changes[field] = value
+        self.field_values[field] = value
         return self
 
     def get_item(self, sequence_field: FieldBase, item_field: FieldBase[F, FT], index: int):
@@ -156,7 +156,7 @@ class ComposingBackend(BackendImplementation):
         c.parent = parent
         n_frame.backend = c
         c.mappings = self.mappings  # Note: does not work without parent pointer
-        c.changes.update(self.changes)
+        c.field_values.update(self.field_values)
         return c
 
 
@@ -167,10 +167,9 @@ class DissectorBackend(BackendImplementation):
         self.is_decoding = True
         self.data = data
         self.post_offset: Dict[FieldBase, int] = {}  # NOTE: Post offsets for variable-length fields
-        self.value_cache: Dict[FieldBase, Any] = {}
 
     def get(self, field: FieldBase[F, T]) -> T:
-        v = self.value_cache.get(field)
+        v = self.field_values.get(field)
         if v is None:
             layer = self.map_layer(field)  # FIXME: Only raw value fields!
             bit_offset = self.get_bit_offset(field.offset)
@@ -188,7 +187,7 @@ class DissectorBackend(BackendImplementation):
                 v = self.decode_as_frame(field, layer, data)
             else:
                 v = field.decode(data, self)
-            self.value_cache[field] = v
+            self.field_values[field] = v
         return v
 
     def map_layer(self, field: FieldBase) -> Optional[LayerMapping]:
@@ -215,7 +214,7 @@ class DissectorBackend(BackendImplementation):
         raise NotImplementedError("set() not supported")
 
     def get_item(self, sequence_field: FieldBase, item_field: FieldBase[F, FT], index: int):
-        v = self.value_cache.get(sequence_field)
+        v = self.field_values.get(sequence_field)
         if v is not None:
             return v[index]
 
@@ -275,7 +274,7 @@ class DissectorBackend(BackendImplementation):
         return f
 
     def iterate(self, sequence_field: FieldBase, item_field: FieldBase[F, FT]) -> Iterator[FT]:
-        v = self.value_cache.get(sequence_field)
+        v = self.field_values.get(sequence_field)
         if v is not None:
             return v.__iter__()  # already value in memory (we do not store it here)
 
@@ -335,5 +334,5 @@ class DissectorBackend(BackendImplementation):
         c.parent = parent
         n_frame.backend = c
         c.mappings = self.mappings
-        c.value_cache.update(self.value_cache)
+        c.field_values.update(self.field_values)
         return c
