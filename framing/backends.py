@@ -37,15 +37,16 @@ class BackendImplementation(FrameBackend):
             v = self.get(f)
             if isinstance(f, Sequence):
                 for num, i in enumerate(v):
-                    be = cast(i.backend, BackendImplementation)
+                    be = i.backend
                     if copy_sub_frames:
                         be = be.copy(parent=self)
-                    r.append(format_line(i_off, f"{num}/{len(v)}"))
-                    v_s = be.dump(bit_offset=bit_off, indent=indent + '  ', width=width)
+                    r.append(format_line(i_off, f"{num + 1}/{len(v)}"))
+                    v_s = be.dump(bit_offset=bit_off, indent=indent + '  ', width=width,
+                                  copy_sub_frames=copy_sub_frames)
                     r.append(v_s)
                 continue
             if isinstance(v, Frame):
-                be = cast(BackendImplementation, v.backend)
+                be = v.backend
                 if copy_sub_frames:
                     be = be.copy(parent=self)
                 r.append(format_line(i_off, f"{n} ({be.structure.structure_name})"))
@@ -320,6 +321,7 @@ class DissectorBackend(BackendImplementation):
 
         n_frame = copy.copy(self.frame)
         c = DissectorBackend(n_frame, limited_data)
+        c.parent = parent
         n_frame.backend = c
         c.mappings = self.mappings
         c.value_cache.update(self.value_cache)
