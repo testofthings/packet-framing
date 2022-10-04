@@ -29,7 +29,7 @@ def test_ipv4():
 
 
 def test_decode_ip():
-    b = Raw.file(pathlib.Path("samples/sample-2.pcap"))
+    b = Raw.file(pathlib.Path("samples/sample-1-head.pcap"))
     pcap = PCAPFile(Frames.dissect(b))
     PCAP_Payloads.add_to(pcap)
 

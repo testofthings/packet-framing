@@ -13,8 +13,6 @@ def test_ethernet():
     EthernetII.type[eth] = 1066
     EthernetII.data[eth] = Raw.hex("55 66 77 88")
 
-    check = f"{eth}"
-
     assert EthernetII.destination.to_string(eth) == "01 02 03 04 05 06  ......"
     assert EthernetII.source.to_string(eth) == "00 00 00 00 00 00  ......"
     assert EthernetII.type.to_string(eth) == "04 2a  .*"
@@ -37,8 +35,27 @@ def test_ethernet():
     assert eth.get_byte_length() == 64
 
 
+def test_decode_ethernet():
+    data = Raw.sequence([
+        Raw.hex("01 02 03 04 05 06"),
+        Raw.hex("06 05 04 03 02 01"),
+        Raw.hex("0a 0b"),
+        Raw.hex("10 11 12 13 14 15 16 17 18 19"),
+        Raw.zeroes(64 - 28),
+        Raw.hex("ff ff fe fc"),
+    ])
+    eth = EthernetII(Frames.dissect(data))
+    assert EthernetII.type[eth] == 0x0a0b
+    assert EthernetII.destination[eth] == Raw.hex("010203040506")
+    assert EthernetII.data[eth] == Raw.hex("10111213141516171819") + Raw.zeroes(64 - 28) + Raw.hex("ff ff fe fc")
+    assert EthernetII.padding[eth] == Raw.empty
+    # assert EthernetII.crc_checksum[eth] == Raw.hex("ff ff fe fc")
+
+    assert eth.get_byte_length() == 64
+
+
 def test_decode_eth_and_ip():
-    b = Raw.file(pathlib.Path("samples/sample-2.pcap"))
+    b = Raw.file(pathlib.Path("samples/sample-1-head.pcap"))
     pcap = PCAPFile(Frames.dissect(b))
     PCAP_Payloads.add_to(pcap)
     Ethernet_Payloads.add_to(pcap)
