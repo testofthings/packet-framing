@@ -21,9 +21,9 @@ class EncodingState:
 
 class FieldOffset:
     def __init__(self, field: Optional['Field'] = None):
-        self.prefix: Optional['FieldOffset'] = None
+        self.prefix: Optional[FieldOffset] = None
+        self.field: Optional[Field] = field
         self.fixed_bit_offset = 0
-        self.variable_field: Optional[Field] = field
         self.min_tail_length = 0
 
     def __repr__(self):
@@ -255,7 +255,6 @@ class FrameStructure(typing.Generic[F]):
                 prefix_offset = 0
             else:
                 # fixed length, just add to offset
-                f.offset.variable_field = None  # not variable
                 prefix_offset += f.fixed_bit_length
         self.fields_length.prefix = prefix
         self.fields_length.fixed_bit_offset = prefix_offset
