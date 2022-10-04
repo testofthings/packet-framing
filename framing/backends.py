@@ -23,16 +23,13 @@ class BackendImplementation(FrameBackend):
         self.mappings.append(mapping)
         return self
 
-    def dump(self, bit_offset=0, indent='', width=80, copy_to_avoid_update=False) -> str:
-        if copy_to_avoid_update:
-            return self.copy(commit=True).dump(bit_offset, indent, width, copy_to_avoid_update=False)
-        r = []
-
+    def dump(self, bit_offset=0, indent='', width=80, copy_sub_frames=False) -> str:
         def format_line(offset: int, name: str, data="") -> str:
             s = f"{offset // 8:06x} {indent} "
             s_len = max(0, width - 8 - len(indent) - len(name) - len(data))
             return s + name + " " * s_len + f"{data}"
 
+        r = []
         state = EncodingState()
         bit_off = bit_offset
         for n, f in self.structure.fields.items():
@@ -40,14 +37,19 @@ class BackendImplementation(FrameBackend):
             v = self.get(f)
             if isinstance(f, Sequence):
                 for num, i in enumerate(v):
+                    be = cast(i.backend, BackendImplementation)
+                    if copy_sub_frames:
+                        be = be.copy(parent=self)
                     r.append(format_line(i_off, f"{num}/{len(v)}"))
-                    v_s = i.backend.dump(bit_offset=bit_off, indent=indent + '  ', width=width)
+                    v_s = be.dump(bit_offset=bit_off, indent=indent + '  ', width=width)
                     r.append(v_s)
                 continue
             if isinstance(v, Frame):
-                be = v.backend
+                be = cast(BackendImplementation, v.backend)
+                if copy_sub_frames:
+                    be = be.copy(parent=self)
                 r.append(format_line(i_off, f"{n} ({be.structure.structure_name})"))
-                v_s = be.dump(bit_offset=bit_off, indent=indent + '  ', width=width, copy_to_avoid_update=True)
+                v_s = be.dump(bit_offset=bit_off, indent=indent + '  ', width=width, copy_sub_frames=copy_sub_frames)
                 r.append(v_s)
                 continue
             ev = f.encode(v, state)
@@ -69,12 +71,12 @@ class BackendImplementation(FrameBackend):
             bit_off += f.get_bit_length(self.frame, value=v)
         return "\n".join(r)
 
-    def copy(self, commit=False) -> Self:
+    def copy(self, parent: Optional[FrameBackend] = None) -> Self:
         raise NotImplementedError()
 
     def __repr__(self):
-        # create a copy to show, so that we do not update state
-        return self.dump(copy_to_avoid_update=True)
+        # create a copy to show, so that we do not update state (parent not copied)
+        return self.copy().dump(copy_sub_frames=True)
 
 
 class RawFrame(Frame):
@@ -145,14 +147,13 @@ class ComposingBackend(BackendImplementation):
             f_list.append(f.encode(v, state))
         return Raw.sequence(f_list)
 
-    def copy(self, commit=False) -> Self:
+    def copy(self, parent: Optional[FrameBackend] = None) -> Self:
         n_frame = copy.copy(self.frame)
         c = ComposingBackend(n_frame)
+        c.parent = parent
         n_frame.backend = c
-        # c.mappings = self.mappings  # Note: does not work without parent pointer
+        c.mappings = self.mappings  # Note: does not work without parent pointer
         c.changes.update(self.changes)
-        if commit:
-            c.encode()
         return c
 
 
@@ -313,13 +314,13 @@ class DissectorBackend(BackendImplementation):
     def input_data(self) -> RawData:
         return self.data
 
-    def copy(self, commit=False) -> Self:
+    def copy(self, parent: Optional[FrameBackend] = None) -> Self:
         # do not read more data for printing
         limited_data = self.data.subBlockBits(0, self.data.bits_available())
 
         n_frame = copy.copy(self.frame)
         c = DissectorBackend(n_frame, limited_data)
         n_frame.backend = c
-        # c.mappings = self.mappings  # Note: does not work without parent pointer
+        c.mappings = self.mappings
         c.value_cache.update(self.value_cache)
         return c
