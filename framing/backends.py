@@ -9,9 +9,9 @@ from framing.raw_data import RawData, Raw
 
 
 class BackendImplementation(FrameBackend):
-    def __init__(self, frame: Frame):
+    def __init__(self, frame: Frame, mappings: LayerMapping):
         super().__init__(frame)
-        self.mappings = LayerMapping()
+        self.mappings = mappings
         self.known_bit_length = -1
         self.field_values: Dict[Field, Any] = {}
 
@@ -96,8 +96,8 @@ class RawFrame(Frame):
 
 class ComposingBackend(BackendImplementation):
     """Backend to compose a frame"""
-    def __init__(self, frame: Frame):
-        super().__init__(frame)
+    def __init__(self, frame: Frame, mappings: LayerMapping):
+        super().__init__(frame, mappings)
 
     def get(self, field: Field[F, T]) -> T:
         v = self.field_values.get(field)
@@ -160,18 +160,17 @@ class ComposingBackend(BackendImplementation):
 
     def copy(self, parent: Optional[FrameBackend] = None) -> Self:
         n_frame = copy.copy(self.frame)
-        c = ComposingBackend(n_frame)
+        c = ComposingBackend(n_frame, self.mappings)
         c.parent = parent
         n_frame.backend = c
-        c.mappings = self.mappings  # Note: does not work without parent pointer
         c.field_values.update(self.field_values)
         return c
 
 
 class DissectorBackend(BackendImplementation):
     """Backend to dissect frame from raw data"""
-    def __init__(self, frame: Frame, data: RawData):
-        super().__init__(frame)
+    def __init__(self, frame: Frame, mappings: LayerMapping, data: RawData):
+        super().__init__(frame, mappings)
         self.is_decoding = True
         self.data = data
         self.end_offset_cache: Dict[Field, int] = {}
@@ -205,8 +204,8 @@ class DissectorBackend(BackendImplementation):
         """Decore raw field as a frame with given mappings"""
         for f_ptr, mm in mapping.items():
             value = f_ptr.get(self.frame)
-            if value in mm:
-                f_type = mm[value]
+            f_type = mm.get(value)
+            if f_type is not None:
                 v = f_type(self.factory(data))
                 return v
         # just raw frame
@@ -272,9 +271,9 @@ class DissectorBackend(BackendImplementation):
     def factory(self, decode: RawData = None) -> Callable[[Frame], FrameBackend]:
         def f(frame: Frame):
             if decode is None:
-                b = ComposingBackend(frame)
+                b = ComposingBackend(frame, self.mappings)
             else:
-                b = DissectorBackend(frame, decode)
+                b = DissectorBackend(frame, self.mappings, decode)
             b.mappings = self.mappings
             b.parent = self
             return b
@@ -337,9 +336,8 @@ class DissectorBackend(BackendImplementation):
         limited_data = self.data.subBlockBits(0, self.data.bits_available())
 
         n_frame = copy.copy(self.frame)
-        c = DissectorBackend(n_frame, limited_data)
+        c = DissectorBackend(n_frame, self.mappings, limited_data)
         c.parent = parent
         n_frame.backend = c
-        c.mappings = self.mappings
         c.field_values.update(self.field_values)
         return c

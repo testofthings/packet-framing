@@ -119,9 +119,7 @@ class ByteData(RawData):
         return self.length
 
     def octet(self, byte_offset: int) -> int:
-        if byte_offset < self.length:
-            return self.data[self.start + byte_offset]
-        return -1
+        return self.data[self.start + byte_offset] if byte_offset < self.length else -1
 
     def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
         ml = min(byte_length, max(0, self.length - byte_offset))
@@ -186,9 +184,7 @@ class RawDataSequence(RawData):
         if bit_offset == 0 and bit_length == self.bit_length():
             return self
         off = 0
-        end_offset = bit_offset + bit_length
-        if end_offset > self.bit_length():
-            raise EOFError(f"{end_offset} beyond end")
+        end_offset = min(bit_offset + bit_length, self.bit_length())
         nc = []
         for c in self.components:
             c_len = c.bit_length()
