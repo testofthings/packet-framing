@@ -1,9 +1,9 @@
 import copy
-from typing import Dict, Any, Callable, Iterator, Optional, List, cast
+from typing import Dict, Any, Callable, Iterator, Optional, List, cast, Type
 
 from typing_extensions import Self
 
-from framing.base import FrameBackend, Frame, EncodingState, Field, F, T, LayerMapping, FieldOffset
+from framing.base import FrameBackend, Frame, EncodingState, Field, F, T, LayerMapping, FieldOffset, FieldPointer
 from framing.fields import Sequence, FT, Structure
 from framing.raw_data import RawData, Raw
 
@@ -11,7 +11,7 @@ from framing.raw_data import RawData, Raw
 class BackendImplementation(FrameBackend):
     def __init__(self, frame: Frame):
         super().__init__(frame)
-        self.mappings: List[LayerMapping] = []
+        self.mappings = LayerMapping()
         self.known_bit_length = -1
         self.field_values: Dict[Field, Any] = {}
 
@@ -27,7 +27,7 @@ class BackendImplementation(FrameBackend):
         return self.known_bit_length
 
     def add_mapping(self, mapping: 'LayerMapping') -> Self:
-        self.mappings.append(mapping)
+        mapping.merge(self.mappings)
         return self
 
     def dump(self, bit_offset=0, indent='', width=80, copy_sub_frames=False) -> str:
@@ -179,7 +179,7 @@ class DissectorBackend(BackendImplementation):
     def get(self, field: Field[F, T]) -> T:
         v = self.field_values.get(field)
         if v is None:
-            layer = self.map_layer(field)  # FIXME: Only raw value fields!
+            layer_map = self.mappings.get_mappings(field)
             bit_offset = self.get_bit_offset(field.offset)
             data = self.data.tailBits(bit_offset)
             if field.fixed_bit_length < 0 and field.offset.min_tail_length:
@@ -193,26 +193,17 @@ class DissectorBackend(BackendImplementation):
             elif field.length_resolver:
                 f_len = int(field.length_resolver.pull(self))
                 data = data.subBlockBits(0, f_len)
-            if layer:
+            if layer_map:
                 # override field to decode as payload frame
-                v = self.decode_as_frame(field, layer, data)
+                v = self.decode_as_frame(field, layer_map, data)
             else:
                 v = field.decode(data, self)
             self.field_values[field] = v
         return v
 
-    def map_layer(self, field: Field) -> Optional[LayerMapping]:
-        """Get layer mappings for a raw field, if any"""
-        for m in self.mappings:
-            mm = m.get_mappings(field)
-            if mm:
-                return m
-        return None
-
-    def decode_as_frame(self, field: Field, mapping: LayerMapping, data: RawData) -> Frame:
+    def decode_as_frame(self, field: Field, mapping: Dict[FieldPointer, Dict[Any, Type[Frame]]], data: RawData) -> Frame:
         """Decore raw field as a frame with given mappings"""
-        f_map = mapping.get_mappings(field)
-        for f_ptr, mm in f_map.items():
+        for f_ptr, mm in mapping.items():
             value = f_ptr.get(self.frame)
             if value in mm:
                 f_type = mm[value]
@@ -268,8 +259,8 @@ class DissectorBackend(BackendImplementation):
         elif field.length_resolver:
             # Length resolver
             b_len = field.length_resolver.pull(self)
-        elif self.map_layer(field):
-            # Frame payload, which determines length - FIXME: We should not call map_layer many times!!!
+        elif self.mappings.is_mapped(field):
+            # Frame payload, which determines length
             pass
         elif field.offset.min_tail_length > 0:
             # limit data length to leave space for the tail

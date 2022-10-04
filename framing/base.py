@@ -297,10 +297,10 @@ class FieldPath(FieldPointer[F, T]):
 
 class LayerMapping:
     """Map lower layer selector into upper layer payload"""
-    def __init__(self, payload: Field):
-        self._mappings: Dict[Field, Dict[FieldPointer, Dict]] = {
-            payload: {}
-        }
+    def __init__(self, payload: Field = None):
+        self._mappings: Dict[Field, Dict[FieldPointer, Dict]] = {}
+        if payload:
+            self._mappings[payload] = {}
         self._payload = payload
 
     def by(self, type_field: FieldPointer[Any, T], mappings: typing.Dict[T, Type[Frame]]) -> Self:
@@ -309,11 +309,22 @@ class LayerMapping:
         mp.setdefault(type_field, {}).update(mappings)
         return self
 
-    def get_mappings(self, payload: Field) -> Dict[FieldPointer, Dict[Any, Type[Frame]]]:
+    def is_mapped(self, payload: Field) -> bool:
+        """Is payload mapped?"""
+        return payload in self._mappings
+
+    def get_mappings(self, payload: Field) -> Optional[Dict[FieldPointer, Dict[Any, Type[Frame]]]]:
         """Get mappings for a payload, if any"""
-        return self._mappings.get(payload) or {}
+        return self._mappings.get(payload)
 
     def add_to(self, frame: F) -> F:
         """Add mappings to a frame"""
         frame.backend.add_mapping(self)
         return frame
+
+    def merge(self, mapping: 'LayerMapping') -> Self:
+        """Merge mappings with other mapping object"""
+        for f, mm in self._mappings.items():
+            mapping._mappings.setdefault(f, {}).update(mm)
+        return self
+
