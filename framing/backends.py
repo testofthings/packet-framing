@@ -45,11 +45,13 @@ class BackendImplementation(FrameBackend):
                                   copy_sub_frames=copy_sub_frames)
                     r.append(v_s)
                 continue
+            if isinstance(v, RawFrame):
+                v = v.encode()
             if isinstance(v, Frame):
                 be = v.backend
                 if copy_sub_frames:
                     be = be.copy(parent=self)
-                r.append(format_line(i_off, f"{n} ({be.structure.structure_name})"))
+                r.append(format_line(i_off, f"{n} ({be.structure_name()})"))
                 v_s = be.dump(bit_offset=bit_off, indent=indent + '  ', width=width, copy_sub_frames=copy_sub_frames)
                 r.append(v_s)
                 continue

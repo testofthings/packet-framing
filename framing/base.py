@@ -123,6 +123,9 @@ class FrameBackend:
             self.structure.finish_building(frame)
         self.parent: Optional[FrameBackend] = None
 
+    def structure_name(self) -> str:
+        return self.structure.structure_name
+
     def get(self, field: FieldBase[F, T]) -> T:
         raise NotImplementedError()
 
