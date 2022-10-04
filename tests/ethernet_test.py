@@ -54,6 +54,20 @@ def test_decode_ethernet():
     assert eth.get_byte_length() == 64
 
 
+def test_decode_short_ethernet():
+    # These gets captured, must handle with ease
+    data = Raw.sequence([
+        Raw.hex("01 02 03 04 05 06"),
+        Raw.hex("06 05 04 03 02 01"),
+        Raw.hex("0a 0b"),
+        Raw.hex("10 11 12 13"),
+    ])
+    eth = EthernetII(Frames.dissect(data))
+    assert EthernetII.data[eth] == Raw.hex("10111213")
+    assert EthernetII.padding[eth] == Raw.empty
+    assert eth.get_byte_length() == 18
+
+
 def test_decode_eth_and_ip():
     b = Raw.file(pathlib.Path("samples/sample-1-head.pcap"))
     pcap = PCAPFile(Frames.dissect(b))

@@ -1,5 +1,7 @@
 import pathlib
 
+from framing.frame_types.ethernet_frames import EthernetII, Ethernet_Payloads
+from framing.frame_types.ipv4_frames import IPv4
 from framing.frames import Frames
 from framing.frame_types.pcap_frames import PCAPFile, FileHeader, PacketRecord, PCAP_Payloads
 from framing.raw_data import Raw
@@ -60,14 +62,26 @@ def test_pcap_decode_payload():
 
 
 def test_pcap_layering():
-    b = Raw.file(pathlib.Path("samples/sample-1.pcap"))
+    b = Raw.file(pathlib.Path("samples/sample-1-head.pcap"))
     pcap = PCAPFile(Frames.dissect(b))
     PCAP_Payloads.add_to(pcap)
+    Ethernet_Payloads.add_to(pcap)
 
     rec = pcap.Packet_Records.get_item(pcap, 1)
-    payload = PacketRecord.Packet_Data.as_frame(rec)
+    eth = PacketRecord.Packet_Data.as_frame(rec)
+    assert isinstance(eth, EthernetII)
+    assert eth.get_byte_length() == 66
+    assert eth.get_bit_length() == 66 * 8
+    assert EthernetII.data[eth].get_byte_length() == 52
+    assert EthernetII.padding[eth] == Raw.empty
 
-    assert payload.get_byte_length() == 66
-    assert payload.get_bit_length() == 66 * 8
+    ip = EthernetII.data.as_frame(eth)
+    assert isinstance(ip, IPv4)
+
+    rec = pcap.Packet_Records.get_item(pcap, 2)
+    eth = PacketRecord.Packet_Data.as_frame(rec)
+    assert eth.get_bit_length() == 42 * 8
+    assert EthernetII.data[eth].get_byte_length() == 28
+    assert EthernetII.padding[eth] == Raw.empty
 
     b.close()
