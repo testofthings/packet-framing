@@ -114,16 +114,13 @@ class ComposingBackend(BackendImplementation):
         val = self.get(sequence_field)
         return val[index]
 
-    def get_as_frame(self, field: Field[F, T], optional=False) -> Optional[Frame]:
+    def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type[F]] = None) -> Optional[Frame]:
         # FIXME: Not implemented
-        if optional:
-            return None
         return RawFrame(self.factory())
 
     def factory(self, decode: RawData = None) -> Callable[[Frame], FrameBackend]:
         def f(frame: Frame):
-            b = ComposingBackend(frame)
-            b.mappings = self.mappings
+            b = ComposingBackend(frame, self.mappings)
             b.parent = self
             return b
         return f
@@ -178,20 +175,8 @@ class DissectorBackend(BackendImplementation):
     def get(self, field: Field[F, T]) -> T:
         v = self.field_values.get(field)
         if v is None:
+            data = self.get_raw(field)
             layer_map = self.mappings.get_mappings(field)
-            bit_offset = self.get_bit_offset(field.offset)
-            data = self.data.tailBits(bit_offset)
-            if field.fixed_bit_length < 0 and field.offset.min_tail_length:
-                data_len = data.bit_length()
-                if data_len >= field.offset.min_tail_length:
-                    # limit data length to leave space for the tail
-                    data = data.subBlockBits(0, data_len - field.offset.min_tail_length)
-            if field.end_offset_resolver:
-                end_offset = int(field.end_offset_resolver.pull(self))
-                data = data.subBlockBits(0, end_offset - bit_offset)
-            elif field.length_resolver:
-                f_len = int(field.length_resolver.pull(self))
-                data = data.subBlockBits(0, f_len)
             if layer_map:
                 # override field to decode as payload frame
                 v = self.decode_as_frame(field, layer_map, data)
@@ -199,6 +184,35 @@ class DissectorBackend(BackendImplementation):
                 v = field.decode(data, self)
             self.field_values[field] = v
         return v
+
+    def get_raw(self, field: Field) -> RawData:
+        bit_offset = self.get_bit_offset(field.offset)
+        bit_length = -1
+
+        if field.fixed_bit_length < 0:
+            # variable length field
+            if field.end_offset_resolver:
+                # end offset resolver
+                bit_length = int(field.end_offset_resolver.pull(self)) - bit_offset
+            elif field.length_resolver:
+                # field length resolver
+                bit_length = int(field.length_resolver.pull(self))
+
+            if field.offset.min_tail_length:
+                data_len = self.data.bit_length()
+                end_offset = bit_offset + max(0, bit_length)
+                if data_len - end_offset > field.offset.min_tail_length:
+                    # limit data length to leave space for the tail
+                    bit_length = data_len - field.offset.min_tail_length - bit_offset
+        else:
+            # constant length field
+            bit_length = field.fixed_bit_length
+
+        if bit_length < 0:
+            data = self.data.tailBits(bit_offset)
+        else:
+            data = self.data.subBlockBits(bit_offset, bit_length)
+        return data
 
     def decode_as_frame(self, field: Field, mapping: Dict[FieldPointer, Dict[Any, Type[Frame]]], data: RawData) -> Frame:
         """Decore raw field as a frame with given mappings"""
@@ -302,12 +316,13 @@ class DissectorBackend(BackendImplementation):
         off = self.get_bit_offset(sequence_field.offset)
         return ItemIterator(off)
 
-    def get_as_frame(self, field: Field[F, T], optional=False) -> Optional[Frame]:
+    def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type[F]] = None) -> Optional[Frame]:
+        if frame_type:
+            raw_data = self.get_raw(field)
+            return frame_type(self.factory(raw_data))
         v = self.get(field)
         if isinstance(v, Frame):
             return v
-        if optional:
-            return None
         if not isinstance(v, RawData):
             # need raw data for a raw frame
             off = self.get_bit_offset(field.offset)
