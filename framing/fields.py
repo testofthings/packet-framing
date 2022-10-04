@@ -30,7 +30,7 @@ class CopyToField(Calculator):
 
 class AddFieldOffset(Calculator):
     """Add field offset to value on push, subtract on pull"""
-    def __init__(self, field: FieldBase, next_step: Calculator):
+    def __init__(self, field: Field, next_step: Calculator):
         super().__init__(next_step)
         self.field = field
 
@@ -45,7 +45,7 @@ class AddFieldOffset(Calculator):
 
 class FieldOffsetValue(Calculator):
     """Get field offset value"""
-    def __init__(self, field: FieldBase):
+    def __init__(self, field: Field):
         super().__init__(None)
         self.field = field
 
@@ -83,7 +83,7 @@ class ValueOf:
         return self
 
 
-class ConfigurableField(FieldBase[F, T]):
+class ConfigurableField(Field[F, T]):
 
     def length_by(self, value: ValueOf) -> Self:
         self.length_resolver = Multiplier(8, value.end)
@@ -233,7 +233,7 @@ class SubStructureField(ConfigurableField[F, FT]):
 
 
 class Sequence(ConfigurableField[F, List[FT]]):
-    def __init__(self, sub: FieldBase[F, FT]):
+    def __init__(self, sub: Field[F, FT]):
         super().__init__("sequence", [])
         self.sub = sub
         self.structure = sub.structure

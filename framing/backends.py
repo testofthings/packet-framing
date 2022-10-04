@@ -3,7 +3,7 @@ from typing import Dict, Any, Callable, Iterator, Optional, List, cast
 
 from typing_extensions import Self
 
-from framing.base import FrameBackend, Frame, EncodingState, FieldBase, F, T, LayerMapping, FieldOffset
+from framing.base import FrameBackend, Frame, EncodingState, Field, F, T, LayerMapping, FieldOffset
 from framing.fields import Sequence, FT, Structure
 from framing.raw_data import RawData, Raw
 
@@ -13,10 +13,10 @@ class BackendImplementation(FrameBackend):
         super().__init__(frame)
         self.mappings: List[LayerMapping] = []
         self.known_bit_length = -1
-        self.field_values: Dict[FieldBase, Any] = {}
+        self.field_values: Dict[Field, Any] = {}
 
     @classmethod
-    def list_resolved_fields(cls, frame: Frame) -> List[FieldBase]:
+    def list_resolved_fields(cls, frame: Frame) -> List[Field]:
         """List resolved fields for unit tests"""
         be = cast(BackendImplementation, frame.backend)
         return sorted(be.field_values.keys())
@@ -99,22 +99,22 @@ class ComposingBackend(BackendImplementation):
     def __init__(self, frame: Frame):
         super().__init__(frame)
 
-    def get(self, field: FieldBase[F, T]) -> T:
+    def get(self, field: Field[F, T]) -> T:
         v = self.field_values.get(field)
         if v is None:
             v = field.get_default_value(self.frame)
             self.field_values[field] = v
         return v
 
-    def set(self, field: FieldBase[F, T], value: T) -> Self:
+    def set(self, field: Field[F, T], value: T) -> Self:
         self.field_values[field] = value
         return self
 
-    def get_item(self, sequence_field: FieldBase, item_field: FieldBase[F, FT], index: int):
+    def get_item(self, sequence_field: Field, item_field: Field[F, FT], index: int):
         val = self.get(sequence_field)
         return val[index]
 
-    def get_as_frame(self, field: FieldBase[F, T], optional=False) -> Optional[Frame]:
+    def get_as_frame(self, field: Field[F, T], optional=False) -> Optional[Frame]:
         # FIXME: Not implemented
         if optional:
             return None
@@ -138,7 +138,7 @@ class ComposingBackend(BackendImplementation):
                 off += prefix.variable_field.get_bit_length(self.frame)
         return off
 
-    def resolve_bit_length(self, field: FieldBase[F, T]) -> int:
+    def resolve_bit_length(self, field: Field[F, T]) -> int:
         b_len = -1
         if field.fixed_bit_length >= 0:
             # Fixed-length field
@@ -172,9 +172,9 @@ class DissectorBackend(BackendImplementation):
         super().__init__(frame)
         self.is_decoding = True
         self.data = data
-        self.post_offset: Dict[FieldBase, int] = {}  # NOTE: Post offsets for variable-length fields
+        self.post_offset: Dict[Field, int] = {}  # NOTE: Post offsets for variable-length fields
 
-    def get(self, field: FieldBase[F, T]) -> T:
+    def get(self, field: Field[F, T]) -> T:
         v = self.field_values.get(field)
         if v is None:
             layer = self.map_layer(field)  # FIXME: Only raw value fields!
@@ -196,7 +196,7 @@ class DissectorBackend(BackendImplementation):
             self.field_values[field] = v
         return v
 
-    def map_layer(self, field: FieldBase) -> Optional[LayerMapping]:
+    def map_layer(self, field: Field) -> Optional[LayerMapping]:
         """Get layer mappings for a raw field, if any"""
         for m in self.mappings:
             mm = m.get_mappings(field)
@@ -204,7 +204,7 @@ class DissectorBackend(BackendImplementation):
                 return m
         return None
 
-    def decode_as_frame(self, field: FieldBase, mapping: LayerMapping, data: RawData) -> Frame:
+    def decode_as_frame(self, field: Field, mapping: LayerMapping, data: RawData) -> Frame:
         """Decore raw field as a frame with given mappings"""
         f_map = mapping.get_mappings(field)
         for f_ptr, mm in f_map.items():
@@ -216,10 +216,10 @@ class DissectorBackend(BackendImplementation):
         # just raw frame
         return RawFrame(self.factory(data))
 
-    def set(self, field: FieldBase[F, T], value: T) -> Self:
+    def set(self, field: Field[F, T], value: T) -> Self:
         raise NotImplementedError("set() not supported")
 
-    def get_item(self, sequence_field: FieldBase, item_field: FieldBase[F, FT], index: int):
+    def get_item(self, sequence_field: Field, item_field: Field[F, FT], index: int):
         v = self.field_values.get(sequence_field)
         if v is not None:
             return v[index]
@@ -250,7 +250,7 @@ class DissectorBackend(BackendImplementation):
                 self.post_offset[prefix.variable_field] = off
         return off
 
-    def resolve_bit_length(self, field: FieldBase[F, T]) -> int:
+    def resolve_bit_length(self, field: Field[F, T]) -> int:
         b_len = -1
         if field.fixed_bit_length >= 0:
             # Fixed-length field
@@ -279,7 +279,7 @@ class DissectorBackend(BackendImplementation):
             return b
         return f
 
-    def iterate(self, sequence_field: FieldBase, item_field: FieldBase[F, FT]) -> Iterator[FT]:
+    def iterate(self, sequence_field: Field, item_field: Field[F, FT]) -> Iterator[FT]:
         v = self.field_values.get(sequence_field)
         if v is not None:
             return v.__iter__()  # already value in memory (we do not store it here)
@@ -302,7 +302,7 @@ class DissectorBackend(BackendImplementation):
         off = self.get_bit_offset(sequence_field.offset)
         return ItemIterator(off)
 
-    def get_as_frame(self, field: FieldBase[F, T], optional=False) -> Optional[Frame]:
+    def get_as_frame(self, field: Field[F, T], optional=False) -> Optional[Frame]:
         v = self.get(field)
         if isinstance(v, Frame):
             return v

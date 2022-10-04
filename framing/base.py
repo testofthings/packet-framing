@@ -20,10 +20,10 @@ class EncodingState:
 
 
 class FieldOffset:
-    def __init__(self, field: Optional['FieldBase'] = None):
+    def __init__(self, field: Optional['Field'] = None):
         self.prefix: Optional['FieldOffset'] = None
         self.fixed_bit_offset = 0
-        self.variable_field: Optional[FieldBase] = field
+        self.variable_field: Optional[Field] = field
         self.min_tail_length = 0
 
     def __repr__(self):
@@ -56,7 +56,7 @@ class FieldPointer(typing.Generic[F, T]):
         raise NotImplementedError()
 
 
-class FieldBase(FieldPointer[F, T]):
+class Field(FieldPointer[F, T]):
     """Base class for fields"""
     def __init__(self, type_name: str, default_value: T):
         self.field_name = "field?"
@@ -66,7 +66,7 @@ class FieldBase(FieldPointer[F, T]):
         self.offset = FieldOffset(self)
         self.structure: Optional['Sturcture'] = None  # set by structure herself
         self.length_resolver: Optional[Calculator] = None
-        self.consumed_by: Optional[FieldBase[F, Any]] = None
+        self.consumed_by: Optional[Field[F, Any]] = None
 
     def get(self, frame: F) -> T:
         return frame.backend.get(self)
@@ -106,13 +106,13 @@ class FieldBase(FieldPointer[F, T]):
         enc = self.encode(self.get(frame), EncodingState())
         return f"{enc}"
 
-    def __truediv__(self, other: 'FieldBase[Any, T]') -> 'FieldPath':
+    def __truediv__(self, other: 'Field[Any, T]') -> 'FieldPath':
         return FieldPath(self) / other
 
     def __repr__(self):
         return f"{self.field_name}: {self.type_name}"
 
-    def __lt__(self, other: 'FieldBase') -> bool:
+    def __lt__(self, other: 'Field') -> bool:
         return self.field_name < other.field_name
 
 class FrameBackend:
@@ -128,27 +128,27 @@ class FrameBackend:
     def structure_name(self) -> str:
         return self.structure.structure_name
 
-    def get(self, field: FieldBase[F, T]) -> T:
+    def get(self, field: Field[F, T]) -> T:
         raise NotImplementedError()
 
-    def set(self, field: FieldBase[F, T], value: T) -> Self:
+    def set(self, field: Field[F, T], value: T) -> Self:
         raise NotImplementedError("Editing not allowed with this backend")
 
     def get_bit_offset(self, offset: FieldOffset) -> int:
         raise NotImplementedError()
 
-    def resolve_bit_length(self, field: FieldBase[F, T]) -> int:
+    def resolve_bit_length(self, field: Field[F, T]) -> int:
         """Resolve bit length without encoding, return -1 if not available"""
         return -1
 
-    def get_item(self, sequence_field: FieldBase, item_field: FieldBase[F, T], index: int):
+    def get_item(self, sequence_field: Field, item_field: Field[F, T], index: int):
         raise NotImplementedError()
 
-    def iterate(self, sequence_field: FieldBase, item_field: FieldBase[F, T]) -> typing.Iterator[T]:
+    def iterate(self, sequence_field: Field, item_field: Field[F, T]) -> typing.Iterator[T]:
         """Iterate sequence field values without storing them"""
         raise NotImplementedError()
 
-    def get_as_frame(self, field: FieldBase[F, T], optional=False) -> 'Optional[Frame]':
+    def get_as_frame(self, field: Field[F, T], optional=False) -> 'Optional[Frame]':
         """Get field value as frame, use type information when available"""
         raise NotImplementedError()
 
@@ -201,9 +201,9 @@ class FrameStructure(typing.Generic[F]):
     """Frame structure definition"""
     def __init__(self):
         self.structure_name = "Unnamed"
-        self.fields: typing.Dict[str, FieldBase] = {}
+        self.fields: typing.Dict[str, Field] = {}
         self.fields_length = FieldOffset()
-        self.commit_procedures: List[typing.Tuple[Optional[FieldBase], Callable[[F], None]]] = []
+        self.commit_procedures: List[typing.Tuple[Optional[Field], Callable[[F], None]]] = []
         self.built = False
 
     def commit(self, frame: F):
@@ -216,7 +216,7 @@ class FrameStructure(typing.Generic[F]):
             return getattr(frame_type, "structure_")  # underscored to avoid naming collision
         return getattr(frame_type, "structure")
 
-    def is_field_here(self, field: FieldBase) -> bool:
+    def is_field_here(self, field: Field) -> bool:
         f = self.fields.get(field.field_name)
         return f == field
 
@@ -227,10 +227,10 @@ class FrameStructure(typing.Generic[F]):
     def finish_building(self, frame: F):
         # find field names
         self.structure_name = type(frame).__name__
-        i_names: typing.Dict[FieldBase, str] = {}
+        i_names: typing.Dict[Field, str] = {}
         for member in inspect.getmembers(frame):
             name, v = member
-            if isinstance(v, FieldBase):
+            if isinstance(v, Field):
                 i_names[v] = name
         # ...keep order of fields
         old_names = self.fields.copy()
@@ -274,10 +274,10 @@ class FrameStructure(typing.Generic[F]):
 
 
 class FieldPath(FieldPointer[F, T]):
-    def __init__(self, start: FieldBase[F, T]):
+    def __init__(self, start: Field[F, T]):
         self.path = [start]
 
-    def __truediv__(self, other: FieldBase[Any, T]) -> 'FieldPath':
+    def __truediv__(self, other: Field[Any, T]) -> 'FieldPath':
         self.path.append(other)
         return self
 
@@ -297,8 +297,8 @@ class FieldPath(FieldPointer[F, T]):
 
 class LayerMapping:
     """Map lower layer selector into upper layer payload"""
-    def __init__(self, payload: FieldBase):
-        self._mappings: Dict[FieldBase, Dict[FieldPointer, Dict]] = {
+    def __init__(self, payload: Field):
+        self._mappings: Dict[Field, Dict[FieldPointer, Dict]] = {
             payload: {}
         }
         self._payload = payload
@@ -309,7 +309,7 @@ class LayerMapping:
         mp.setdefault(type_field, {}).update(mappings)
         return self
 
-    def get_mappings(self, payload: FieldBase) -> Dict[FieldPointer, Dict[Any, Type[Frame]]]:
+    def get_mappings(self, payload: Field) -> Dict[FieldPointer, Dict[Any, Type[Frame]]]:
         """Get mappings for a payload, if any"""
         return self._mappings.get(payload) or {}
 
