@@ -92,7 +92,7 @@ class Field(FieldPointer[F, T]):
     def get_byte_length(self, frame: F, value: Optional[T] = None) -> int:
         return self.get_bit_length(frame, value) // 8
 
-    def as_frame(self, frame: F) -> 'Frame':
+    def as_frame(self, frame: F, frame_type: Optional[Type[F]] = None) -> 'Frame':
         """Return value as frame, use type information when available"""
         return frame.backend.get_as_frame(self)
 
@@ -149,8 +149,8 @@ class FrameBackend:
         """Iterate sequence field values without storing them"""
         raise NotImplementedError()
 
-    def get_as_frame(self, field: Field[F, T], optional=False) -> 'Optional[Frame]':
-        """Get field value as frame, use type information when available"""
+    def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type[F]] = None) -> 'Optional[Frame]':
+        """Get field value as frame, use implicit or explicit type"""
         raise NotImplementedError()
 
     def factory(self, decode: RawData = None) -> Callable[['Frame'], 'FrameBackend']:

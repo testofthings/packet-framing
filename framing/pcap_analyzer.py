@@ -36,17 +36,18 @@ class PCAPScanner:
         raw_data = Raw.file(file)
         try:
             pcap = PCAPFile(Frames.dissect(raw_data))
-            PCAP_Payloads.add_to(pcap)
+            # PCAP_Payloads.add_to(pcap)  # handle link type manually for performance
             Ethernet_Payloads.add_to(pcap)
 
             hdr = PCAPFile.File_Header[pcap]
-            assert FileHeader.LinkType[hdr] == 1, "Non-Ethernet capture not supported"
+            link_type = FileHeader.LinkType[hdr]
+            assert link_type == 1, "Non-Ethernet capture not supported"
 
             frame_num = 0
             for i, rec in enumerate(PCAPFile.Packet_Records.iterate(pcap)):
                 frame_num += 1
                 self.pcap_frame_count += 1
-                eth = PacketRecord.Packet_Data[rec]
+                eth = PacketRecord.Packet_Data.as_frame(rec, frame_type=EthernetII)
                 eth_dt = EthernetII.type[eth]
                 self.ethernet_data_type_count[eth_dt] = self.ethernet_data_type_count.get(eth_dt, 0) + 1
                 if eth_dt == 0x0800:
