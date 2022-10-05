@@ -1,3 +1,4 @@
+import ipaddress
 import pathlib
 
 from framing.raw_data import Raw, ByteData
@@ -26,6 +27,7 @@ def test_bit_alignment():
     assert bb.octet(0) == 0x3a
     assert bb.octet(1) == 0xd1
     assert bb == Raw.hex("3ad1")
+    assert bb.as_bytes(0, 2) == bytes.fromhex("3ad1")
 
     bb = bb.subBlockBits(4, 8)
     assert isinstance(bb, ByteData)
@@ -42,6 +44,7 @@ def test_merged_data():
     assert b.byte_length() == 5
     assert b == Raw.hex("01 02 03 04 05")
     assert b != Raw.hex("01 02 03 04 ff")
+    assert b.as_bytes(1, 4) == bytes.fromhex("02030405")
 
     b2 = b.tailBytes(1)
     assert b2 == Raw.hex("02 03 04 05")
@@ -64,8 +67,12 @@ def test_merged_data():
     assert b.octet(1) == 0x88
 
 
-
 def test_file():
     b = Raw.file(pathlib.Path("samples/hello-world.txt"))
     assert b == Raw.hex("48 65 6c 6c 6f 2c 20 77 6f 72 6c 64 21 0a")
     assert b.byte_length() == 14
+
+
+def test_ip_address():
+    assert Raw.hex("01020304").as_ip_address() == ipaddress.ip_address("1.2.3.4")
+    assert Raw.hex("00000000 00000000 00000000 00000001").as_ip_address() == ipaddress.ip_address("::1")

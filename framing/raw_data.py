@@ -1,6 +1,7 @@
+import ipaddress
 import mmap
 import pathlib
-from typing import Iterable, List, BinaryIO
+from typing import Iterable, List, BinaryIO, Union
 
 
 class RawData:
@@ -25,6 +26,25 @@ class RawData:
     def octet(self, byte_offset: int) -> int:
         """Get octet by offset or -1 if past EOF"""
         raise NotImplementedError()
+
+    def as_bytes(self, byte_offset: int, byte_length: int) -> bytes:
+        """Get data as bytes, EOF if not enough available"""
+        # NOTE: Default implementation is slow!
+        b = bytearray(byte_length)
+        for i in range(0, byte_length):
+            v = self.octet(byte_offset + i)
+            if v < 0:
+                raise EOFError("Not enough bytes available")
+            b[i] = v
+        return b
+
+    def as_ip_address(self) -> Union[ipaddress.IPv6Address, ipaddress.IPv4Address]:
+        bl = self.bit_length()
+        if bl == 32:
+            return ipaddress.IPv4Address(self.as_bytes(0, 4))
+        if bl == 128:
+            return ipaddress.IPv6Address(self.as_bytes(0, 16))
+        raise ValueError("Raw data is not IP address: " + self.to_hex())
 
     def bit(self, bit_offset: int) -> int:
         """Get bit by offset or -1 if past EOF"""
@@ -77,7 +97,12 @@ class RawData:
     def __add__(self, other: 'RawData') -> 'RawData':
         return Raw.sequence([self, other])
 
+    def to_hex(self) -> str:
+        """Show as hex string"""
+        return "".join([f"{self.octet(i):02x}" for i in range(0, self.byte_length())])
+
     def dump(self, center_line=False) -> str:
+        """Print a classic data dump"""
         if self.bit_length() == 0:
             return "()"
         if self.bit_length() % 8 != 0:
@@ -120,6 +145,12 @@ class ByteData(RawData):
 
     def octet(self, byte_offset: int) -> int:
         return self.data[self.start + byte_offset] if byte_offset < self.length else -1
+
+    def as_bytes(self, byte_offset: int, byte_length: int) -> bytes:
+        ml = min(byte_length, max(0, self.length - byte_offset))
+        if ml < byte_length:
+            raise EOFError("Not enough bytes")
+        return self.data[byte_offset:byte_offset + ml]
 
     def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
         ml = min(byte_length, max(0, self.length - byte_offset))
