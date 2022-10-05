@@ -2,10 +2,11 @@ import ipaddress
 import pathlib
 
 from framing.backends import BackendImplementation
-from framing.frame_types.ethernet_frames import EthernetII
+from framing.frame_types.ethernet_frames import EthernetII, Ethernet_Payloads
 from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads, PacketRecord
+from framing.frame_types.tcp_frames import TCP
 from framing.frames import Frames
-from framing.frame_types.ipv4_frames import IPv4
+from framing.frame_types.ipv4_frames import IPv4, IP_Payloads
 from framing.raw_data import Raw
 
 
@@ -52,5 +53,17 @@ def test_decode_ip():
     assert BackendImplementation.list_resolved_fields(ip) == [IPv4.Total_Length]
     a = IPv4.Payload[ip]
     assert BackendImplementation.list_resolved_fields(ip) == [IPv4.IHL, IPv4.Payload, IPv4.Total_Length]
+
+    pcap.close()
+
+
+def test_decode_payload():
+    pcap = PCAPFile.open_file(pathlib.Path("samples/sample-1-head.pcap"),
+                              mappings=PCAP_Payloads + Ethernet_Payloads + IP_Payloads)
+
+    ip = PCAPFile.Packet_Records.item(pcap, 0) / PacketRecord.Packet_Data / EthernetII.data
+    pl = IPv4.Payload.as_frame(ip)
+    assert isinstance(ip, IPv4)
+    assert isinstance(pl, TCP)
 
     pcap.close()

@@ -1,6 +1,7 @@
-from framing.base import Frame
+from framing.base import Frame, LayerMapping
 from framing.codecs import IntegerFormat
 from framing.fields import Structure, ValueOf
+from framing.frame_types.tcp_frames import TCP
 
 
 class IPv4(Frame):
@@ -23,3 +24,9 @@ class IPv4(Frame):
     Options = structure.raw().end_offset_by(ValueOf(IHL) * 4)
 
     Payload = structure.raw().end_offset_by(ValueOf(Total_Length))
+
+
+# Define IP protocol type mappings
+IP_Payloads = LayerMapping(IPv4.Payload).by(IPv4.Protocol, {
+    0x06: TCP,
+})
