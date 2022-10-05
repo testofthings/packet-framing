@@ -1,5 +1,4 @@
 import enum
-import math
 from typing import Iterator
 
 from framing.base import *
@@ -11,10 +10,10 @@ class Multiplier(Calculator):
         super().__init__(next_step)
         self.multiplier = multiplier
 
-    def pull(self, backend: 'FrameBackend') -> float:
+    def pull(self, backend: FrameBackend) -> float:
         return self.next_step.pull(backend) * self.multiplier
 
-    def push(self, backend: 'FrameBackend', value: float):
+    def push(self, backend: FrameBackend, value: float):
         self.next_step.push(backend, value / self.multiplier)
 
 
@@ -24,7 +23,7 @@ class CopyToField(Calculator):
         super().__init__(next_step)
         self.field = field
 
-    def push(self, backend: 'FrameBackend', value: float):
+    def push(self, backend: FrameBackend, value: float):
         backend.set(self.field, int(value))
         self.next_step.push(backend, value)
 
@@ -35,7 +34,7 @@ class FieldOffsetValue(Calculator):
         super().__init__(None)
         self.field = field
 
-    def pull(self, backend: 'FrameBackend') -> float:
+    def pull(self, backend: FrameBackend) -> float:
         return backend.get_bit_offset(self.field.offset)
 
 
@@ -45,7 +44,7 @@ class PaddingValue(Calculator):
         super().__init__(next_step)
         self.target_length = target_length * 8  # target_length in bytes
 
-    def pull(self, backend: 'FrameBackend') -> float:
+    def pull(self, backend: FrameBackend) -> float:
         value = self.next_step.pull(backend)
         len_v = max(0, self.target_length - int(value))
         return len_v
