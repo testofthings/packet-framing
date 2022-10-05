@@ -263,11 +263,27 @@ class Sequence(ConfigurableField[F, List[FT]]):
         else:
             raise NotImplementedError("Only sub-structure sequences supported, now")
             # self.item_fixed_bit_length = self.item_codec.get_fixed_bit_length() if item_codec else -1
+        self.count_resolver: Optional[Calculator] = None
         sub.consumed_by = self
+
+    def count_by(self, value: ValueOf) -> Self:
+        self.count_resolver = value.end
+        return self
 
     def iterate(self, frame: F) -> Iterator[FT]:
         """Get item by index"""
-        return frame.backend.iterate(self, self.sub)
+        known_count = int(self.count_resolver.pull(frame.backend)) if self.count_resolver else -1
+        return frame.backend.iterate(self, self.sub, known_count)
+
+    def get_count(self, frame: F) -> int:
+        if self.count_resolver:
+            return int(self.count_resolver.pull(frame.backend))
+        # horrible way...
+        c = 0
+        it = self.iterate(frame)
+        for _ in it:
+            c += 1
+        return c
 
     def item(self, frame: F, index: int) -> FT:
         return frame.backend.get_item(self, self.sub, index)
@@ -314,8 +330,11 @@ class Sequence(ConfigurableField[F, List[FT]]):
         return Raw.sequence(r)
 
     def decode(self, data: RawData, backend: FrameBackend) -> List[FT]:
+        known_count = int(self.count_resolver.pull(backend)) if self.count_resolver else -1
         r = []
         while True:
+            if 0 <= known_count <= len(r):
+                break
             if data.octet(0) < 0:
                 break  # no more data to read
             if self.item_codec:

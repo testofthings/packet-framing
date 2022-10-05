@@ -20,3 +20,7 @@ def test_decode_dns():
     assert DNSHeader.ID[hdr] == Raw.octets(0x59, 0x80)
     assert DNSHeader.QDCOUNT[hdr] == 1
 
+    qds = DNSMessage.Question[msg]
+    assert len(qds) == 1
+    qd = qds[0]
+

@@ -146,7 +146,7 @@ class FrameBackend:
     def get_item(self, sequence_field: Field, item_field: Field[F, T], index: int):
         raise NotImplementedError()
 
-    def iterate(self, sequence_field: Field, item_field: Field[F, T]) -> typing.Iterator[T]:
+    def iterate(self, sequence_field: Field, item_field: Field[F, T], count=-1) -> typing.Iterator[T]:
         """Iterate sequence field values without storing them"""
         raise NotImplementedError()
 
