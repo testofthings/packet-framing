@@ -4,6 +4,10 @@ import pathlib
 from typing import Iterable, List, BinaryIO, Union
 
 
+# IP address, shouldn't this be defined by Python?
+IPAddress = Union[ipaddress.IPv6Address, ipaddress.IPv4Address]
+
+
 class RawData:
     """Raw data buffer"""
 
@@ -38,7 +42,7 @@ class RawData:
             b[i] = v
         return b
 
-    def as_ip_address(self) -> Union[ipaddress.IPv6Address, ipaddress.IPv4Address]:
+    def as_ip_address(self) -> IPAddress:
         bl = self.bit_length()
         if bl == 32:
             return ipaddress.IPv4Address(self.as_bytes(0, 4))
@@ -150,7 +154,8 @@ class ByteData(RawData):
         ml = min(byte_length, max(0, self.length - byte_offset))
         if ml < byte_length:
             raise EOFError("Not enough bytes")
-        return self.data[byte_offset:byte_offset + ml]
+        mo = self.start + byte_offset
+        return self.data[mo:mo + ml]
 
     def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
         ml = min(byte_length, max(0, self.length - byte_offset))

@@ -1,3 +1,4 @@
+import ipaddress
 import pathlib
 
 from framing.backends import BackendImplementation
@@ -42,6 +43,8 @@ def test_decode_ip():
 
     assert IPv4.Version[ip] == 4
     assert IPv4.IHL[ip] == 5
+    assert IPv4.Source_IP[ip].as_ip_address() == ipaddress.ip_address("18.194.10.142")
+    assert IPv4.Destination_IP[ip].as_ip_address() == ipaddress.ip_address("192.168.4.16")
     assert IPv4.Total_Length[ip] == 0x34
     assert IPv4.Options[ip] == Raw.empty
     assert ip.get_bit_length() == 0x34 * 8
