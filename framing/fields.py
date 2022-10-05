@@ -1,3 +1,4 @@
+import enum
 import math
 from typing import Iterator
 
@@ -165,6 +166,9 @@ class IntField(ConfigurableField[F, int], Calculator):
         super().__init__("int", default_value)
         self.codec = codec
         self.fixed_bit_length = codec.get_fixed_bit_length()
+
+    def flag_values(self, definition: Type[enum.IntFlag]) -> Self:
+        return self
 
     def get_bit_length(self, frame: F, value: Optional[int] = None) -> int:
         b_len = self.codec.get_fixed_bit_length()

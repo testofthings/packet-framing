@@ -3,7 +3,7 @@ import pathlib
 from framing.frame_types.ethernet_frames import Ethernet_Payloads, EthernetII
 from framing.frame_types.ipv4_frames import IPv4
 from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads, PacketRecord
-from framing.frame_types.tcp_frames import TCP
+from framing.frame_types.tcp_frames import TCP, TCPFlag
 from framing.frames import Frames
 from framing.raw_data import Raw
 
@@ -15,6 +15,8 @@ def test_decode_tcp():
     tcp = TCP(Frames.dissect(raw))
     assert TCP.Checksum[tcp] == Raw.octets(0x84, 0x25)
     assert TCP.Data[tcp] == Raw.empty
+    assert TCP.Flags[tcp] & TCPFlag.FIN == 0
+    assert TCP.Flags[tcp] & TCPFlag.ACK != 0
 
     raw = IPv4.Payload[PCAPFile.Packet_Records.item(pcap, 6) / PacketRecord.Packet_Data / EthernetII.data]
     tcp = TCP(Frames.dissect(raw))

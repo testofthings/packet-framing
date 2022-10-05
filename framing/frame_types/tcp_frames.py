@@ -1,3 +1,5 @@
+import enum
+
 from framing.base import Frame
 from framing.codecs import IntegerFormat
 from framing.fields import Structure, ValueOf
@@ -21,4 +23,21 @@ class TCP(Frame):
     Options = structure.raw()
     Padding = structure.raw().end_offset_by(ValueOf(Data_offset) * 4)
     Data = structure.raw()
+
+
+class TCPFlag(enum.IntFlag):
+    """TCP flag definitions"""
+    NS  = 0b100000000
+    CWR = 0b010000000
+    ECE = 0b001000000
+    URG = 0b000100000
+    ACK = 0b000010000
+    PSH = 0b000001000
+    RST = 0b000000100
+    SYN = 0b000000010
+    FIN = 0b000000001
+
+
+TCP.Flags.flag_values(TCPFlag)
+
 
