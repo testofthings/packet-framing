@@ -38,6 +38,26 @@ class FieldOffsetValue(Calculator):
         return backend.get_bit_offset(self.field.offset)
 
 
+class FieldLengthByTerminator(Calculator):
+    """Get field offset value"""
+    def __init__(self, field: Field, terminator: RawData):
+        super().__init__(None)
+        self.field = field
+        assert terminator.bit_length() == 8, "Only supporting 8-bit terminators"
+        self.terminator = terminator.octet(0)
+
+    def pull(self, backend: FrameBackend) -> float:
+        f_off = backend.get_bit_offset(self.field.offset) // 8
+        data = backend.input_data()
+        v = data.octet(f_off)
+        while v != -1:
+            f_off += 1
+            if v == self.terminator:
+                break
+            v = data.octet(f_off)
+        return f_off * 8
+
+
 class PaddingValue(Calculator):
     """Get padding value, next step calculates padded length"""
     def __init__(self, target_length: int, next_step: Calculator):
@@ -79,6 +99,10 @@ class ConfigurableField(Field[F, T]):
             field.length_resolver.push(frame.backend, f_len)
         # call at commit to push length
         self.structure.commit_procedures.append((self, procedure))
+        return self
+
+    def terminator(self, value: RawData) -> Self:
+        self.end_offset_resolver = FieldLengthByTerminator(self, value)
         return self
 
     def end_offset_by(self, value: ValueOf) -> Self:
