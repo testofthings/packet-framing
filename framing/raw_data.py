@@ -366,6 +366,11 @@ class Raw:
         return ByteData(data, 0, len(data))
 
     @classmethod
+    def octets(cls, *data: int) -> RawData:
+        b = bytes(data)
+        return ByteData(b, 0, len(b))
+
+    @classmethod
     def string(cls, value: str, encoding='ascii'):
         return cls.bytes(value.encode(encoding))
 
