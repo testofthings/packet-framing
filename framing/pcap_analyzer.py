@@ -2,10 +2,11 @@ import argparse
 import logging
 import os
 import pathlib
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 from framing.frame_types.ethernet_frames import Ethernet_Payloads, EthernetII
-from framing.frame_types.ipv4_frames import IPv4
+from framing.frame_types.ipv4_frames import IPv4, IP_Payloads
+from framing.frame_types.tcp_frames import TCP
 from framing.frames import Frames
 from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads, PacketRecord, FileHeader
 from framing.raw_data import Raw, IPAddress
@@ -20,7 +21,7 @@ class PCAPScanner:
         self.pcap_frame_count = 0
         self.ethernet_data_type_count: Dict[int, int] = {}
         self.ip_data_type_count: Dict[int, int] = {}
-        self.ip_addresses: Dict[IPAddress, int] = {}
+        self.ip_endpoints: Dict[Tuple[IPAddress, str], int] = {}
 
     def scan_files(self, file_list: List[pathlib.Path], limit=0):
         for file in file_list:
@@ -42,6 +43,7 @@ class PCAPScanner:
             pcap = PCAPFile(Frames.dissect(raw_data))
             # PCAP_Payloads.add_to(pcap)  # handle link type manually for performance
             Ethernet_Payloads.add_to(pcap)
+            IP_Payloads.add_to(pcap)
 
             hdr = PCAPFile.File_Header[pcap]
             link_type = FileHeader.LinkType[hdr]
@@ -55,11 +57,17 @@ class PCAPScanner:
                 eth_dt = EthernetII.type[eth]
                 self.ethernet_data_type_count[eth_dt] = self.ethernet_data_type_count.get(eth_dt, 0) + 1
                 if eth_dt == 0x0800:
-                    ip = EthernetII.data[eth]
+                    ip = EthernetII.data.as_frame(eth)
                     ip_td = IPv4.Protocol[ip]
                     self.ip_data_type_count[ip_td] = self.ip_data_type_count.get(ip_td, 0) + 1
-                    for ad in (IPv4.Source_IP[ip].as_ip_address(), IPv4.Destination_IP[ip].as_ip_address()):
-                        self.ip_addresses[ad] = self.ip_addresses.get(ad, 0) + 1
+                    pay = IPv4.Payload.as_frame(ip)
+
+                    src_ip, dst_ip = IPv4.Source_IP[ip].as_ip_address(), IPv4.Destination_IP[ip].as_ip_address()
+                    if isinstance(pay, TCP):
+                        src_port, dst_port = TCP.Source_port[pay], TCP.Destination_port[pay]
+                        ep = dst_ip, f"tcp:{dst_port}"
+                        self.ip_endpoints[ep] = self.ip_endpoints.get(ep, 0) + 1
+
 
         finally:
             raw_data.close()
@@ -80,8 +88,8 @@ class PCAPScanner:
         r.append("IP payload types and addresses:")
         for t, c in sorted(self.ip_data_type_count.items()):
             r.append(f"  0x{t:02x}: {c}")
-        for a, c in sorted(self.ip_addresses.items(), key=lambda x: f"{x[0]}"):
-            r.append(f"  {a}: {c}")
+        for a, c in sorted(self.ip_endpoints.items(), key=lambda x: f"{x[0]}"):
+            r.append(f"  {a[0]}:{a[1]}: {c}")
         return "\n".join(r)
 
 
