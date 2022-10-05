@@ -8,7 +8,7 @@ from framing.frame_types.ethernet_frames import Ethernet_Payloads, EthernetII
 from framing.frame_types.ipv4_frames import IPv4
 from framing.frames import Frames
 from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads, PacketRecord, FileHeader
-from framing.raw_data import Raw
+from framing.raw_data import Raw, IPAddress
 
 
 class PCAPScanner:
@@ -20,6 +20,7 @@ class PCAPScanner:
         self.pcap_frame_count = 0
         self.ethernet_data_type_count: Dict[int, int] = {}
         self.ip_data_type_count: Dict[int, int] = {}
+        self.ip_addresses: Dict[IPAddress, int] = {}
 
     def scan_files(self, file_list: List[pathlib.Path], limit=0):
         for file in file_list:
@@ -57,6 +58,9 @@ class PCAPScanner:
                     ip = EthernetII.data[eth]
                     ip_td = IPv4.Protocol[ip]
                     self.ip_data_type_count[ip_td] = self.ip_data_type_count.get(ip_td, 0) + 1
+                    for ad in (IPv4.Source_IP[ip].as_ip_address(), IPv4.Destination_IP[ip].as_ip_address()):
+                        self.ip_addresses[ad] = self.ip_addresses.get(ad, 0) + 1
+
         finally:
             raw_data.close()
 
@@ -73,9 +77,11 @@ class PCAPScanner:
         for t, c in sorted(self.ethernet_data_type_count.items()):
             r.append(f"  0x{t:04x}: {c}")
 
-        r.append("IP payload types:")
+        r.append("IP payload types and addresses:")
         for t, c in sorted(self.ip_data_type_count.items()):
             r.append(f"  0x{t:02x}: {c}")
+        for a, c in sorted(self.ip_addresses.items(), key=lambda x: f"{x[0]}"):
+            r.append(f"  {a}: {c}")
         return "\n".join(r)
 
 
