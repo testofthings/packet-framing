@@ -6,7 +6,8 @@ from typing import Dict, List, Tuple
 
 from framing.frame_types.ethernet_frames import Ethernet_Payloads, EthernetII
 from framing.frame_types.ipv4_frames import IPv4, IP_Payloads
-from framing.frame_types.tcp_frames import TCP
+from framing.frame_types.tcp_frames import TCP, TCPFlag
+from framing.frame_types.udp_frames import UDP
 from framing.frames import Frames
 from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads, PacketRecord, FileHeader
 from framing.raw_data import Raw, IPAddress
@@ -62,10 +63,18 @@ class PCAPScanner:
                     self.ip_data_type_count[ip_td] = self.ip_data_type_count.get(ip_td, 0) + 1
                     pay = IPv4.Payload.as_frame(ip)
 
-                    src_ip, dst_ip = IPv4.Source_IP[ip].as_ip_address(), IPv4.Destination_IP[ip].as_ip_address()
                     if isinstance(pay, TCP):
-                        src_port, dst_port = TCP.Source_port[pay], TCP.Destination_port[pay]
+                        flags = TCP.Flags[pay]
+                        if flags & TCPFlag.SYN == 0 or flags & TCPFlag.ACK != 0:
+                            continue  # not initial handshake
+                        src_ip, dst_ip = IPv4.Source_IP[ip].as_ip_address(), IPv4.Destination_IP[ip].as_ip_address()
+                        dst_port = TCP.Destination_port[pay]
                         ep = dst_ip, f"tcp:{dst_port}"
+                        self.ip_endpoints[ep] = self.ip_endpoints.get(ep, 0) + 1
+                    elif isinstance(pay, UDP):
+                        src_ip, dst_ip = IPv4.Source_IP[ip].as_ip_address(), IPv4.Destination_IP[ip].as_ip_address()
+                        dst_port = UDP.Destination_port[pay]
+                        ep = dst_ip, f"udp:{dst_port}"
                         self.ip_endpoints[ep] = self.ip_endpoints.get(ep, 0) + 1
 
 
