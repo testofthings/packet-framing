@@ -31,14 +31,9 @@ def test_ipv4():
 
 
 def test_decode_ip():
-    b = Raw.file(pathlib.Path("samples/sample-1-head.pcap"))
-    pcap = PCAPFile(Frames.dissect(b))
-    PCAP_Payloads.add_to(pcap)
+    pcap = PCAPFile.open_file(pathlib.Path("samples/sample-1-head.pcap"), mappings=PCAP_Payloads)
 
-    rec = PCAPFile.Packet_Records.get_item(pcap, 0)
-    eth = PacketRecord.Packet_Data.as_frame(rec)
-    raw_ip = EthernetII.data[eth]
-
+    raw_ip = EthernetII.data[PCAPFile.Packet_Records.item(pcap, 0) / PacketRecord.Packet_Data]
     ip = IPv4(Frames.dissect(raw_ip))
 
     assert IPv4.Version[ip] == 4
@@ -57,3 +52,5 @@ def test_decode_ip():
     assert BackendImplementation.list_resolved_fields(ip) == [IPv4.Total_Length]
     a = IPv4.Payload[ip]
     assert BackendImplementation.list_resolved_fields(ip) == [IPv4.IHL, IPv4.Payload, IPv4.Total_Length]
+
+    pcap.close()

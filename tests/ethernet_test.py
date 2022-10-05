@@ -1,6 +1,7 @@
 import pathlib
 
 from framing.base import *
+from framing.frame_types.ipv4_frames import IPv4
 from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads, PacketRecord
 from framing.frames import Frames
 from framing.frame_types.ethernet_frames import EthernetII, Ethernet_Payloads
@@ -69,12 +70,9 @@ def test_decode_short_ethernet():
 
 
 def test_decode_eth_and_ip():
-    b = Raw.file(pathlib.Path("samples/sample-1-head.pcap"))
-    pcap = PCAPFile(Frames.dissect(b))
-    PCAP_Payloads.add_to(pcap)
-    Ethernet_Payloads.add_to(pcap)
+    pcap = PCAPFile.open_file(pathlib.Path("samples/sample-1-head.pcap"), mappings=PCAP_Payloads + Ethernet_Payloads)
 
-    rec = PCAPFile.Packet_Records.get_item(pcap, 0)
+    rec = PCAPFile.Packet_Records.item(pcap, 0)
     eth = PacketRecord.Packet_Data.as_frame(rec)
     ip = EthernetII.data.as_frame(eth)
     assert ip.get_bit_length() == 0x34 * 8
@@ -82,3 +80,12 @@ def test_decode_eth_and_ip():
     pad = EthernetII.padding[eth]
     assert EthernetII.padding[eth] == Raw.empty
     assert eth.get_bit_length() == 528
+
+    ip = EthernetII.data.as_frame(eth)
+    assert isinstance(ip, IPv4)
+    assert isinstance(EthernetII.data[eth], RawData)
+    # or
+    ip = eth / EthernetII.data
+    assert isinstance(ip, IPv4)
+
+    pcap.close()

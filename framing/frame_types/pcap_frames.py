@@ -1,3 +1,6 @@
+import pathlib
+from typing import Optional
+
 from framing.base import Frame, LayerMapping
 from framing.codecs import IntegerFormat
 from framing.fields import Structure, Sequence, ValueOf
@@ -38,6 +41,10 @@ class PCAPFile(Frame):
     File_Header = structure.sub(FileHeader)
     Packet_Records = Sequence(structure.sub(PacketRecord))
 
+    @classmethod
+    def open_file(cls, file: pathlib.Path, mappings: Optional[LayerMapping]) -> 'PCAPFile':
+        f = PCAPFile(Frames.dissect_file(file))
+        return mappings.add_to(f) if mappings else f
 
 # Define ARP payload type mappings
 PCAP_Payloads = LayerMapping(PacketRecord.Packet_Data).by(PCAPFile.File_Header / FileHeader.LinkType, {

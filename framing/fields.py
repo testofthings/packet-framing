@@ -133,6 +133,13 @@ class RawField(ConfigurableField[F, RawData]):
             return v.encode()
         return v
 
+    def __getitem__(self, frame: F) -> T:
+        v = frame.backend.get(self)
+        if isinstance(v, Frame):
+            # payload can be a frame
+            return v.encode()
+        return v
+
     def get_bit_length(self, frame: F, value: Optional[RawData] = None) -> int:
         if value is not None:
             return value.bit_length()
@@ -235,7 +242,7 @@ class Sequence(ConfigurableField[F, List[FT]]):
         """Get item by index"""
         return frame.backend.iterate(self, self.sub)
 
-    def get_item(self, frame: F, index: int) -> FT:
+    def item(self, frame: F, index: int) -> FT:
         return frame.backend.get_item(self, self.sub, index)
 
     def set_repeat(self, frame: F, count: int) -> List[F]:

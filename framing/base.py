@@ -116,6 +116,7 @@ class Field(FieldPointer[F, T]):
     def __lt__(self, other: 'Field') -> bool:
         return self.field_name < other.field_name
 
+
 class FrameBackend:
     """Base class for frame backend"""
     def __init__(self, frame: 'Frame'):
@@ -176,6 +177,13 @@ class FrameBackend:
     def dump(self, bit_offset=0, indent='', width=0, copy_to_avoid_update=False) -> str:
         raise NotImplementedError()
 
+    def close(self) -> Self:
+        """Close underlying open files if any"""
+        return self
+
+
+TF = typing.TypeVar("TF", bound='Frame')
+
 
 class Frame:
     """Base class for frames"""
@@ -193,6 +201,14 @@ class Frame:
     def encode(self) -> RawData:
         """Encode the frame into bytes"""
         return self.backend.encode()
+
+    def close(self) -> Self:
+        """Close underlying open files if any"""
+        self.backend.close()
+        return self
+
+    def __truediv__(self, field: Field[Self, TF]) -> TF:
+        return field.as_frame(self)
 
     def __repr__(self):
         return self.backend.__repr__()
@@ -328,3 +344,9 @@ class LayerMapping:
             mapping._mappings.setdefault(f, {}).update(mm)
         return self
 
+    def __add__(self, other: 'LayerMapping') -> 'LayerMapping':
+        """Add layer mappings to a fresh mapping (slower way, use with care)"""
+        m = LayerMapping()
+        self.merge(m)
+        other.merge(m)
+        return m

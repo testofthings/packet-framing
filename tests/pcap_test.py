@@ -67,21 +67,21 @@ def test_pcap_layering():
     PCAP_Payloads.add_to(pcap)
     Ethernet_Payloads.add_to(pcap)
 
-    rec = pcap.Packet_Records.get_item(pcap, 1)
+    rec = pcap.Packet_Records.item(pcap, 1)
     eth = PacketRecord.Packet_Data.as_frame(rec)
     assert isinstance(eth, EthernetII)
     assert eth.get_byte_length() == 66
     assert eth.get_bit_length() == 66 * 8
-    assert EthernetII.data[eth].get_byte_length() == 52
+    assert EthernetII.data.as_frame(eth).get_byte_length() == 52
     assert EthernetII.padding[eth] == Raw.empty
 
     ip = EthernetII.data.as_frame(eth)
     assert isinstance(ip, IPv4)
 
-    rec = pcap.Packet_Records.get_item(pcap, 2)
+    rec = pcap.Packet_Records.item(pcap, 2)
     eth = PacketRecord.Packet_Data.as_frame(rec)
     assert eth.get_bit_length() == 42 * 8
-    assert EthernetII.data[eth].get_byte_length() == 28
+    assert (eth / EthernetII.data).get_byte_length() == 28
     assert EthernetII.padding[eth] == Raw.empty
 
     b.close()

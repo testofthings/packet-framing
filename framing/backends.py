@@ -355,3 +355,6 @@ class DissectorBackend(BackendImplementation):
         n_frame.backend = c
         c.field_values.update(self.field_values)
         return c
+
+    def close(self) -> Self:
+        self.data.close()

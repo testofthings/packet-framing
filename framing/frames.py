@@ -1,8 +1,9 @@
+import pathlib
 from typing import Callable, cast
 
 from framing.backends import ComposingBackend, FrameBackend, DissectorBackend, BackendImplementation
 from framing.base import Frame, LayerMapping
-from framing.raw_data import RawData
+from framing.raw_data import RawData, Raw
 
 
 class Frames:
@@ -13,6 +14,11 @@ class Frames:
 
     @classmethod
     def dissect(cls, data: RawData) -> Callable[['Frame'], FrameBackend]:
+        return lambda f: DissectorBackend(f, LayerMapping(), data)
+
+    @classmethod
+    def dissect_file(cls, file: pathlib.Path) -> Callable[['Frame'], FrameBackend]:
+        data = Raw.file(file)
         return lambda f: DissectorBackend(f, LayerMapping(), data)
 
     @classmethod

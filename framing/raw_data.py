@@ -133,6 +133,10 @@ class RawData:
             r.append(line)
         return "\n".join(r)
 
+    def close(self) -> 'RawData':
+        """Close underlying file, if any"""
+        return self
+
 
 class ByteData(RawData):
     """Bytes"""
@@ -349,7 +353,6 @@ class FileData(ByteData):
         self.file_path = file_path
 
     def close(self):
-        """Close the file"""
         self.file.close()
 
 
