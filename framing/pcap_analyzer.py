@@ -72,7 +72,13 @@ class PCAPScanner:
                         ep = dst_ip, f"tcp:{dst_port}"
                         self.ip_endpoints[ep] = self.ip_endpoints.get(ep, 0) + 1
                     elif isinstance(pay, UDP):
-                        src_ip, dst_ip = IPv4.Source_IP[ip].as_ip_address(), IPv4.Destination_IP[ip].as_ip_address()
+                        src_ip = IPv4.Source_IP[ip].as_ip_address()
+                        src_port = UDP.Source_port[pay]
+                        src_ep = src_ip, f"udp:{src_port}"
+                        if src_ep in self.ip_endpoints:
+                            # seen traffic _from_ here -> assume UDP client (FIXME: Could check addr-port pairs)
+                            continue
+                        dst_ip = IPv4.Destination_IP[ip].as_ip_address()
                         dst_port = UDP.Destination_port[pay]
                         ep = dst_ip, f"udp:{dst_port}"
                         self.ip_endpoints[ep] = self.ip_endpoints.get(ep, 0) + 1
