@@ -216,15 +216,15 @@ class IntField(ConfigurableField[F, int], Calculator):
     def pull(self, backend: FrameBackend) -> float:
         return backend.get(self)
 
-    def push(self, backend: FrameBackend, value: float):
-        backend.set(self, int(value))
+    def push(self, backend: FrameBackend, value: float) -> float:
+        return backend.set(self, int(value))
 
 
 FT = typing.TypeVar("FT", bound=Frame)
 
 
 class SubStructureField(ConfigurableField[F, FT]):
-    """String field"""
+    """Sub-frame field"""
     def __init__(self, sub_type: Type[FT]):
         super().__init__("sub", None)
         self.sub_type = sub_type
@@ -251,7 +251,54 @@ class SubStructureField(ConfigurableField[F, FT]):
         return self.sub_type(backend.factory(decode=data))
 
 
+class LengthOfLV(Calculator):
+    def __init__(self, field: 'LVField'):
+        super().__init__(None)
+        self.field = field
+
+    def pull(self, backend: 'FrameBackend') -> float:
+        bit_off = backend.get_bit_offset(self.field.offset)
+        data = backend.input_data().subBlockBits(0, bit_off)
+        return self.field.length_codec.decode(data)
+
+
+class LVField(ConfigurableField[F, T]):
+    """Field with length prefix"""
+    def __init__(self, sub: Field[F, T], length=IntegerFormat()):
+        super().__init__("LV", [])
+        self.sub = sub
+        self.structure = sub.structure
+        self.length_codec = length.create_codec()
+        if self.length_codec.get_fixed_bit_length() < 0:
+            raise Exception("Variable-length length in LV not supported, now")
+        self.length_resolver = LengthOfLV(self)
+        sub.consumed_by = self
+
+    def get_bit_length(self, frame: F, value: Optional[T] = None) -> int:
+        len_len = self.length_codec.get_fixed_bit_length()
+        value_len = self.sub.get_bit_length(frame, value)
+        return len_len + value_len
+
+    def encode(self, value: T, state: EncodingState) -> RawData:
+        value_r = self.sub.encode(value, state)
+        len_v = value_r.byte_length()  # NOTE: How to add calculations here (no backend)?
+        len_r = self.length_codec.encode(len_v)
+        return len_r + value_r
+
+    def decode(self, data: RawData, backend: FrameBackend) -> T:
+        len_len = self.length_codec.decode(data) * 8
+        d_data = data.subBlockBits(self.length_codec.get_fixed_bit_length(), len_len)
+        return self.sub.decode(d_data, backend)
+
+    def pull(self, backend: FrameBackend) -> float:
+        return backend.get(self.sub)
+
+    def push(self, backend: FrameBackend, value: float):
+        backend.set(self.sub, value)
+
+
 class Sequence(ConfigurableField[F, List[FT]]):
+    """Field of sequence of values"""
     def __init__(self, sub: Field[F, FT]):
         super().__init__("sequence", [])
         self.sub = sub
