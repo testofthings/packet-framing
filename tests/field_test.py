@@ -1,3 +1,4 @@
+from framing.backends import BackendImplementation
 from framing.base import Frame
 from framing.codecs import IntegerCodec, IntegerFormat
 from framing.fields import Structure, LVField, Sequence
@@ -24,12 +25,16 @@ def test_lv_compose():
     b = a_frame.encode()
     assert b == Raw.hex("0003 010203")
 
+    assert BackendImplementation.list_resolved_fields(a_frame) == [AFrame.lv_field]
+    assert AFrame.lv_field.get_bit_length(a_frame) == 5 * 8
+
 
 def test_lv_dissect():
     a_frame = AFrame(Frames.dissect(Raw.hex("0002 0102030405")))
 
     v = AFrame.lv_field[a_frame]
     assert v == Raw.hex("0102")
+    assert AFrame.lv_field.get_bit_length(a_frame) == 4 * 8
 
 
 def test_seq_lv_compose():
@@ -39,6 +44,7 @@ def test_seq_lv_compose():
 
     b = a_frame.encode()
     assert b == Raw.hex("0003 010203 0000 0001 04")
+    assert BFrame.s_field.get_bit_length(a_frame) == 10 * 8
 
 
 def test_seq_lv_dissect():
@@ -46,3 +52,4 @@ def test_seq_lv_dissect():
 
     v = BFrame.s_field[a_frame]
     assert v == [Raw.hex("010203"), Raw.empty, Raw.hex("04")]
+    assert BFrame.s_field.get_bit_length(a_frame) == 10 * 8

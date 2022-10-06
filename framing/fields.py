@@ -275,9 +275,13 @@ class LVField(ConfigurableField[F, T]):
         sub.consumed_by = self
 
     def get_bit_length(self, frame: F, value: Optional[T] = None) -> int:
-        len_len = self.length_codec.get_fixed_bit_length()
-        value_len = self.sub.get_bit_length(frame, value)
-        return len_len + value_len
+        l_len = self.length_codec.get_fixed_bit_length()
+        v_len = frame.backend.resolve_bit_length(self.sub)
+        if v_len == -1:
+            # must resolve value
+            v = frame.backend.get(self) if value is None else value
+            v_len = self.sub.get_bit_length(frame, v)
+        return l_len + v_len
 
     def encode(self, value: T, state: EncodingState) -> RawData:
         value_r = self.sub.encode(value, state)
@@ -361,7 +365,7 @@ class Sequence(ConfigurableField[F, List[FT]]):
         value = frame.backend.get(self)
         b_len = 0
         for v in value:
-            b_len += self.sub.get_bit_length(v)
+            b_len += self.sub.get_bit_length(frame, v)
         return b_len
 
     def encode(self, value: List[FT], state: EncodingState) -> RawData:
@@ -383,7 +387,7 @@ class Sequence(ConfigurableField[F, List[FT]]):
             v = self.sub.decode(data, backend)
             if v == self.terminator_value:
                 break
-            v_len = self.sub.get_bit_length(backend, v)
+            v_len = self.sub.get_bit_length(backend.frame, v)
             r.append(v)
             data = data.tailBits(v_len)
         return r
