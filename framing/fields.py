@@ -344,6 +344,7 @@ class Sequence(ConfigurableField[F, List[FT]]):
         v = []
         for _ in range(0, count):
             v.append(self.sub.get_default_value(frame))
+        frame.backend.set(self, v)
         return v
 
     def get_default_value(self, frame: F) -> List[FT]:
