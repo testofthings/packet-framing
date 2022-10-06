@@ -1,6 +1,6 @@
 import pathlib
 
-from framing.frame_types.dns_frames import DNSMessage, DNSHeader
+from framing.frame_types.dns_frames import DNSMessage, DNSHeader, DNSQuestion
 from framing.frame_types.ethernet_frames import Ethernet_Payloads, EthernetII
 from framing.frame_types.ipv4_frames import IPv4, IP_Payloads
 from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads, PacketRecord
@@ -23,4 +23,7 @@ def test_decode_dns():
     qds = DNSMessage.Question[msg]
     assert len(qds) == 1
     qd = qds[0]
+    q_name = DNSQuestion.QNAME[qd]
+    assert q_name == [Raw.string("mask"), Raw.string("apple-dns"), Raw.string("net")]
+
 

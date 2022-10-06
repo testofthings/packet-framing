@@ -292,7 +292,8 @@ class DissectorBackend(BackendImplementation):
             return b
         return f
 
-    def iterate(self, sequence_field: Field, item_field: Field[F, FT], count=-1) -> Iterator[FT]:
+    def iterate(self, sequence_field: Field, item_field: Field[F, FT],
+                count=-1, terminator: Optional[T] = None) -> Iterator[FT]:
         v = self.field_values.get(sequence_field)
         if v is not None:
             return v.__iter__()  # already value in memory (we do not store it here)
@@ -301,8 +302,9 @@ class DissectorBackend(BackendImplementation):
         data = self.data
 
         class ItemIterator(Iterator[FT]):
-            def __init__(self, offset: int):
+            def __init__(self, offset: int, count: int):
                 self.offset = offset
+                self.count = count
                 self.items = 0
 
             def __next__(self) -> Optional[FT]:
@@ -313,11 +315,14 @@ class DissectorBackend(BackendImplementation):
                     raise StopIteration()
                 v = item_field.decode(n_data, backend)
                 self.offset += v.get_bit_length()
+                if terminator == v:
+                    self.count = self.items
+                    raise StopIteration()
                 self.items += 1
                 return v
 
         off = self.get_bit_offset(sequence_field.offset)
-        return ItemIterator(off)
+        return ItemIterator(off, count)
 
     def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type[F]] = None) -> Optional[Frame]:
         if frame_type:

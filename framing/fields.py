@@ -310,16 +310,21 @@ class Sequence(ConfigurableField[F, List[FT]]):
         else:
             self.item_fixed_bit_length = self.sub.fixed_bit_length
         self.count_resolver: Optional[Calculator] = None
+        self.terminator_value: Optional[FT] = None
         sub.consumed_by = self
 
     def count_by(self, value: ValueOf) -> Self:
         self.count_resolver = value.end
         return self
 
+    def terminate_by(self, value) -> Self:
+        self.terminator_value = value
+        return self
+
     def iterate(self, frame: F) -> Iterator[FT]:
         """Get item by index"""
         known_count = int(self.count_resolver.pull(frame.backend)) if self.count_resolver else -1
-        return frame.backend.iterate(self, self.sub, known_count)
+        return frame.backend.iterate(self, self.sub, known_count, self.terminator_value)
 
     def get_count(self, frame: F) -> int:
         if self.count_resolver:
@@ -373,6 +378,8 @@ class Sequence(ConfigurableField[F, List[FT]]):
             if data.octet(0) < 0:
                 break  # no more data to read
             v = self.sub.decode(data, backend)
+            if v == self.terminator_value:
+                break
             v_len = self.sub.get_bit_length(backend, v)
             r.append(v)
             data = data.tailBits(v_len)

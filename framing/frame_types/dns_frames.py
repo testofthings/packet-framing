@@ -1,6 +1,6 @@
 from framing.base import Frame
 from framing.codecs import IntegerFormat
-from framing.fields import Structure, Sequence, ValueOf
+from framing.fields import Structure, Sequence, ValueOf, LVField
 from framing.raw_data import Raw
 
 
@@ -25,7 +25,7 @@ class DNSHeader(Frame):
 class DNSQuestion(Frame):
     structure = Structure['DNSQuestion']()
 
-    QNAME = structure.raw().terminator(Raw.octets(0x00))
+    QNAME = Sequence(LVField(structure.raw(), length=IntegerFormat(bits=8))).terminate_by(Raw.empty)
     QTYPE = structure.integer(IntegerFormat(bytes=2))
     QCLASS = structure.integer(IntegerFormat(bytes=2))
 
