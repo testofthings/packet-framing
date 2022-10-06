@@ -368,6 +368,8 @@ class Sequence(ConfigurableField[F, List[FT]]):
         r = []
         for v in value:
             r.append(self.sub.encode(v, state))
+        if self.terminator_value:
+            r.append(self.sub.encode(self.terminator_value, state))
         return Raw.sequence(r)
 
     def decode(self, data: RawData, backend: FrameBackend) -> List[FT]:
