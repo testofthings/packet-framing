@@ -42,7 +42,7 @@ class BackendImplementation(FrameBackend):
         for n, f in self.structure.fields.items():
             i_off = bit_off
             v = self.get(f)
-            if isinstance(f, Sequence):
+            if isinstance(f, Sequence) and isinstance(f.sub, Frame):
                 for num, i in enumerate(v):
                     be = i.backend
                     if copy_sub_frames:
