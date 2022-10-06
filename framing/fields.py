@@ -13,8 +13,8 @@ class Multiplier(Calculator):
     def pull(self, backend: FrameBackend) -> float:
         return self.next_step.pull(backend) * self.multiplier
 
-    def push(self, backend: FrameBackend, value: float):
-        self.next_step.push(backend, value / self.multiplier)
+    def push(self, backend: FrameBackend, value: float) -> float:
+        return self.next_step.push(backend, value / self.multiplier)
 
 
 class CopyToField(Calculator):
@@ -23,9 +23,9 @@ class CopyToField(Calculator):
         super().__init__(next_step)
         self.field = field
 
-    def push(self, backend: FrameBackend, value: float):
+    def push(self, backend: FrameBackend, value: float) -> float:
         backend.set(self.field, int(value))
-        self.next_step.push(backend, value)
+        return self.next_step.push(backend, value)
 
 
 class FieldOffsetValue(Calculator):

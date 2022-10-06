@@ -45,9 +45,9 @@ class Calculator:
         """Pull value from source"""
         return self.next_step.pull(backend)
 
-    def push(self, backend: 'FrameBackend', value: float):
+    def push(self, backend: 'FrameBackend', value: float) -> float:
         """Push value to source"""
-        self.next_step.push(backend, value)
+        return self.next_step.push(backend, value)
 
 
 class FieldPointer(typing.Generic[F, T]):
