@@ -23,7 +23,11 @@ def test_decode_dns():
     qds = DNSMessage.Question[msg]
     assert len(qds) == 1
     qd = qds[0]
+
+    print(f"{qd}")
+
     q_name = DNSQuestion.QNAME[qd]
     assert q_name == [Raw.string("mask"), Raw.string("apple-dns"), Raw.string("net")]
-
+    assert DNSQuestion.QTYPE[qd] == 0x0041
+    assert DNSQuestion.QCLASS[qd] == 0x0001
 
