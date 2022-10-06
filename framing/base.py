@@ -253,7 +253,7 @@ class FrameStructure(typing.Generic[F]):
         old_names = self.fields.copy()
         self.fields.clear()
         for n, v in old_names.items():
-            if v.consumed_by:
+            while v.consumed_by:
                 v = v.consumed_by  # wrapped by another field
             nn = i_names[v] if n.startswith("__") else n
             self.fields[nn] = v

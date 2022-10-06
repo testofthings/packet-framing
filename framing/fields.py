@@ -303,13 +303,12 @@ class Sequence(ConfigurableField[F, List[FT]]):
         super().__init__("sequence", [])
         self.sub = sub
         self.structure = sub.structure
+        self.item_frame: Optional[Type[FT]] = None
         if isinstance(sub, SubStructureField):
-            self.item_type = sub.sub_type
-            self.item_codec = None
+            self.item_frame = sub.sub_type
             self.item_fixed_bit_length = -1  # Note: Structure should support this!
         else:
-            raise NotImplementedError("Only sub-structure sequences supported, now")
-            # self.item_fixed_bit_length = self.item_codec.get_fixed_bit_length() if item_codec else -1
+            self.item_fixed_bit_length = self.sub.fixed_bit_length
         self.count_resolver: Optional[Calculator] = None
         sub.consumed_by = self
 
@@ -338,13 +337,8 @@ class Sequence(ConfigurableField[F, List[FT]]):
     def set_repeat(self, frame: F, count: int) -> List[F]:
         """Set value by repeating item given times"""
         v = []
-        if self.item_codec:
-            v = [self.item_codec.default_value()] * count
-        else:
-            factory = frame.backend.factory()
-            for _ in range(0, count):
-                v.append(self.item_type(factory))
-        self.set(frame, v)
+        for _ in range(0, count):
+            v.append(self.sub.get_default_value(frame))
         return v
 
     def get_default_value(self, frame: F) -> List[FT]:
@@ -361,19 +355,13 @@ class Sequence(ConfigurableField[F, List[FT]]):
         value = frame.backend.get(self)
         b_len = 0
         for v in value:
-            if isinstance(v, Frame):
-                b_len += v.get_bit_length()
-            else:
-                b_len += self.item_codec.get_bit_length(v)
+            b_len += self.sub.get_bit_length(v)
         return b_len
 
     def encode(self, value: List[FT], state: EncodingState) -> RawData:
         r = []
         for v in value:
-            if isinstance(v, Frame):
-                r.append(v.encode())
-            else:
-                r.append(self.item_codec.encode(v))
+            r.append(self.sub.encode(v, state))
         return Raw.sequence(r)
 
     def decode(self, data: RawData, backend: FrameBackend) -> List[FT]:
@@ -384,12 +372,8 @@ class Sequence(ConfigurableField[F, List[FT]]):
                 break
             if data.octet(0) < 0:
                 break  # no more data to read
-            if self.item_codec:
-                v = self.item_codec.decode(data)
-                v_len = self.item_codec.get_bit_length(v)
-            else:
-                v = self.item_type(backend.factory(data))
-                v_len = v.get_bit_length()
+            v = self.sub.decode(data, backend)
+            v_len = self.sub.get_bit_length(backend, v)
             r.append(v)
             data = data.tailBits(v_len)
         return r
