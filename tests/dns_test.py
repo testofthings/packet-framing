@@ -45,3 +45,4 @@ def test_decode_dns():
     assert q_name == [Raw.string("mask"), Raw.string("apple-dns"), Raw.string("net")]
     assert DNSQuestion.QTYPE[qd] == 0x0041
     assert DNSQuestion.QCLASS[qd] == 0x0001
+    assert DNSQuestion.QCLASS[qd] == 0xffff

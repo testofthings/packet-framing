@@ -224,6 +224,9 @@ class FrameStructure(typing.Generic[F]):
         self.commit_procedures: List[typing.Tuple[Optional[Field], Callable[[F], None]]] = []
         self.built = False
 
+    def field(self, field: Field) -> Field:
+        raise NotImplementedError()
+
     def commit(self, frame: F):
         for cp in self.commit_procedures:
             cp[1](frame)

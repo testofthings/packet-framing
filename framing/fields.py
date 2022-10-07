@@ -290,8 +290,16 @@ class LVField(ConfigurableField[F, T]):
         return len_r + value_r
 
     def decode(self, data: RawData, backend: FrameBackend) -> T:
-        len_len = self.length_codec.decode(data) * 8
-        d_data = data.subBlockBits(self.length_codec.get_fixed_bit_length(), len_len)
+        d_len = self.length_codec.decode(data) * 8
+        d_data = data.subBlockBits(self.length_codec.get_fixed_bit_length(), d_len)
+
+        fb = data.octet(0)
+        if fb >= 0xc0:
+            # FIXME: DNS name compression
+            offset = d_data.octet(0)
+            ref_to = backend.parent.input_data().tailBytes(offset)
+            raise Exception("JEEJEE")
+
         return self.sub.decode(d_data, backend)
 
     def pull(self, backend: FrameBackend) -> float:
@@ -397,6 +405,12 @@ class Sequence(ConfigurableField[F, List[FT]]):
 
 class Structure(FrameStructure[F]):
     """Frame structure definition"""
+
+    def field(self, field: Field, name: str = None) -> Field:
+        fn = self._get_a_name(name)
+        field.structure = self
+        self.fields[fn] = field
+        return field
 
     def raw(self, bits: int = None, bytes: int = None, default: RawData = Raw.empty,
             name: str = None) -> RawField[F]:
