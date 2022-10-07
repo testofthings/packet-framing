@@ -366,6 +366,8 @@ class Sequence(ConfigurableField[F, List[FT]]):
         b_len = 0
         for v in value:
             b_len += self.sub.get_bit_length(frame, v)
+        if self.terminator_value is not None:
+            b_len += self.sub.get_bit_length(frame, self.terminator_value)
         return b_len
 
     def encode(self, value: List[FT], state: EncodingState) -> RawData:

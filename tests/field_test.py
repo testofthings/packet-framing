@@ -18,6 +18,12 @@ class BFrame(Frame):
     s_field = Sequence(LVField(structure.raw(), IntegerFormat(bytes=2)))
 
 
+class CFrame(Frame):
+    structure = Structure['CFrame']()
+
+    s_field = Sequence(LVField(structure.raw(), IntegerFormat(bytes=2))).terminate_by(Raw.empty)
+
+
 def test_lv_compose():
     a_frame = AFrame(Frames.compose())
     AFrame.lv_field[a_frame] = Raw.hex("010203")
@@ -53,3 +59,8 @@ def test_seq_lv_dissect():
     v = BFrame.s_field[a_frame]
     assert v == [Raw.hex("010203"), Raw.empty, Raw.hex("04")]
     assert BFrame.s_field.get_bit_length(a_frame) == 10 * 8
+
+    c_frame = CFrame(Frames.dissect(Raw.hex("0003 010203 0000 0001 04")))
+    v = CFrame.s_field[a_frame]
+    assert v == [Raw.hex("010203")]
+    assert CFrame.s_field.get_bit_length(a_frame) == 7 * 8
