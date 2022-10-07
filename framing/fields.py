@@ -162,6 +162,11 @@ class RawField(ConfigurableField[F, RawData]):
     def __getitem__(self, frame: F) -> RawData:
         return self.get(frame)
 
+    def get_bit_length(self, frame: F) -> int:
+        """Get bit length for a value"""
+        v = frame.backend.get(self)
+        return v.get_bit_length() if isinstance(v, Frame) else v.bit_length()
+
     def encoding_bit_length(self, backend: FrameBackend, value: RawData) -> int:
         return value.bit_length()
 
