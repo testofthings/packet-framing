@@ -147,7 +147,7 @@ class ComposingBackend(BackendImplementation):
             off = self.get_bit_offset(prefix)
             # add prefix variable length to it
             v = self.get(prefix.field)
-            off += prefix.field.get_bit_length(self.frame, v)
+            off += prefix.field.encoding_bit_length(self, v)
         else:
             off = 0
         off += offset.fixed_bit_offset
@@ -189,6 +189,9 @@ class DissectorBackend(BackendImplementation):
                 # override field to decode as payload frame
                 v = self.decode_as_frame(field, layer_map, data)
             else:
+                v = self.field_values.get(field)
+                if v is not None:
+                    return v  # offset resolver may produce value, sometimes
                 v = field.decode(data, self)
             self.field_values[field] = v
         return v
@@ -223,7 +226,8 @@ class DissectorBackend(BackendImplementation):
         return RawFrame(self.factory(data))
 
     def set(self, field: Field[F, T], value: T) -> Self:
-        raise NotImplementedError("set() not supported")
+        self.field_values[field] = value
+        return self
 
     def get_item(self, sequence_field: Field, item_field: Field[F, FT], index: int):
         v = self.field_values.get(sequence_field)

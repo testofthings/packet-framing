@@ -96,7 +96,7 @@ class ConfigurableField(Field[F, T]):
 
         def procedure(frame: F):
             v = frame.backend.get(field)
-            f_len = field.get_bit_length(frame, v)
+            f_len = field.encoding_bit_length(frame.backend, v)
             field.length_resolver.push(frame.backend, f_len)
         # call at commit to push length
         self.structure.commit_procedures.append((self, procedure))
@@ -114,7 +114,7 @@ class ConfigurableField(Field[F, T]):
         def procedure(frame: F):
             v = frame.backend.get(field)
             f_off = frame.backend.get_bit_offset(field.offset)
-            f_len = field.get_bit_length(frame, v)
+            f_len = field.encoding_bit_length(frame.backend, v)
             field.end_offset_resolver.push(frame.backend, f_off + f_len)
         # call at commit to push length
         self.structure.commit_procedures.append((self, procedure))
@@ -159,7 +159,10 @@ class RawField(ConfigurableField[F, RawData]):
             return v.encode()
         return v
 
-    def get_bit_length(self, frame: F, value: RawData) -> int:
+    def __getitem__(self, frame: F) -> RawData:
+        return self.get(frame)
+
+    def encoding_bit_length(self, backend: FrameBackend, value: RawData) -> int:
         return value.bit_length()
 
     def encode(self, value: RawData, state: EncodingState) -> RawData:
@@ -187,7 +190,7 @@ class IntField(ConfigurableField[F, int], Calculator):
     def flag_values(self, definition: Type[enum.IntFlag]) -> Self:
         return self
 
-    def get_bit_length(self, frame: F, value: int) -> int:
+    def encoding_bit_length(self, backend: FrameBackend, value: int) -> int:
         return self.codec.get_bit_length(value)
 
     def encode(self, value: int, state: EncodingState) -> RawData:
@@ -216,7 +219,7 @@ class SubStructureField(ConfigurableField[F, FT]):
     def get_default_value(self, frame: F) -> FT:
         return self.sub_type(frame.backend.factory())
 
-    def get_bit_length(self, frame: F, value: FT) -> int:
+    def encoding_bit_length(self, backend: FrameBackend, value: FT) -> int:
         return value.get_bit_length()
 
     def encode(self, value: FT, state: EncodingState) -> RawData:
@@ -258,9 +261,9 @@ class LVField(ConfigurableField[F, T]):
         self.length_resolver = LengthOfLV(self)
         sub.consumed_by = self
 
-    def get_bit_length(self, frame: F, value: T) -> int:
+    def encoding_bit_length(self, backend: FrameBackend, value: T) -> int:
         len_len = self.length_codec.get_fixed_bit_length()
-        v_len = self.sub.get_bit_length(frame, value)
+        v_len = self.sub.encoding_bit_length(backend, value)
         return len_len + v_len
 
     def encode(self, value: T, state: EncodingState) -> RawData:
@@ -277,7 +280,7 @@ class LVField(ConfigurableField[F, T]):
     def decode_bit_length(self, data: RawData, bit_offset: int, backend: 'FrameBackend') -> int:
         l_data = data.tailBits(bit_offset)
         d_len = self.length_codec.decode(l_data) * 8
-        return self.fixed_bit_length + d_len
+        return self.length_codec.get_fixed_bit_length() + d_len
 
     def pull(self, backend: FrameBackend) -> float:
         return backend.get(self.sub)
@@ -339,12 +342,14 @@ class Sequence(ConfigurableField[F, List[FT]]):
     def get_default_value(self, frame: F) -> List[FT]:
         return []
 
-    def get_bit_length(self, frame: F, value: List[FT]) -> int:
+    def encoding_bit_length(self, backend: FrameBackend, value: List[FT]) -> int:
         if self.sub.fixed_bit_length >= 0:
             return self.sub.fixed_bit_length * len(value)
         b_len = 0
         for v in value:
-            b_len += self.sub.get_bit_length(frame, v)
+            b_len += self.sub.encoding_bit_length(backend, v)
+        if self.terminator_value is not None:
+            b_len += self.sub.encoding_bit_length(backend, self.terminator_value)
         return b_len
 
     def encode(self, value: List[FT], state: EncodingState) -> RawData:
@@ -357,12 +362,15 @@ class Sequence(ConfigurableField[F, List[FT]]):
 
     def decode_bit_length(self, data: RawData, bit_offset: int, backend: 'FrameBackend') -> int:
         known_count = int(self.count_resolver.pull(backend)) if self.count_resolver else -1
-        if known_count == 0 or self.fixed_bit_length >= 0:
+        if known_count == 0 or (known_count >= 0 and self.fixed_bit_length >= 0):
             return known_count * self.sub.fixed_bit_length
 
         b_len = super().decode_bit_length(data, bit_offset, backend)
         if b_len >= 0:
             return b_len
+
+        if self.terminator_value is None:
+            return -1  # we decode everything...
 
         # The hard way...
         b_off = 0
@@ -370,20 +378,17 @@ class Sequence(ConfigurableField[F, List[FT]]):
         while True:
             if 0 <= known_count <= len(items):
                 break
-            if data.octet(b_off) < 0:
+            b_data = data.tailBits(bit_offset + b_off)
+            if b_data.octet(0) < 0:
                 break  # no more data to read
-            v_len = self.sub.decode_bit_length(data, bit_offset + b_off, backend)
+            v_len = self.sub.decode_bit_length(b_data, 0, backend)
             assert v_len >= 0, "Sequence sub-value must know its length"
             b_off += v_len
-            if self.terminator_value:
-                v = self.sub.decode(data.tailBits(bit_offset + b_off), backend)
-                if v == self.terminator_value:
-                    break
-                items.append(v)
-            else:
-                items.append(None)
-        if self.terminator_value:
-            backend.set(self, items)  # ...as we know them
+            v = self.sub.decode(b_data, backend)
+            if v == self.terminator_value:
+                break
+            items.append(v)
+        backend.set(self, items)  # ...as we know them
         return b_off
 
     def decode(self, data: RawData, backend: FrameBackend) -> List[FT]:

@@ -76,24 +76,31 @@ class Field(FieldPointer[F, T]):
         return self.default_value
 
     def __getitem__(self, frame: F) -> T:
-        return self.get(frame)
+        return frame.backend.get(self)
 
     def set(self, frame: F, value: T) -> F:
         frame.backend.set(self, value)
         return frame
 
     def __setitem__(self, frame: F, value: T) -> F:
-        return self.set(frame, value)
+        frame.backend.set(self, value)
+        return frame
 
-    def get_bit_length(self, frame: F, value: T) -> int:
+    def get_bit_length(self, frame: F) -> int:
         """Get bit length for a value"""
-        raise NotImplementedError()
+        v = frame.backend.get(self)
+        return self.encoding_bit_length(frame.backend, v)
 
     def as_frame(self, frame: F, frame_type: Optional[Type[F]] = None) -> 'Frame':
         """Return value as frame, use type information when available"""
         return frame.backend.get_as_frame(self, frame_type)
 
+    def encoding_bit_length(self, backend: 'FrameBackend', value: T) -> int:
+        """Resolve encoding length for a value"""
+        raise NotImplementedError()
+
     def encode(self, value: T, state: EncodingState) -> RawData:
+        """Encode a value"""
         raise NotImplementedError()
 
     def decode_bit_length(self, data: RawData, bit_offset: int, backend: 'FrameBackend') -> int:
