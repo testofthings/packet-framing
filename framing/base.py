@@ -156,9 +156,6 @@ class FrameBackend:
     def set(self, field: Field[F, T], value: T) -> Self:
         raise NotImplementedError("Editing not allowed with this backend")
 
-    def get_bit_offset(self, offset: FieldOffset) -> int:
-        raise NotImplementedError()
-
     def get_item(self, sequence_field: Field, item_field: Field[F, T], index: int):
         raise NotImplementedError()
 
@@ -173,6 +170,9 @@ class FrameBackend:
 
     def factory(self, decode: RawData = None) -> Callable[['Frame'], 'FrameBackend']:
         """Create a fresh backend for given frame"""
+        raise NotImplementedError()
+
+    def get_bit_offset(self, offset: FieldOffset) -> int:
         raise NotImplementedError()
 
     def get_bit_length(self) -> int:

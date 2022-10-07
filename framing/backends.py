@@ -198,7 +198,6 @@ class DissectorBackend(BackendImplementation):
 
     def get_raw(self, field: Field) -> RawData:
         bit_offset = self.get_bit_offset(field.offset)
-        # FIXME: call get_bit_length(field)?
         bit_length = field.decode_bit_length(self.data, bit_offset, self)
 
         if bit_length < 0 and field.offset.min_tail_length:
