@@ -24,13 +24,17 @@ class CFrame(Frame):
     s_field = Sequence(LVField(structure.raw(), IntegerFormat(bytes=2))).terminate_by(Raw.empty)
 
 
+class DFrame(Frame):
+    structure = Structure['CFrame']()
+
+    asciiz = structure.raw().terminator(Raw.octets(0))
+
+
 def test_lv_compose():
     a_frame = AFrame(Frames.compose())
     AFrame.lv_field[a_frame] = Raw.hex("010203")
-
     b = a_frame.encode()
     assert b == Raw.hex("0003 010203")
-
     assert BackendImplementation.list_resolved_fields(a_frame) == [AFrame.lv_field]
     assert AFrame.lv_field.get_bit_length(a_frame) == 5 * 8
 
@@ -64,3 +68,13 @@ def test_seq_lv_dissect():
     v = CFrame.s_field[c_frame]
     assert v == [Raw.hex("010203")]
     assert CFrame.s_field.get_bit_length(c_frame) == 7 * 8
+
+
+def test_terminator():
+    d_frame = DFrame(Frames.compose())
+    DFrame.asciiz[d_frame] = Raw.string("abc")
+    d = d_frame.encode()
+    assert d == Raw.hex("616263")  # NOTE: Does *not* add the end-zero - would require new field class!
+
+    d_frame = DFrame(Frames.dissect(Raw.hex("61626300 6465")))
+    assert DFrame.asciiz[d_frame] == Raw.hex("61626300")
