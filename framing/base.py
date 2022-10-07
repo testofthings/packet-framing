@@ -95,6 +95,22 @@ class Field(FieldPointer[F, T]):
         """Return value as frame, use type information when available"""
         return frame.backend.get_as_frame(self, frame_type)
 
+    def to_string(self, frame: F) -> str:
+        """A string representation of current value, for unit tests"""
+        enc = self.encode(self.get(frame), EncodingState())
+        return f"{enc}"
+
+    def __truediv__(self, other: 'Field[Any, T]') -> 'FieldPath':
+        return FieldPath(self) / other
+
+    def __repr__(self):
+        return f"{self.field_name}: {self.type_name}"
+
+    def __lt__(self, other: 'Field') -> bool:
+        return self.field_name < other.field_name
+
+    # Methods for access by backend
+
     def encoding_bit_length(self, backend: 'FrameBackend', value: T) -> int:
         """Resolve encoding length for a value"""
         raise NotImplementedError()
@@ -119,20 +135,6 @@ class Field(FieldPointer[F, T]):
 
     def decode(self, data: RawData, backend: 'FrameBackend') -> T:
         raise NotImplementedError()
-
-    def to_string(self, frame: F) -> str:
-        """A string representation of current value, for unit tests"""
-        enc = self.encode(self.get(frame), EncodingState())
-        return f"{enc}"
-
-    def __truediv__(self, other: 'Field[Any, T]') -> 'FieldPath':
-        return FieldPath(self) / other
-
-    def __repr__(self):
-        return f"{self.field_name}: {self.type_name}"
-
-    def __lt__(self, other: 'Field') -> bool:
-        return self.field_name < other.field_name
 
 
 class FrameBackend:
