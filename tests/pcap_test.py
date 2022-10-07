@@ -67,7 +67,14 @@ def test_pcap_layering():
     PCAP_Payloads.add_to(pcap)
     Ethernet_Payloads.add_to(pcap)
 
+    print(f"{pcap}")
+
     rec = pcap.Packet_Records.item(pcap, 1)
+
+    # backend gives frames implicitly
+    eth_r = rec.backend.get(PacketRecord.Packet_Data)
+    assert isinstance(eth_r, EthernetII)
+
     eth = PacketRecord.Packet_Data.as_frame(rec)
     assert isinstance(eth, EthernetII)
     assert eth.get_byte_length() == 66

@@ -173,11 +173,8 @@ class RawField(ConfigurableField[F, RawData]):
     def encode(self, value: RawData, state: EncodingState) -> RawData:
         return value
 
-    def decode_bit_length(self, data: RawData, bit_offset: int, backend: 'FrameBackend') -> int:
-        b_len = super().decode_bit_length(data, bit_offset, backend)
-        if b_len >= 0:
-            backend.set(self, data.subBlockBits(bit_offset, b_len))  # store as this is known
-        return b_len
+    # NOTE: We never store the raw here, even as we could, as it can be mapped to frames...
+    #def decode_bit_length(self, data: RawData, bit_offset: int, backend: 'FrameBackend') -> int:
 
     def decode(self, data: RawData, backend: FrameBackend) -> RawData:
         if self.fixed_bit_length < 0:
