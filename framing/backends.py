@@ -4,7 +4,7 @@ from typing import Dict, Any, Callable, Iterator, Optional, List, cast, Type
 from typing_extensions import Self
 
 from framing.base import FrameBackend, Frame, EncodingState, Field, F, T, LayerMapping, FieldOffset, FieldPointer
-from framing.fields import Sequence, FT, Structure
+from framing.fields import Sequence, FT, Structure, SubStructureField
 from framing.raw_data import RawData, Raw
 
 
@@ -37,20 +37,38 @@ class BackendImplementation(FrameBackend):
             return s + name + " " * s_len + f"{data}"
 
         r = []
+
+        def dump_value(offset: int, value: RawData):
+            sv = value.dump(center_line=True).split("\n")
+            i_off = offset
+            for i in range(0, len(sv)):
+                if i == 0:
+                    line = format_line(i_off, n, sv[i])
+                else:
+                    line = format_line(i_off, "", sv[i])
+                r.append(line)
+                i_off += 16 * 8
+
         state = EncodingState()
         bit_off = bit_offset
         for n, f in self.structure.fields.items():
-            i_off = bit_off
             v = self.get(f)
-            if isinstance(f, Sequence) and isinstance(f.sub, Frame):
+            if isinstance(f, Sequence) and isinstance(f.sub, SubStructureField):
+                # Sequence of frames
                 for num, i in enumerate(v):
                     be = i.backend
                     if copy_sub_frames:
                         be = be.copy(parent=self)
-                    r.append(format_line(i_off, f"{num + 1}/{len(v)}"))
+                    r.append(format_line(bit_off, f"{num + 1}/{len(v)}"))
                     v_s = be.dump(bit_offset=bit_off, indent=indent + '  ', width=width,
                                   copy_sub_frames=copy_sub_frames)
                     r.append(v_s)
+                continue
+            if isinstance(f, Sequence):
+                # Sequence of values
+                for num, v in enumerate(v):
+                    ev = f.sub.encode(v, state)
+                    dump_value(bit_off, ev)
                 continue
             if isinstance(v, RawFrame):
                 v = v.encode()
@@ -58,26 +76,19 @@ class BackendImplementation(FrameBackend):
                 be = v.backend
                 if copy_sub_frames:
                     be = be.copy(parent=self)
-                r.append(format_line(i_off, f"{n} ({be.structure_name()})"))
+                r.append(format_line(bit_off, f"{n} ({be.structure_name()})"))
                 v_s = be.dump(bit_offset=bit_off, indent=indent + '  ', width=width, copy_sub_frames=copy_sub_frames)
                 r.append(v_s)
                 continue
             ev = f.encode(v, state)
             if ev.bit_length() == 0:
-                r.append(format_line(i_off, n, "()" + " " * 18))
+                r.append(format_line(bit_off, n, "()" + " " * 18))
             elif ev.bit_length() % 8 == 0:
                 # full octets - 'dump' view
-                sv = ev.dump(center_line=True).split("\n")
-                for i in range(0, len(sv)):
-                    if i == 0:
-                        line = format_line(i_off, n, sv[i])
-                    else:
-                        line = format_line(i_off, "", sv[i])
-                    r.append(line)
-                    i_off += 16 * 8
+                dump_value(bit_off, ev)
             else:
                 # bit-length, just show the bits
-                r.append(format_line(i_off, n, f"b{ev.dump()}" + " " * 18))
+                r.append(format_line(bit_off, n, f"b{ev.dump()}" + " " * 18))
             bit_off += f.get_bit_length(self.frame, value=v)
         return "\n".join(r)
 
