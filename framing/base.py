@@ -85,7 +85,8 @@ class Field(FieldPointer[F, T]):
     def __setitem__(self, frame: F, value: T) -> F:
         return self.set(frame, value)
 
-    def get_bit_length(self, frame: F, value: Optional[T] = None) -> int:
+    def get_bit_length(self, frame: F, value: T) -> int:
+        """Get bit length for a value"""
         raise NotImplementedError()
 
     def as_frame(self, frame: F, frame_type: Optional[Type[F]] = None) -> 'Frame':
@@ -94,6 +95,20 @@ class Field(FieldPointer[F, T]):
 
     def encode(self, value: T, state: EncodingState) -> RawData:
         raise NotImplementedError()
+
+    def decode_bit_length(self, data: RawData, bit_offset: int, backend: 'FrameBackend') -> int:
+        """Resolve bit length on decoding, if possible without resolving value"""
+        if self.fixed_bit_length >= 0:
+            return self.fixed_bit_length
+        # variable length field
+        bit_length = -1
+        if self.end_offset_resolver:
+            # end offset resolver
+            bit_length = int(self.end_offset_resolver.pull(backend)) - bit_offset
+        elif self.length_resolver:
+            # field length resolver
+            bit_length = int(self.length_resolver.pull(backend))
+        return bit_length
 
     def decode(self, data: RawData, backend: 'FrameBackend') -> T:
         raise NotImplementedError()
@@ -134,10 +149,6 @@ class FrameBackend:
 
     def get_bit_offset(self, offset: FieldOffset) -> int:
         raise NotImplementedError()
-
-    def resolve_bit_length(self, field: Field[F, T]) -> int:
-        """Resolve bit length without encoding, return -1 if not available"""
-        return -1
 
     def get_item(self, sequence_field: Field, item_field: Field[F, T], index: int):
         raise NotImplementedError()
