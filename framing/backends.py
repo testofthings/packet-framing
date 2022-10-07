@@ -198,6 +198,7 @@ class DissectorBackend(BackendImplementation):
 
     def get_raw(self, field: Field) -> RawData:
         bit_offset = self.get_bit_offset(field.offset)
+        # FIXME: call get_bit_length(field)?
         bit_length = -1
 
         if field.fixed_bit_length < 0:
@@ -275,7 +276,7 @@ class DissectorBackend(BackendImplementation):
         off += offset.fixed_bit_offset
         return off
 
-    def resolve_bit_length(self, field: Field[F, T]) -> int:
+    def resolve_bit_length(self, field: Field[F, T], tail_cap=False) -> int:
         b_len = -1
         if field.fixed_bit_length >= 0:
             # Fixed-length field
@@ -286,7 +287,7 @@ class DissectorBackend(BackendImplementation):
         elif self.mappings.is_mapped(field):
             # Frame payload, which determines length
             pass
-        elif field.offset.min_tail_length > 0:
+        elif tail_cap and field.offset.min_tail_length > 0:
             # limit data length to leave space for the tail
             off = self.get_bit_offset(field.offset)
             tail_len = self.data.bit_length() - off
@@ -345,7 +346,7 @@ class DissectorBackend(BackendImplementation):
         if not isinstance(v, RawData):
             # need raw data for a raw frame
             off = self.get_bit_offset(field.offset)
-            b_len = self.resolve_bit_length(field)
+            b_len = self.resolve_bit_length(field, tail_cap=True)
             v = self.data.subBlockBits(off, b_len)
         return RawFrame(self.factory(v))
 
