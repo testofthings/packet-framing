@@ -286,6 +286,7 @@ class DissectorBackend(BackendImplementation):
         backend = self
         data = self.data
 
+
         class ItemIterator(Iterator[FT]):
             def __init__(self, offset: int, count: int):
                 self.offset = offset
@@ -299,7 +300,8 @@ class DissectorBackend(BackendImplementation):
                 if n_data.octet(0) < 0:
                     raise StopIteration()
                 v = item_field.decode(n_data, backend)
-                self.offset += v.get_bit_length()
+                v_len = v.get_bit_length() if isinstance(v, Frame) else item_field.decode_bit_length(n_data, 0, backend)
+                self.offset += v_len
                 if terminator == v:
                     self.count = self.items
                     raise StopIteration()
