@@ -76,15 +76,14 @@ class Field(FieldPointer[F, T]):
         return self.default_value
 
     def __getitem__(self, frame: F) -> T:
-        return frame.backend.get(self)
+        return self.get(frame)
 
     def set(self, frame: F, value: T) -> F:
         frame.backend.set(self, value)
         return frame
 
     def __setitem__(self, frame: F, value: T) -> F:
-        frame.backend.set(self, value)
-        return frame
+        return self.set(frame, value)
 
     def get_bit_length(self, frame: F, value: Optional[T] = None) -> int:
         raise NotImplementedError()
