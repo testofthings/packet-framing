@@ -31,22 +31,25 @@ class BackendImplementation(FrameBackend):
         return self
 
     def dump(self, bit_offset=0, indent='', width=80, copy_sub_frames=False) -> str:
-        def format_line(offset: int, name: str, data="") -> str:
-            s = f"{offset // 8:06x} {indent} "
-            s_len = max(0, width - 8 - len(indent) - len(name) - len(data))
-            return s + name + " " * s_len + f"{data}"
-
         r = []
 
-        def dump_value(offset: int, value: RawData):
+        def print_line(offset: int, name: str, data=""):
+            s = f"{offset // 8:06x} {indent} "
+            s_len = width - 8 - len(indent) - len(name) - len(data)
+            if s_len < 0:
+                r.append(f"{s}{name}")
+                s_len = width - 8 - len(indent) - 0 - len(data)
+            s_len = max(0, s_len)
+            r.append(s + name + " " * s_len + f"{data}")
+
+        def print_value(offset: int, value: RawData):
             sv = value.dump(center_line=True).split("\n")
             i_off = offset
             for i in range(0, len(sv)):
                 if i == 0:
-                    line = format_line(i_off, n, sv[i])
+                    print_line(i_off, n, sv[i])
                 else:
-                    line = format_line(i_off, "", sv[i])
-                r.append(line)
+                    print_line(i_off, "", sv[i])
                 i_off += 16 * 8
 
         state = EncodingState()
@@ -59,7 +62,7 @@ class BackendImplementation(FrameBackend):
                     be = i.backend
                     if copy_sub_frames:
                         be = be.copy(parent=self)
-                    r.append(format_line(bit_off, f"{num + 1}/{len(v)}"))
+                    print_line(bit_off, f"{num + 1}/{len(v)}")
                     v_s = be.dump(bit_offset=bit_off, indent=indent + '  ', width=width,
                                   copy_sub_frames=copy_sub_frames)
                     r.append(v_s)
@@ -68,7 +71,7 @@ class BackendImplementation(FrameBackend):
                 # Sequence of values
                 for num, v in enumerate(v):
                     ev = f.sub.encode(v, state)
-                    dump_value(bit_off, ev)
+                    print_value(bit_off, ev)
                 continue
             if isinstance(v, RawFrame):
                 v = v.encode()
@@ -76,19 +79,19 @@ class BackendImplementation(FrameBackend):
                 be = v.backend
                 if copy_sub_frames:
                     be = be.copy(parent=self)
-                r.append(format_line(bit_off, f"{n} ({be.structure_name()})"))
+                print_line(bit_off, f"{n} ({be.structure_name()})")
                 v_s = be.dump(bit_offset=bit_off, indent=indent + '  ', width=width, copy_sub_frames=copy_sub_frames)
                 r.append(v_s)
                 continue
             ev = f.encode(v, state)
             if ev.bit_length() == 0:
-                r.append(format_line(bit_off, n, "()" + " " * 18))
+                print_line(bit_off, n, "()" + " " * 18)
             elif ev.bit_length() % 8 == 0:
                 # full octets - 'dump' view
-                dump_value(bit_off, ev)
+                print_value(bit_off, ev)
             else:
                 # bit-length, just show the bits
-                r.append(format_line(bit_off, n, f"b{ev.dump()}" + " " * 18))
+                print_line(bit_off, n, f"b{ev.dump()}" + " " * 18)
             bit_off += f.get_bit_length(self.frame, value=v)
         return "\n".join(r)
 
