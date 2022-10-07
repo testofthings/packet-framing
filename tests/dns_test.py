@@ -13,6 +13,23 @@ def test_decode_dns():
     pcap = PCAPFile.open_file(pathlib.Path("samples/sample-1.pcap"),
                               mappings=PCAP_Payloads + Ethernet_Payloads + IP_Payloads)
 
+    # Frame 136
+
+    raw = UDP.Data[PCAPFile.Packet_Records.item(pcap, 135) / PacketRecord.Packet_Data / EthernetII.data / IPv4.Payload]
+    msg = DNSMessage(Frames.dissect(raw))
+    qds = DNSMessage.Question[msg]
+    ans = DNSMessage.Answer[msg]
+    nss = DNSMessage.Authority[msg]
+    ads = DNSMessage.Additional[msg]
+    assert len(qds) == 1
+    assert len(ans) == 0
+    assert len(nss) == 1
+    assert len(ads) == 0
+
+    print(f"{msg}")
+
+    # Frame 135
+
     raw = UDP.Data[PCAPFile.Packet_Records.item(pcap, 134) / PacketRecord.Packet_Data / EthernetII.data / IPv4.Payload]
     msg = DNSMessage(Frames.dissect(raw))
     hdr = DNSMessage.Header[msg]
@@ -24,10 +41,7 @@ def test_decode_dns():
     assert len(qds) == 1
     qd = qds[0]
 
-    print(f"{qd}")
-
     q_name = DNSQuestion.QNAME[qd]
     assert q_name == [Raw.string("mask"), Raw.string("apple-dns"), Raw.string("net")]
     assert DNSQuestion.QTYPE[qd] == 0x0041
     assert DNSQuestion.QCLASS[qd] == 0x0001
-

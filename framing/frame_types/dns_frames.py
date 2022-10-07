@@ -30,10 +30,23 @@ class DNSQuestion(Frame):
     QCLASS = structure.integer(IntegerFormat(bytes=2))
 
 
+class DNSResource(Frame):
+    structure = Structure['DNSResource']()
+
+    NAME = Sequence(LVField(structure.raw(), length=IntegerFormat(bits=8))).terminate_by(Raw.empty)
+    TYPE = structure.integer(IntegerFormat(bytes=2))
+    CLASS = structure.integer(IntegerFormat(bytes=2))
+    TTL = structure.integer(IntegerFormat(bytes=2))
+    RDLENGTH = structure.integer(IntegerFormat(bytes=2))
+    RDATA = structure.raw().length_by(ValueOf(RDLENGTH))
+
+
 class DNSMessage(Frame):
     structure = Structure['DNSMessage']()
 
     Header = structure.sub(DNSHeader)
     Question = Sequence(structure.sub(DNSQuestion)).count_by(ValueOf(DNSHeader.QDCOUNT))
-
+    Answer = Sequence(structure.sub(DNSResource)).count_by(ValueOf(DNSHeader.ANCOUNT))
+    Authority = Sequence(structure.sub(DNSResource)).count_by(ValueOf(DNSHeader.NSCOUNT))
+    Additional = Sequence(structure.sub(DNSResource)).count_by(ValueOf(DNSHeader.ARCOUNT))
 
