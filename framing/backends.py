@@ -36,8 +36,9 @@ class BackendImplementation(FrameBackend):
         def print_line(offset: int, name: str, data=""):
             s = f"{offset // 8:06x} {indent} "
             s_len = width - 8 - len(indent) - len(name) - len(data)
-            if s_len < 0:
+            if s_len < 1:
                 r.append(f"{s}{name}")
+                name = ""
                 s_len = width - 8 - len(indent) - 0 - len(data)
             s_len = max(0, s_len)
             r.append(s + name + " " * s_len + f"{data}")
