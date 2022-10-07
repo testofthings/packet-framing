@@ -231,16 +231,14 @@ class DissectorBackend(BackendImplementation):
             return v[index]
 
         bit_offset = self.get_bit_offset(sequence_field.offset)
-        data = self.data.tailBits(bit_offset)
         i = 0
-        while True:
-            v = item_field.decode(data, self)
-            if i == index:
-                return v
-            v_len = v.get_bit_length()
-            data = data.tailBits(v_len)
+        while i < index:
+            v_len = item_field.decode_bit_length(self.data, bit_offset, self)
             bit_offset += v_len
             i += 1
+        data = self.data.tailBits(bit_offset)
+        v = item_field.decode(data, self)
+        return v
 
     def get_bit_offset(self, offset: FieldOffset) -> int:
         prefix = offset.prefix
