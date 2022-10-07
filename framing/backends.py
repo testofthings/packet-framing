@@ -248,6 +248,7 @@ class DissectorBackend(BackendImplementation):
             if off is None:
                 # not found from the cache
                 if prefix.field.end_offset_resolver:
+                    # Note: field.decode_bit_length would also use the resolver, but it needs the offset
                     off = int(prefix.field.end_offset_resolver.pull(self))
                 else:
                     # prefix offset + variable length
