@@ -201,12 +201,9 @@ class DissectorBackend(BackendImplementation):
         # FIXME: call get_bit_length(field)?
         bit_length = field.decode_bit_length(self.data, bit_offset, self)
 
-        if field.fixed_bit_length < 0 and field.offset.min_tail_length:
-            data_len = self.data.bit_length()
-            end_offset = bit_offset + max(0, bit_length)
-            if data_len - end_offset > field.offset.min_tail_length:
-                # limit data length to leave space for the tail
-                bit_length = data_len - field.offset.min_tail_length - bit_offset
+        if bit_length < 0 and field.offset.min_tail_length:
+            # length not known, limited by space required by later field(s)
+            bit_length = max(0, self.data.bit_length() - bit_length - field.offset.min_tail_length)
 
         if bit_length < 0:
             data = self.data.tailBits(bit_offset)
@@ -258,7 +255,14 @@ class DissectorBackend(BackendImplementation):
                 else:
                     # prefix offset + variable length
                     off = self.get_bit_offset(prefix)
-                    off += prefix.field.decode_bit_length(self.data, off, self)
+                    p_len = prefix.field.decode_bit_length(self.data, off, self)
+                    if p_len < 0:
+                        # no length information, assuming all available
+                        p_len = self.data.read_all().bit_length()
+                        if prefix.field.offset.min_tail_length:
+                            # data limited by space required by later field(s)
+                            p_len = max(0, p_len - prefix.field.offset.min_tail_length)
+                    off += p_len
                 self.end_offset_cache[prefix.field] = off  # cache for next call
         else:
             off = 0

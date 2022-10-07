@@ -27,6 +27,10 @@ class RawData:
         """Number of bytes available without waiting"""
         return self.byte_length()
 
+    def read_all(self) -> 'RawData':
+        """Read all data so that length is known"""
+        return self
+
     def octet(self, byte_offset: int) -> int:
         """Get octet by offset or -1 if past EOF"""
         raise NotImplementedError()
