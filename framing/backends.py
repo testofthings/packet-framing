@@ -93,7 +93,7 @@ class BackendImplementation(FrameBackend):
             else:
                 # bit-length, just show the bits
                 print_line(bit_off, n, f"b{ev.dump()}" + " " * 18)
-            bit_off += f.get_bit_length(self.frame, value=v)
+            bit_off += f.get_bit_length(self.frame)
         return "\n".join(r)
 
     def copy(self, parent: Optional[FrameBackend] = None) -> Self:
