@@ -51,10 +51,10 @@ def test_pcap_decode_payload():
     pcap = PCAPFile(Frames.dissect(b))
 
     c = 0
-    off = PCAPFile.File_Header[pcap].get_byte_length()
+    off = PCAPFile.File_Header[pcap].get_bit_length() // 8
     for rec in PCAPFile.Packet_Records.iterate(pcap):
         c += 1
-        off += rec.get_byte_length()
+        off += rec.get_bit_length() // 8
     b.close()
 
     assert c == 2349
@@ -72,7 +72,7 @@ def test_pcap_layering():
     assert isinstance(eth, EthernetII)
     assert eth.get_byte_length() == 66
     assert eth.get_bit_length() == 66 * 8
-    assert EthernetII.data.as_frame(eth).get_byte_length() == 52
+    assert EthernetII.data.as_frame(eth).get_bit_length() == 52 * 8
     assert EthernetII.padding[eth] == Raw.empty
 
     ip = EthernetII.data.as_frame(eth)
@@ -81,7 +81,7 @@ def test_pcap_layering():
     rec = pcap.Packet_Records.item(pcap, 2)
     eth = PacketRecord.Packet_Data.as_frame(rec)
     assert eth.get_bit_length() == 42 * 8
-    assert (eth / EthernetII.data).get_byte_length() == 28
+    assert (eth / EthernetII.data).get_bit_length() == 28 * 8
     assert EthernetII.padding[eth] == Raw.empty
 
     b.close()

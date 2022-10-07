@@ -202,11 +202,6 @@ class IntField(ConfigurableField[F, int], Calculator):
             b_len = self.codec.get_bit_length(v)
         return b_len
 
-    def get_byte_length(self, frame: F, value: Optional[int] = None) -> int:
-        if self.fixed_bit_length >= 0:
-            return self.fixed_bit_length // 8
-        return self.codec.get_bit_length(self.get(frame)) // 8
-
     def encode(self, value: int, state: EncodingState) -> RawData:
         return self.codec.encode(value)
 

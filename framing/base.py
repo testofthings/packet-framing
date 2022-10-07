@@ -89,9 +89,6 @@ class Field(FieldPointer[F, T]):
     def get_bit_length(self, frame: F, value: Optional[T] = None) -> int:
         raise NotImplementedError()
 
-    def get_byte_length(self, frame: F, value: Optional[T] = None) -> int:
-        return self.get_bit_length(frame, value) // 8
-
     def as_frame(self, frame: F, frame_type: Optional[Type[F]] = None) -> 'Frame':
         """Return value as frame, use type information when available"""
         return frame.backend.get_as_frame(self, frame_type)
