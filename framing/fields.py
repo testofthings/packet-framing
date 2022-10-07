@@ -369,7 +369,7 @@ class Sequence(ConfigurableField[F, List[FT]]):
         if b_len >= 0:
             return b_len
 
-        if self.terminator_value is None:
+        if known_count < 0 and self.terminator_value is None:
             return -1  # we decode everything...
 
         # The hard way...
