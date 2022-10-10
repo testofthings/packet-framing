@@ -5,7 +5,7 @@ from typing_extensions import Self
 
 from framing.base import FrameBackend, Frame, EncodingState, Field, F, T, LayerMapping, FieldOffset, FieldPointer
 from framing.fields import Sequence, FT, Structure, SubStructureField
-from framing.raw_data import RawData, Raw
+from framing.raw_data import RawData, Raw, LengthEntity
 
 
 class BackendImplementation(FrameBackend):
@@ -300,7 +300,8 @@ class DissectorBackend(BackendImplementation):
                 if n_data.octet(0) < 0:
                     raise StopIteration()
                 v = item_field.decode(n_data, backend)
-                v_len = v.bit_length() if isinstance(v, Frame) else item_field.decode_bit_length(n_data, 0, backend)
+                v_len = v.bit_length() if isinstance(v, LengthEntity) \
+                    else item_field.decode_bit_length(n_data, 0, backend)
                 self.offset += v_len
                 if terminator == v:
                     self.count = self.items

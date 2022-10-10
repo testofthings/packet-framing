@@ -8,15 +8,22 @@ from typing import Iterable, List, BinaryIO, Union
 IPAddress = Union[ipaddress.IPv6Address, ipaddress.IPv4Address]
 
 
-class RawData:
-    """Raw data buffer"""
-
+class LengthEntity:
     def bit_length(self) -> int:
         """Length in bits or -1 if a stream"""
         raise NotImplementedError()
 
     def byte_length(self) -> int:
         """Length in full bytes or -1 if a stream"""
+        return self.bit_length() // 8
+
+
+class RawData:
+    """Raw data buffer"""
+    def bit_length(self) -> int:
+        raise NotImplementedError()
+
+    def byte_length(self) -> int:
         return self.bit_length() // 8
 
     def bits_available(self) -> int:

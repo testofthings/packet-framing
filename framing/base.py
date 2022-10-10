@@ -5,7 +5,7 @@ from typing import Optional, Callable, List, Type, Any, Dict
 from typing_extensions import Self
 
 from framing.codecs import IntegerCodec, IntegerFormat, ValueCodec
-from framing.raw_data import Raw, RawData
+from framing.raw_data import Raw, RawData, LengthEntity
 
 # Frame type
 F = typing.TypeVar("F", bound='Frame')
@@ -202,17 +202,15 @@ class FrameBackend:
 TF = typing.TypeVar("TF", bound='Frame')
 
 
-class Frame:
+class Frame(LengthEntity):
     """Base class for frames"""
     def __init__(self, backend_factory: Callable[['Frame'], FrameBackend]):
         self.backend = backend_factory(self)
 
     def bit_length(self) -> int:
-        """Get frame bit length"""
         return self.backend.get_bit_length()
 
     def byte_length(self) -> int:
-        """Get frame byte length"""
         return self.backend.get_bit_length() // 8
 
     def encode(self) -> RawData:
