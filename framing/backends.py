@@ -189,9 +189,6 @@ class DissectorBackend(BackendImplementation):
                 # override field to decode as payload frame
                 v = self.decode_as_frame(field, layer_map, data)
             else:
-                v = self.field_values.get(field)
-                if v is not None:
-                    return v  # offset resolver may produce value, sometimes
                 v = field.decode(data, self)
             self.field_values[field] = v
         return v
@@ -234,6 +231,7 @@ class DissectorBackend(BackendImplementation):
         i = 0
         while i < index:
             v_len = item_field.decode_bit_length(self.data, bit_offset, self)
+            assert v_len >= 0, f"Length with unknown length at {index}"
             bit_offset += v_len
             i += 1
         data = self.data.tailBits(bit_offset)
@@ -286,27 +284,31 @@ class DissectorBackend(BackendImplementation):
         backend = self
         data = self.data
 
-
         class ItemIterator(Iterator[FT]):
             def __init__(self, offset: int, count: int):
                 self.offset = offset
                 self.count = count
                 self.items = 0
+                self.previous = None
 
             def __next__(self) -> Optional[FT]:
                 if 0 <= count <= self.items:
                     raise StopIteration()
+
+                if self.previous is not None:
+                    v_len = item_field.decode_bit_length(data, self.offset, backend)
+                    self.offset += v_len
+
                 n_data = data.tailBits(self.offset)
                 if n_data.octet(0) < 0:
+                    self.count = self.items
                     raise StopIteration()
                 v = item_field.decode(n_data, backend)
-                v_len = v.bit_length() if isinstance(v, LengthEntity) \
-                    else item_field.decode_bit_length(n_data, 0, backend)
-                self.offset += v_len
                 if terminator == v:
                     self.count = self.items
                     raise StopIteration()
                 self.items += 1
+                self.previous = v
                 return v
 
         off = self.get_bit_offset(sequence_field.offset)

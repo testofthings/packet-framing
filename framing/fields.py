@@ -233,7 +233,6 @@ class SubStructureField(ConfigurableField[F, FT]):
         if b_len >= 0:
             return b_len
         v = self.decode(data.tailBits(bit_offset), backend)
-        backend.set(self, v)
         return v.bit_length()
 
     def decode(self, data: RawData, backend: FrameBackend) -> FT:
@@ -375,10 +374,10 @@ class Sequence(ConfigurableField[F, List[FT]]):
             return -1  # we decode everything...
 
         # The hard way...
+        item_count = 0
         b_off = 0
-        items = []
         while True:
-            if 0 <= known_count <= len(items):
+            if 0 <= known_count <= item_count:
                 break
             b_data = data.tailBits(bit_offset + b_off)
             if b_data.octet(0) < 0:
@@ -386,27 +385,30 @@ class Sequence(ConfigurableField[F, List[FT]]):
             v_len = self.sub.decode_bit_length(b_data, 0, backend)
             assert v_len >= 0, "Sequence sub-value must know its length"
             b_off += v_len
-            v = self.sub.decode(b_data, backend)
-            if v == self.terminator_value:
-                break
-            items.append(v)
-        backend.set(self, items)  # ...as we know them
+            if self.terminator_value is not None:
+                v = self.sub.decode(b_data, backend)
+                if v == self.terminator_value:
+                    break
+            item_count += 1
         return b_off
 
     def decode(self, data: RawData, backend: FrameBackend) -> List[FT]:
         known_count = int(self.count_resolver.pull(backend)) if self.count_resolver else -1
         items = []
+        previous = None
         while True:
             if 0 <= known_count <= len(items):
                 break
+            if previous is not None:
+                v_len = self.sub.decode_bit_length(data, 0, backend)
+                data = data.tailBits(v_len)
             if data.octet(0) < 0:
                 break  # no more data to read
             v = self.sub.decode(data, backend)
             if v == self.terminator_value:
                 break
-            v_len = self.sub.decode_bit_length(data, 0, backend)
             items.append(v)
-            data = data.tailBits(v_len)
+            previous = v
         return items
 
 
