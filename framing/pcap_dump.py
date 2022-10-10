@@ -36,13 +36,13 @@ if __name__ == "__main__":
         hdr = PCAPFile.File_Header[pcap]
         if not silent:
             print(f"{Frames.dump(hdr, bit_offset=offset, width=wid)}")
-        offset += hdr.get_bit_length()
+        offset += hdr.bit_length()
 
         for i, rec in enumerate(PCAPFile.Packet_Records.iterate(pcap)):
             if not silent:
                 print(f"=== #{i + 1} ===")
                 print(f"{Frames.dump(rec, bit_offset=offset, width=wid, indent='  ')}")
-            offset += rec.get_bit_length()
+            offset += rec.bit_length()
 
         print(f"Total length: {offset // 8} bytes")
 

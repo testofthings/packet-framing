@@ -165,7 +165,7 @@ class RawField(ConfigurableField[F, RawData]):
     def get_bit_length(self, frame: F) -> int:
         """Get bit length for a value"""
         v = frame.backend.get(self)
-        return v.get_bit_length() if isinstance(v, Frame) else v.bit_length()
+        return v.bit_length() if isinstance(v, Frame) else v.bit_length()
 
     def encoding_bit_length(self, backend: FrameBackend, value: RawData) -> int:
         return value.bit_length()
@@ -222,7 +222,7 @@ class SubStructureField(ConfigurableField[F, FT]):
         return self.sub_type(frame.backend.factory())
 
     def encoding_bit_length(self, backend: FrameBackend, value: FT) -> int:
-        return value.get_bit_length()
+        return value.bit_length()
 
     def encode(self, value: FT, state: EncodingState) -> RawData:
         enc = value.encode()
@@ -234,7 +234,7 @@ class SubStructureField(ConfigurableField[F, FT]):
             return b_len
         v = self.decode(data.tailBits(bit_offset), backend)
         backend.set(self, v)
-        return v.get_bit_length()
+        return v.bit_length()
 
     def decode(self, data: RawData, backend: FrameBackend) -> FT:
         return self.sub_type(backend.factory(decode=data))

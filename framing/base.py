@@ -207,11 +207,11 @@ class Frame:
     def __init__(self, backend_factory: Callable[['Frame'], FrameBackend]):
         self.backend = backend_factory(self)
 
-    def get_bit_length(self) -> int:
+    def bit_length(self) -> int:
         """Get frame bit length"""
         return self.backend.get_bit_length()
 
-    def get_byte_length(self) -> int:
+    def byte_length(self) -> int:
         """Get frame byte length"""
         return self.backend.get_bit_length() // 8
 

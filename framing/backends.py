@@ -300,7 +300,7 @@ class DissectorBackend(BackendImplementation):
                 if n_data.octet(0) < 0:
                     raise StopIteration()
                 v = item_field.decode(n_data, backend)
-                v_len = v.get_bit_length() if isinstance(v, Frame) else item_field.decode_bit_length(n_data, 0, backend)
+                v_len = v.bit_length() if isinstance(v, Frame) else item_field.decode_bit_length(n_data, 0, backend)
                 self.offset += v_len
                 if terminator == v:
                     self.count = self.items
@@ -324,7 +324,7 @@ class DissectorBackend(BackendImplementation):
         return RawFrame(self.factory(v))
 
     def encode(self) -> RawData:
-        bit_length = self.frame.get_bit_length()
+        bit_length = self.frame.bit_length()
         return self.data.subBlockBits(0, bit_length)
 
     def get_bit_length(self) -> int:
