@@ -20,8 +20,8 @@ class TCP(Frame):
     Window = structure.integer(IntegerFormat(bits=16))
     Checksum = structure.raw(bits=16)
     Urgent_Pointer = structure.integer(IntegerFormat(bits=16))
-    Options = structure.raw()
-    Padding = structure.raw().end_offset_by(ValueOf(Data_offset) * 4)
+    Options = structure.raw().end_offset_by(ValueOf(Data_offset) * 4)
+    #Padding = structure.raw().end_offset_by(ValueOf(Data_offset) * 4)
     Data = structure.raw()
 
 
