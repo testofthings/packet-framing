@@ -360,16 +360,14 @@ class Sequence(ConfigurableField[F, List[FT]]):
         b_len = 0
         for v in value:
             b_len += self.sub.encoding_bit_length(backend, v)
-        if self.terminator_value is not None:
-            b_len += self.sub.encoding_bit_length(backend, self.terminator_value)
+        # Note: terminator must be in the list
         return b_len
 
     def encode(self, value: List[FT], state: EncodingState) -> RawData:
         r = []
         for v in value:
             r.append(self.sub.encode(v, state))
-        if self.terminator_value:
-            r.append(self.sub.encode(self.terminator_value, state))
+        # Note: terminator must be in the list
         return Raw.sequence(r)
 
     def decode_bit_length(self, data: RawData, bit_offset: int, value: List[FT], backend: 'FrameBackend') -> int:
@@ -421,9 +419,9 @@ class Sequence(ConfigurableField[F, List[FT]]):
             if data.octet(0) < 0:
                 break  # no more data to read
             v = self.sub.decode(data, backend)
+            items.append(v)  # Add terminator to the list
             if v == self.terminator_value:
                 break
-            items.append(v)
             previous = v
         return items
 

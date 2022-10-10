@@ -66,7 +66,7 @@ def test_seq_lv_dissect():
 
     c_frame = CFrame(Frames.dissect(Raw.hex("0003 010203 0000 0001 04")))
     v = CFrame.s_field[c_frame]
-    assert v == [Raw.hex("010203")]
+    assert v == [Raw.hex("010203"), Raw.empty]
     assert CFrame.s_field.get_bit_length(c_frame) == 7 * 8
 
 

@@ -63,7 +63,7 @@ class BackendImplementation(FrameBackend):
                     be = i.backend
                     if copy_sub_frames:
                         be = be.copy(parent=self)
-                    print_line(bit_off, f"{num + 1}/{len(v)}")
+                    print_line(bit_off, f"{n} {num + 1}/{len(v)}")
                     v_s = be.dump(bit_offset=bit_off, indent=indent + '  ', width=width,
                                   copy_sub_frames=copy_sub_frames)
                     r.append(v_s)
@@ -307,11 +307,10 @@ class DissectorBackend(BackendImplementation):
                     self.count = self.items
                     raise StopIteration()
                 v = item_field.decode(n_data, backend)
-                if terminator == v:
-                    self.count = self.items
-                    raise StopIteration()
                 self.items += 1
                 self.previous = v
+                if terminator == v:
+                    self.count = self.items
                 return v
 
         off = self.get_bit_offset(sequence_field.offset)
