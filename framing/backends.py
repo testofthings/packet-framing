@@ -5,7 +5,7 @@ from typing_extensions import Self
 
 from framing.base import FrameBackend, Frame, EncodingState, Field, F, T, LayerMapping, FieldOffset, FieldPointer
 from framing.fields import Sequence, FT, Structure, SubStructureField
-from framing.raw_data import RawData, Raw
+from framing.raw_data import RawData, Raw, LengthEntity
 
 
 class BackendImplementation(FrameBackend):
@@ -93,7 +93,7 @@ class BackendImplementation(FrameBackend):
             else:
                 # bit-length, just show the bits
                 print_line(bit_off, n, f"b{ev.dump()}" + " " * 18)
-            bit_off += f.get_bit_length(self.frame, value=v)
+            bit_off += f.get_bit_length(self.frame)
         return "\n".join(r)
 
     def copy(self, parent: Optional[FrameBackend] = None) -> Self:
@@ -146,19 +146,12 @@ class ComposingBackend(BackendImplementation):
             # get offset of the prefix
             off = self.get_bit_offset(prefix)
             # add prefix variable length to it
-            off += prefix.field.get_bit_length(self.frame)
+            v = self.get(prefix.field)
+            off += prefix.field.encoding_bit_length(self, v)
         else:
             off = 0
         off += offset.fixed_bit_offset
         return off
-
-    def resolve_bit_length(self, field: Field[F, T]) -> int:
-        b_len = -1
-        if field.fixed_bit_length >= 0:
-            # Fixed-length field
-            b_len = field.fixed_bit_length
-        # NOTE: We do *not* call length resolvers, they are called in commit to update fields
-        return b_len
 
     def encode(self) -> RawData:
         self.structure.commit(self.frame)
@@ -202,27 +195,11 @@ class DissectorBackend(BackendImplementation):
 
     def get_raw(self, field: Field) -> RawData:
         bit_offset = self.get_bit_offset(field.offset)
-        # FIXME: call get_bit_length(field)?
-        bit_length = -1
+        bit_length = field.decode_bit_length(self.data, bit_offset, None, self)
 
-        if field.fixed_bit_length < 0:
-            # variable length field
-            if field.end_offset_resolver:
-                # end offset resolver
-                bit_length = int(field.end_offset_resolver.pull(self)) - bit_offset
-            elif field.length_resolver:
-                # field length resolver
-                bit_length = int(field.length_resolver.pull(self))
-
-            if field.offset.min_tail_length:
-                data_len = self.data.bit_length()
-                end_offset = bit_offset + max(0, bit_length)
-                if data_len - end_offset > field.offset.min_tail_length:
-                    # limit data length to leave space for the tail
-                    bit_length = data_len - field.offset.min_tail_length - bit_offset
-        else:
-            # constant length field
-            bit_length = field.fixed_bit_length
+        if bit_length < 0 and field.offset.min_tail_length:
+            # length not known, limited by space required by later field(s)
+            bit_length = max(0, self.data.bit_length() - bit_length - field.offset.min_tail_length)
 
         if bit_length < 0:
             data = self.data.tailBits(bit_offset)
@@ -242,7 +219,8 @@ class DissectorBackend(BackendImplementation):
         return RawFrame(self.factory(data))
 
     def set(self, field: Field[F, T], value: T) -> Self:
-        raise NotImplementedError("set() not supported")
+        self.field_values[field] = value
+        return self
 
     def get_item(self, sequence_field: Field, item_field: Field[F, FT], index: int):
         v = self.field_values.get(sequence_field)
@@ -250,16 +228,15 @@ class DissectorBackend(BackendImplementation):
             return v[index]
 
         bit_offset = self.get_bit_offset(sequence_field.offset)
-        data = self.data.tailBits(bit_offset)
         i = 0
-        while True:
-            v = item_field.decode(data, self)
-            if i == index:
-                return v
-            v_len = v.get_bit_length()
-            data = data.tailBits(v_len)
+        while i < index:
+            v_len = item_field.decode_bit_length(self.data, bit_offset, None, self)
+            assert v_len >= 0, f"Length with unknown length at {index}"
             bit_offset += v_len
             i += 1
+        data = self.data.tailBits(bit_offset)
+        v = item_field.decode(data, self)
+        return v
 
     def get_bit_offset(self, offset: FieldOffset) -> int:
         prefix = offset.prefix
@@ -269,34 +246,24 @@ class DissectorBackend(BackendImplementation):
             if off is None:
                 # not found from the cache
                 if prefix.field.end_offset_resolver:
+                    # Note: field.decode_bit_length would also use the resolver, but it needs the offset
                     off = int(prefix.field.end_offset_resolver.pull(self))
                 else:
                     # prefix offset + variable length
                     off = self.get_bit_offset(prefix)
-                    off += prefix.field.get_bit_length(self.frame)
+                    p_len = prefix.field.decode_bit_length(self.data, off, None, self)
+                    if p_len < 0:
+                        # no length information, assuming all available
+                        p_len = self.data.read_all().bit_length()
+                        if prefix.field.offset.min_tail_length:
+                            # data limited by space required by later field(s)
+                            p_len = max(0, p_len - prefix.field.offset.min_tail_length)
+                    off += p_len
                 self.end_offset_cache[prefix.field] = off  # cache for next call
         else:
             off = 0
         off += offset.fixed_bit_offset
         return off
-
-    def resolve_bit_length(self, field: Field[F, T], tail_cap=False) -> int:
-        b_len = -1
-        if field.fixed_bit_length >= 0:
-            # Fixed-length field
-            b_len = field.fixed_bit_length
-        elif field.length_resolver:
-            # Length resolver
-            b_len = field.length_resolver.pull(self)
-        elif self.mappings.is_mapped(field):
-            # Frame payload, which determines length
-            pass
-        elif tail_cap and field.offset.min_tail_length > 0:
-            # limit data length to leave space for the tail
-            off = self.get_bit_offset(field.offset)
-            tail_len = self.data.bit_length() - off
-            b_len = max(tail_len - field.offset.min_tail_length, 0)
-        return b_len
 
     def factory(self, decode: RawData = None) -> Callable[[Frame], FrameBackend]:
         def f(frame: Frame):
@@ -322,19 +289,26 @@ class DissectorBackend(BackendImplementation):
                 self.offset = offset
                 self.count = count
                 self.items = 0
+                self.previous = None
 
             def __next__(self) -> Optional[FT]:
                 if 0 <= count <= self.items:
                     raise StopIteration()
+
+                if self.previous is not None:
+                    v_len = item_field.decode_bit_length(data, self.offset, self.previous, backend)
+                    self.offset += v_len
+
                 n_data = data.tailBits(self.offset)
                 if n_data.octet(0) < 0:
+                    self.count = self.items
                     raise StopIteration()
                 v = item_field.decode(n_data, backend)
-                self.offset += v.get_bit_length()
                 if terminator == v:
                     self.count = self.items
                     raise StopIteration()
                 self.items += 1
+                self.previous = v
                 return v
 
         off = self.get_bit_offset(sequence_field.offset)
@@ -349,13 +323,11 @@ class DissectorBackend(BackendImplementation):
             return v
         if not isinstance(v, RawData):
             # need raw data for a raw frame
-            off = self.get_bit_offset(field.offset)
-            b_len = self.resolve_bit_length(field, tail_cap=True)
-            v = self.data.subBlockBits(off, b_len)
+            v = self.get_raw(field)
         return RawFrame(self.factory(v))
 
     def encode(self) -> RawData:
-        bit_length = self.frame.get_bit_length()
+        bit_length = self.frame.bit_length()
         return self.data.subBlockBits(0, bit_length)
 
     def get_bit_length(self) -> int:

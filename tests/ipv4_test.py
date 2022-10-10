@@ -43,12 +43,12 @@ def test_decode_ip():
     assert IPv4.Destination_IP[ip].as_ip_address() == ipaddress.ip_address("192.168.4.16")
     assert IPv4.Total_Length[ip] == 0x34
     assert IPv4.Options[ip] == Raw.empty
-    assert ip.get_bit_length() == 0x34 * 8
+    assert ip.bit_length() == 0x34 * 8
 
     # check which fields gets decoded
     ip = IPv4(Frames.dissect(raw_ip))
     assert BackendImplementation.list_resolved_fields(ip) == []
-    a = ip.get_bit_length()
+    a = ip.bit_length()
     # FIXME: No need to resolve IHL!
     assert BackendImplementation.list_resolved_fields(ip) == [IPv4.Total_Length]
     a = IPv4.Payload[ip]

@@ -41,7 +41,7 @@ def test_pcap_decode():
     assert FileHeader.Minor_Version[pcap_hdr] == 4
     assert FileHeader.SnapLen[pcap_hdr] == 0xffff
 
-    records = PCAPFile.Packet_Records[pcap_hdr]
+    records = PCAPFile.Packet_Records[pcap]
     assert len(records) == 2349
     b.close()
 
@@ -51,10 +51,10 @@ def test_pcap_decode_payload():
     pcap = PCAPFile(Frames.dissect(b))
 
     c = 0
-    off = PCAPFile.File_Header[pcap].get_byte_length()
+    off = PCAPFile.File_Header[pcap].bit_length() // 8
     for rec in PCAPFile.Packet_Records.iterate(pcap):
         c += 1
-        off += rec.get_byte_length()
+        off += rec.bit_length() // 8
     b.close()
 
     assert c == 2349
@@ -67,12 +67,19 @@ def test_pcap_layering():
     PCAP_Payloads.add_to(pcap)
     Ethernet_Payloads.add_to(pcap)
 
+    print(f"{pcap}")
+
     rec = pcap.Packet_Records.item(pcap, 1)
+
+    # backend gives frames implicitly
+    eth_r = rec.backend.get(PacketRecord.Packet_Data)
+    assert isinstance(eth_r, EthernetII)
+
     eth = PacketRecord.Packet_Data.as_frame(rec)
     assert isinstance(eth, EthernetII)
-    assert eth.get_byte_length() == 66
-    assert eth.get_bit_length() == 66 * 8
-    assert EthernetII.data.as_frame(eth).get_byte_length() == 52
+    assert eth.byte_length() == 66
+    assert eth.bit_length() == 66 * 8
+    assert EthernetII.data.as_frame(eth).bit_length() == 52 * 8
     assert EthernetII.padding[eth] == Raw.empty
 
     ip = EthernetII.data.as_frame(eth)
@@ -80,8 +87,8 @@ def test_pcap_layering():
 
     rec = pcap.Packet_Records.item(pcap, 2)
     eth = PacketRecord.Packet_Data.as_frame(rec)
-    assert eth.get_bit_length() == 42 * 8
-    assert (eth / EthernetII.data).get_byte_length() == 28
+    assert eth.bit_length() == 42 * 8
+    assert (eth / EthernetII.data).bit_length() == 28 * 8
     assert EthernetII.padding[eth] == Raw.empty
 
     b.close()

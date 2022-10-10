@@ -1,8 +1,6 @@
-from typing import Optional
-
 from framing.base import Frame, F, T, FrameBackend
 from framing.codecs import IntegerFormat
-from framing.fields import Structure, Sequence, ValueOf, LVField, IntField, RawField
+from framing.fields import Structure, Sequence, ValueOf, LVField, RawField
 from framing.raw_data import Raw, RawData
 
 
@@ -24,32 +22,23 @@ class DNSHeader(Frame):
     ARCOUNT = structure.integer((IntegerFormat(bits=16)))
 
 
-class DNSName(LVField[F, RawData]):
+class DNSName(RawField):
     def __init__(self):
-        super().__init__(RawField(Raw.empty), length=IntegerFormat(bits=8))
+        super().__init__(Raw.empty)
 
-    def get_bit_length(self, frame: F, value: Optional[T] = None) -> int:
-
-        # FIXME: A stud for testing
-        if value and value.byte_length() == 2:
-            return 2
-
-        return super().get_bit_length(frame, value)
+    def decode_bit_length(self, data: RawData, bit_offset: int, value: T, backend: FrameBackend) -> int:
+        fb = data.octet(bit_offset // 8)
+        return 8 + fb * 8 if fb < 0xc0 else 2 * 8
 
     def decode(self, data: RawData, backend: FrameBackend) -> RawData:
         fb = data.octet(0)
-        if fb < 0xc0:
-            r = super().decode(data, backend)
-            return r
-        # DNS name compression
-        # offset = data.octet(1)
-        return backend.input_data().subBlock(0, 2)
+        return data.subBlock(0, fb + 1) if fb < 0xc0 else data.subBlock(0, 2)
 
 
 class DNSQuestion(Frame):
     structure = Structure['DNSQuestion']()
 
-    QNAME = Sequence(structure.field(DNSName())).terminate_by(Raw.empty)
+    QNAME = Sequence(structure.field(DNSName())).terminate_by(Raw.octets(0))
     QTYPE = structure.integer(IntegerFormat(bytes=2))
     QCLASS = structure.integer(IntegerFormat(bytes=2))
 
@@ -57,7 +46,7 @@ class DNSQuestion(Frame):
 class DNSResource(Frame):
     structure = Structure['DNSResource']()
 
-    NAME = Sequence(structure.field(DNSName())).terminate_by(Raw.empty)
+    NAME = Sequence(structure.field(DNSName())).terminate_by(Raw.octets(0))
     TYPE = structure.integer(IntegerFormat(bytes=2))
     CLASS = structure.integer(IntegerFormat(bytes=2))
     TTL = structure.integer(IntegerFormat(bytes=2))

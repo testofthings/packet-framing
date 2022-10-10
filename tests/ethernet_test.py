@@ -27,13 +27,13 @@ def test_ethernet():
     assert EthernetII.data.get_bit_length(eth) == 4 * 8
     assert EthernetII.padding.get_bit_length(eth) == 0 * 8
 
-    assert eth.get_byte_length() == 18
+    assert eth.byte_length() == 18
 
     raw = eth.backend.encode()
     assert EthernetII.padding.get_bit_length(eth) == 46 * 8
     assert raw.byte_length() == 64
 
-    assert eth.get_byte_length() == 64
+    assert eth.byte_length() == 64
 
 
 def test_decode_ethernet():
@@ -52,7 +52,7 @@ def test_decode_ethernet():
     assert EthernetII.padding[eth] == Raw.empty
     # assert EthernetII.crc_checksum[eth] == Raw.hex("ff ff fe fc")
 
-    assert eth.get_byte_length() == 64
+    assert eth.byte_length() == 64
 
 
 def test_decode_short_ethernet():
@@ -66,7 +66,7 @@ def test_decode_short_ethernet():
     eth = EthernetII(Frames.dissect(data))
     assert EthernetII.data[eth] == Raw.hex("10111213")
     assert EthernetII.padding[eth] == Raw.empty
-    assert eth.get_byte_length() == 18
+    assert eth.byte_length() == 18
 
 
 def test_decode_eth_and_ip():
@@ -75,11 +75,11 @@ def test_decode_eth_and_ip():
     rec = PCAPFile.Packet_Records.item(pcap, 0)
     eth = PacketRecord.Packet_Data.as_frame(rec)
     ip = EthernetII.data.as_frame(eth)
-    assert ip.get_bit_length() == 0x34 * 8
+    assert ip.bit_length() == 0x34 * 8
 
     pad = EthernetII.padding[eth]
     assert EthernetII.padding[eth] == Raw.empty
-    assert eth.get_bit_length() == 528
+    assert eth.bit_length() == 528
 
     ip = EthernetII.data.as_frame(eth)
     assert isinstance(ip, IPv4)

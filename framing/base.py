@@ -5,7 +5,7 @@ from typing import Optional, Callable, List, Type, Any, Dict
 from typing_extensions import Self
 
 from framing.codecs import IntegerCodec, IntegerFormat, ValueCodec
-from framing.raw_data import Raw, RawData
+from framing.raw_data import Raw, RawData, LengthEntity
 
 # Frame type
 F = typing.TypeVar("F", bound='Frame')
@@ -86,21 +86,14 @@ class Field(FieldPointer[F, T]):
         frame.backend.set(self, value)
         return frame
 
-    def get_bit_length(self, frame: F, value: Optional[T] = None) -> int:
-        raise NotImplementedError()
-
-    def get_byte_length(self, frame: F, value: Optional[T] = None) -> int:
-        return self.get_bit_length(frame, value) // 8
+    def get_bit_length(self, frame: F) -> int:
+        """Get bit length for a value"""
+        v = frame.backend.get(self)
+        return self.encoding_bit_length(frame.backend, v)
 
     def as_frame(self, frame: F, frame_type: Optional[Type[F]] = None) -> 'Frame':
         """Return value as frame, use type information when available"""
         return frame.backend.get_as_frame(self, frame_type)
-
-    def encode(self, value: T, state: EncodingState) -> RawData:
-        raise NotImplementedError()
-
-    def decode(self, data: RawData, backend: 'FrameBackend') -> T:
-        raise NotImplementedError()
 
     def to_string(self, frame: F) -> str:
         """A string representation of current value, for unit tests"""
@@ -115,6 +108,33 @@ class Field(FieldPointer[F, T]):
 
     def __lt__(self, other: 'Field') -> bool:
         return self.field_name < other.field_name
+
+    # Methods for access by backend
+
+    def encoding_bit_length(self, backend: 'FrameBackend', value: T) -> int:
+        """Resolve encoding length for a value"""
+        raise NotImplementedError()
+
+    def encode(self, value: T, state: EncodingState) -> RawData:
+        """Encode a value"""
+        raise NotImplementedError()
+
+    def decode_bit_length(self, data: RawData, bit_offset: int, value: Optional[T], backend: 'FrameBackend') -> int:
+        """Resolve bit length on decoding, if possible without resolving value"""
+        if self.fixed_bit_length >= 0:
+            return self.fixed_bit_length
+        # variable length field
+        bit_length = -1
+        if self.end_offset_resolver:
+            # end offset resolver
+            bit_length = int(self.end_offset_resolver.pull(backend)) - bit_offset
+        elif self.length_resolver:
+            # field length resolver
+            bit_length = int(self.length_resolver.pull(backend))
+        return bit_length
+
+    def decode(self, data: RawData, backend: 'FrameBackend') -> T:
+        raise NotImplementedError()
 
 
 class FrameBackend:
@@ -136,13 +156,6 @@ class FrameBackend:
     def set(self, field: Field[F, T], value: T) -> Self:
         raise NotImplementedError("Editing not allowed with this backend")
 
-    def get_bit_offset(self, offset: FieldOffset) -> int:
-        raise NotImplementedError()
-
-    def resolve_bit_length(self, field: Field[F, T]) -> int:
-        """Resolve bit length without encoding, return -1 if not available"""
-        return -1
-
     def get_item(self, sequence_field: Field, item_field: Field[F, T], index: int):
         raise NotImplementedError()
 
@@ -157,6 +170,9 @@ class FrameBackend:
 
     def factory(self, decode: RawData = None) -> Callable[['Frame'], 'FrameBackend']:
         """Create a fresh backend for given frame"""
+        raise NotImplementedError()
+
+    def get_bit_offset(self, offset: FieldOffset) -> int:
         raise NotImplementedError()
 
     def get_bit_length(self) -> int:
@@ -186,17 +202,15 @@ class FrameBackend:
 TF = typing.TypeVar("TF", bound='Frame')
 
 
-class Frame:
+class Frame(LengthEntity):
     """Base class for frames"""
     def __init__(self, backend_factory: Callable[['Frame'], FrameBackend]):
         self.backend = backend_factory(self)
 
-    def get_bit_length(self) -> int:
-        """Get frame bit length"""
+    def bit_length(self) -> int:
         return self.backend.get_bit_length()
 
-    def get_byte_length(self) -> int:
-        """Get frame byte length"""
+    def byte_length(self) -> int:
         return self.backend.get_bit_length() // 8
 
     def encode(self) -> RawData:
