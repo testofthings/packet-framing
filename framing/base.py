@@ -119,7 +119,7 @@ class Field(FieldPointer[F, T]):
         """Encode a value"""
         raise NotImplementedError()
 
-    def decode_bit_length(self, data: RawData, bit_offset: int, backend: 'FrameBackend') -> int:
+    def decode_bit_length(self, data: RawData, bit_offset: int, value: Optional[T], backend: 'FrameBackend') -> int:
         """Resolve bit length on decoding, if possible without resolving value"""
         if self.fixed_bit_length >= 0:
             return self.fixed_bit_length

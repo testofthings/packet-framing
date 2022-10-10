@@ -195,7 +195,7 @@ class DissectorBackend(BackendImplementation):
 
     def get_raw(self, field: Field) -> RawData:
         bit_offset = self.get_bit_offset(field.offset)
-        bit_length = field.decode_bit_length(self.data, bit_offset, self)
+        bit_length = field.decode_bit_length(self.data, bit_offset, None, self)
 
         if bit_length < 0 and field.offset.min_tail_length:
             # length not known, limited by space required by later field(s)
@@ -230,7 +230,7 @@ class DissectorBackend(BackendImplementation):
         bit_offset = self.get_bit_offset(sequence_field.offset)
         i = 0
         while i < index:
-            v_len = item_field.decode_bit_length(self.data, bit_offset, self)
+            v_len = item_field.decode_bit_length(self.data, bit_offset, None, self)
             assert v_len >= 0, f"Length with unknown length at {index}"
             bit_offset += v_len
             i += 1
@@ -251,7 +251,7 @@ class DissectorBackend(BackendImplementation):
                 else:
                     # prefix offset + variable length
                     off = self.get_bit_offset(prefix)
-                    p_len = prefix.field.decode_bit_length(self.data, off, self)
+                    p_len = prefix.field.decode_bit_length(self.data, off, None, self)
                     if p_len < 0:
                         # no length information, assuming all available
                         p_len = self.data.read_all().bit_length()
@@ -296,7 +296,7 @@ class DissectorBackend(BackendImplementation):
                     raise StopIteration()
 
                 if self.previous is not None:
-                    v_len = item_field.decode_bit_length(data, self.offset, backend)
+                    v_len = item_field.decode_bit_length(data, self.offset, self.previous, backend)
                     self.offset += v_len
 
                 n_data = data.tailBits(self.offset)
