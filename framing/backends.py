@@ -67,12 +67,14 @@ class BackendImplementation(FrameBackend):
                     v_s = be.dump(bit_offset=bit_off, indent=indent + '  ', width=width,
                                   copy_sub_frames=copy_sub_frames)
                     r.append(v_s)
+                    bit_off += be.frame.bit_length()
                 continue
             if isinstance(f, Sequence):
                 # Sequence of values
                 for num, v in enumerate(v):
                     ev = f.sub.encode(v, state)
                     print_value(bit_off, ev)
+                    bit_off += ev.bit_length()
                 continue
             if isinstance(v, RawFrame):
                 v = v.encode()
@@ -83,6 +85,7 @@ class BackendImplementation(FrameBackend):
                 print_line(bit_off, f"{n} ({be.structure_name()})")
                 v_s = be.dump(bit_offset=bit_off, indent=indent + '  ', width=width, copy_sub_frames=copy_sub_frames)
                 r.append(v_s)
+                bit_off += be.frame.bit_length()
                 continue
             ev = f.encode(v, state)
             if ev.bit_length() == 0:
