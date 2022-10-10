@@ -179,8 +179,10 @@ class RawField(ConfigurableField[F, RawData]):
             return value.bit_length()  # Pst... value could be Frame, as well
         return super().decode_bit_length(data, bit_offset, None, backend)
 
-    def decode(self, data: RawData, backend: FrameBackend) -> RawData:
+    def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> RawData:
         if self.fixed_bit_length < 0:
+            if bit_length >= 0:
+                return data.subBlockBits(0, bit_length)
             return data  # read it all
         return data.subBlockBits(0, self.fixed_bit_length)
 
@@ -207,7 +209,7 @@ class IntField(ConfigurableField[F, int], Calculator):
             return self.codec.get_bit_length(value)
         return super().decode_bit_length(data, bit_offset, None, backend)
 
-    def decode(self, data: RawData, backend: FrameBackend) -> int:
+    def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> int:
         return self.codec.decode(data)
 
     def pull(self, backend: FrameBackend) -> float:
@@ -243,10 +245,10 @@ class SubStructureField(ConfigurableField[F, FT]):
         b_len = super().decode_bit_length(data, bit_offset, None, backend)
         if b_len >= 0:
             return b_len
-        v = self.decode(data.tailBits(bit_offset), backend)
+        v = self.decode(data.tailBits(bit_offset), -1, backend)
         return v.bit_length()
 
-    def decode(self, data: RawData, backend: FrameBackend) -> FT:
+    def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> FT:
         return self.sub_type(backend.factory(decode=data))
 
 
@@ -284,10 +286,10 @@ class LVField(ConfigurableField[F, T]):
         len_r = self.length_codec.encode(len_v)
         return len_r + value_r
 
-    def decode(self, data: RawData, backend: FrameBackend) -> T:
+    def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> T:
         d_len = self.length_codec.decode(data) * 8
         d_data = data.subBlockBits(self.length_codec.get_fixed_bit_length(), d_len)
-        return self.sub.decode(d_data, backend)
+        return self.sub.decode(d_data, -1, backend)
 
     def decode_bit_length(self, data: RawData, bit_offset: int, value: T, backend: 'FrameBackend') -> int:
         l_data = data.tailBits(bit_offset)
@@ -400,13 +402,13 @@ class Sequence(ConfigurableField[F, List[FT]]):
             assert v_len >= 0, "Sequence sub-value must know its length"
             b_off += v_len
             if self.terminator_value is not None:
-                v = self.sub.decode(b_data, backend)
+                v = self.sub.decode(b_data, v_len, backend)
                 if v == self.terminator_value:
                     break
             i += 1
         return b_off
 
-    def decode(self, data: RawData, backend: FrameBackend) -> List[FT]:
+    def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> List[FT]:
         known_count = int(self.count_resolver.pull(backend)) if self.count_resolver else -1
         items = []
         previous = None
@@ -418,7 +420,7 @@ class Sequence(ConfigurableField[F, List[FT]]):
                 data = data.tailBits(v_len)
             if data.octet(0) < 0:
                 break  # no more data to read
-            v = self.sub.decode(data, backend)
+            v = self.sub.decode(data, -1, backend)
             items.append(v)  # Add terminator to the list
             if v == self.terminator_value:
                 break

@@ -120,7 +120,7 @@ class Field(FieldPointer[F, T]):
         raise NotImplementedError()
 
     def decode_bit_length(self, data: RawData, bit_offset: int, value: Optional[T], backend: 'FrameBackend') -> int:
-        """Resolve bit length on decoding, if possible without resolving value"""
+        """Resolve bit length on decoding, value is provided if known"""
         if self.fixed_bit_length >= 0:
             return self.fixed_bit_length
         # variable length field
@@ -133,7 +133,8 @@ class Field(FieldPointer[F, T]):
             bit_length = int(self.length_resolver.pull(backend))
         return bit_length
 
-    def decode(self, data: RawData, backend: 'FrameBackend') -> T:
+    def decode(self, data: RawData, bit_length: int, backend: 'FrameBackend') -> T:
+        """Decode value. Bit length is provided if it is resolved earlier and available"""
         raise NotImplementedError()
 
 

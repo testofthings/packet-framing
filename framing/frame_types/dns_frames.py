@@ -30,7 +30,7 @@ class DNSName(RawField):
         fb = data.octet(bit_offset // 8)
         return 8 + fb * 8 if fb < 0xc0 else 2 * 8
 
-    def decode(self, data: RawData, backend: FrameBackend) -> RawData:
+    def decode(self, data: RawData, bit_length, backend: FrameBackend) -> RawData:
         fb = data.octet(0)
         return data.subBlock(0, fb + 1) if fb < 0xc0 else data.subBlock(0, 2)
 

@@ -1,5 +1,5 @@
 import copy
-from typing import Dict, Any, Callable, Iterator, Optional, List, cast, Type
+from typing import Dict, Any, Callable, Iterator, Optional, List, cast, Type, Tuple
 
 from typing_extensions import Self
 
@@ -186,17 +186,17 @@ class DissectorBackend(BackendImplementation):
     def get(self, field: Field[F, T]) -> T:
         v = self.field_values.get(field)
         if v is None:
-            data = self.get_raw(field)
+            data, d_len = self.get_raw(field)
             layer_map = self.mappings.get_mappings(field)
             if layer_map:
                 # override field to decode as payload frame
                 v = self.decode_as_frame(field, layer_map, data)
             else:
-                v = field.decode(data, self)
+                v = field.decode(data, d_len, self)
             self.field_values[field] = v
         return v
 
-    def get_raw(self, field: Field) -> RawData:
+    def get_raw(self, field: Field) -> Tuple[RawData, int]:
         bit_offset = self.get_bit_offset(field.offset)
         bit_length = field.decode_bit_length(self.data, bit_offset, None, self)
 
@@ -208,7 +208,7 @@ class DissectorBackend(BackendImplementation):
             data = self.data.tailBits(bit_offset)
         else:
             data = self.data.subBlockBits(bit_offset, bit_length)
-        return data
+        return data, bit_length
 
     def decode_as_frame(self, field: Field, mapping: Dict[FieldPointer, Dict[Any, Type[Frame]]], data: RawData) -> Frame:
         """Decore raw field as a frame with given mappings"""
@@ -238,7 +238,7 @@ class DissectorBackend(BackendImplementation):
             bit_offset += v_len
             i += 1
         data = self.data.tailBits(bit_offset)
-        v = item_field.decode(data, self)
+        v = item_field.decode(data, -1, self)
         return v
 
     def get_bit_offset(self, offset: FieldOffset) -> int:
@@ -306,7 +306,7 @@ class DissectorBackend(BackendImplementation):
                 if n_data.octet(0) < 0:
                     self.count = self.items
                     raise StopIteration()
-                v = item_field.decode(n_data, backend)
+                v = item_field.decode(n_data, -1, backend)
                 self.items += 1
                 self.previous = v
                 if terminator == v:
@@ -318,14 +318,14 @@ class DissectorBackend(BackendImplementation):
 
     def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type[F]] = None) -> Optional[Frame]:
         if frame_type:
-            raw_data = self.get_raw(field)
+            raw_data, _ = self.get_raw(field)
             return frame_type(self.factory(raw_data))
         v = self.get(field)
         if isinstance(v, Frame):
             return v
         if not isinstance(v, RawData):
             # need raw data for a raw frame
-            v = self.get_raw(field)
+            v, _ = self.get_raw(field)
         return RawFrame(self.factory(v))
 
     def encode(self) -> RawData:

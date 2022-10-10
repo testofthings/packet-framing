@@ -23,4 +23,5 @@ def test_decode_tcp():
     assert TCP.Checksum[tcp] == Raw.octets(0x7d, 0x12)
     assert TCP.Source_port[tcp] == 64973
     assert TCP.Destination_port[tcp] == 443
+    assert TCP.Options[tcp].byte_length() == 12
     assert TCP.Data[tcp].byte_length() == 24
