@@ -1,6 +1,7 @@
-from framing.base import Frame
+from framing.base import Frame, LayerMapping
 from framing.codecs import IntegerFormat
 from framing.fields import Structure, ValueOf
+from framing.frame_types.dns_frames import DNSMessage
 
 
 class UDP(Frame):
@@ -12,3 +13,10 @@ class UDP(Frame):
     Checksum = structure.raw(bits=16)
     Data = structure.raw().end_offset_by(ValueOf(Destination_port))
 
+
+# Well-known UDP port mappings
+UDP_Common_Payloads = LayerMapping(UDP.Data).by(UDP.Destination_port, {
+    53: DNSMessage,
+}).by(UDP.Source_port, {
+    53: DNSMessage,
+})
