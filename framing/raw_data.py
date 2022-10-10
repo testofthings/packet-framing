@@ -61,6 +61,9 @@ class RawData:
             return ipaddress.IPv6Address(self.as_bytes(0, 16))
         raise ValueError("Raw data is not IP address: " + self.to_hex())
 
+    def as_string(self, encoding='ascii') -> str:
+        return self.as_bytes(0, self.byte_length()).decode(encoding)
+
     def bit(self, bit_offset: int) -> int:
         """Get bit by offset or -1 if past EOF"""
         octet = self.octet(bit_offset // 8)

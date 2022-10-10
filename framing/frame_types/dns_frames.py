@@ -1,3 +1,5 @@
+from typing import List
+
 from framing.base import Frame, F, T, FrameBackend
 from framing.codecs import IntegerFormat
 from framing.fields import Structure, Sequence, ValueOf, LVField, RawField
@@ -33,6 +35,30 @@ class DNSName(RawField):
     def decode(self, data: RawData, bit_length, backend: FrameBackend) -> RawData:
         fb = data.octet(0)
         return data.subBlock(0, fb + 1) if fb < 0xc0 else data.subBlock(0, 2)
+
+    @classmethod
+    def parse_string(cls, data: RawData, message: FrameBackend) -> List[str]:
+        fb = data.octet(0)
+        r = []
+        while fb > 0:
+            if fb >= 0xc0:
+                # compressed
+                offset = fb & 0x3f << 8 | data.octet(1)
+                cs = cls.parse_string(message.input_data().tailBytes(offset), message)
+                r.extend(cs)
+                break
+            else:
+                r.append(data.subBlock(1, fb).as_string())
+                data = data.tailBytes(1 + fb)
+                fb = data.octet(0)
+        return r
+
+    @classmethod
+    def string(cls, frame: Frame, field: Sequence) -> str:
+        s = []
+        for r in field.get(frame):
+            s.extend(cls.parse_string(r, frame.backend.parent))
+        return ".".join(s)
 
 
 class DNSQuestion(Frame):
