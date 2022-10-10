@@ -2,12 +2,13 @@ import argparse
 import logging
 import os
 import pathlib
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Set
 
+from framing.frame_types.dns_frames import DNSMessage, DNSQuestion, DNSName
 from framing.frame_types.ethernet_frames import Ethernet_Payloads, EthernetII
 from framing.frame_types.ipv4_frames import IPv4, IP_Payloads
 from framing.frame_types.tcp_frames import TCP, TCPFlag
-from framing.frame_types.udp_frames import UDP
+from framing.frame_types.udp_frames import UDP, UDP_Common_Payloads
 from framing.frames import Frames
 from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads, PacketRecord, FileHeader
 from framing.raw_data import Raw, IPAddress
@@ -23,6 +24,7 @@ class PCAPScanner:
         self.ethernet_data_type_count: Dict[int, int] = {}
         self.ip_data_type_count: Dict[int, int] = {}
         self.ip_endpoints: Dict[Tuple[IPAddress, str], int] = {}
+        self.dns_names: Set[str] = set()
 
     def scan_files(self, file_list: List[pathlib.Path], limit=0):
         for file in file_list:
@@ -45,6 +47,7 @@ class PCAPScanner:
             # PCAP_Payloads.add_to(pcap)  # handle link type manually for performance
             Ethernet_Payloads.add_to(pcap)
             IP_Payloads.add_to(pcap)
+            UDP_Common_Payloads.add_to(pcap)
 
             hdr = PCAPFile.File_Header[pcap]
             link_type = FileHeader.LinkType[hdr]
@@ -72,6 +75,11 @@ class PCAPScanner:
                         ep = dst_ip, f"tcp:{dst_port}"
                         self.ip_endpoints[ep] = self.ip_endpoints.get(ep, 0) + 1
                     elif isinstance(pay, UDP):
+                        udp_pay = UDP.Data.as_frame(pay)
+                        if isinstance(udp_pay, DNSMessage):
+                            for qn in DNSMessage.Question[udp_pay]:
+                                name = DNSName.string(qn, DNSQuestion.QNAME)
+                                self.dns_names.add(name)
                         src_ip = IPv4.Source_IP[ip].as_ip_address()
                         src_port = UDP.Source_port[pay]
                         src_ep = src_ip, f"udp:{src_port}"
@@ -105,6 +113,10 @@ class PCAPScanner:
             r.append(f"  0x{t:02x}: {c}")
         for a, c in sorted(self.ip_endpoints.items(), key=lambda x: f"{x[0]}"):
             r.append(f"  {a[0]}:{a[1]}: {c}")
+
+        r.append("DNS names:")
+        for n in sorted(self.dns_names):
+            r.append(f"  {n}")
         return "\n".join(r)
 
 
