@@ -61,25 +61,22 @@ class FixedByteIntegerCodec(IntegerCodec):
         self.length = byte_length
         self.little_end = little_end
         if little_end:
-            self.lo_index = byte_length - 1
-            self.hi_index = 0
-            self.index_step = -1
+            self.steps = list(range(byte_length - 1, -1, -1))
         else:
-            self.lo_index = 0
-            self.hi_index = byte_length - 1
-            self.index_step = 1
+            self.steps = list(range(0, byte_length))
+        self.reverse = list(reversed(self.steps))
 
     def encode(self, value: int) -> RawData:
         b = bytearray(self.length)
         v = value
-        for i in range(self.lo_index, self.hi_index + self.index_step, self.index_step):
+        for i in self.steps:
             b[i] = v % 256
             v >>= 8
         return Raw.bytes(b)
 
     def decode(self, data: RawData) -> int:
         v = 0
-        for i in range(self.hi_index, self.lo_index - self.index_step, -self.index_step):
+        for i in self.reverse:
             v <<= 8
             v |= data.octet(i)
         return v
