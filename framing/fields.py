@@ -370,7 +370,7 @@ class Sequence(ConfigurableField[F, List[FT]]):
         self.count_resolver = value.end
         return self
 
-    def terminator_test(self, test: Callable[[FT], bool]) -> Self:
+    def terminator_test(self, test: Callable[[Any], bool]) -> Self:
         self.terminator_call = test
         return self
 
