@@ -1,6 +1,6 @@
 from typing import List
 
-from framing.base import Frame, F, T, FrameBackend
+from framing.base import Frame, F, T, FrameBackend, LayerMapping
 from framing.codecs import IntegerFormat
 from framing.fields import Structure, Sequence, ValueOf, LVField, RawField
 from framing.raw_data import Raw, RawData
@@ -59,8 +59,11 @@ class DNSName(RawField):
     def string(cls, frame: Frame, field: Sequence) -> str:
         """Parse DNS name field value"""
         s = []
+        msg = frame  # find DNS message
+        while not isinstance(msg, DNSMessage):
+            msg = msg.backend.parent.frame
         for r in field.get(frame):
-            s.extend(cls.parse_string(r, frame.backend.parent.frame))
+            s.extend(cls.parse_string(r, msg))
         return ".".join(s)
 
 
@@ -97,3 +100,20 @@ class DNSMessage(Frame):
     Answer = Sequence(structure.sub(DNSResource)).count_by(ValueOf(DNSHeader.ANCOUNT))
     Authority = Sequence(structure.sub(DNSResource)).count_by(ValueOf(DNSHeader.NSCOUNT))
     Additional = Sequence(structure.sub(DNSResource)).count_by(ValueOf(DNSHeader.ARCOUNT))
+
+
+class SOA_RDATA(Frame):
+    structure = Structure['SOA_RDATA']()
+
+    MNAME = Sequence(structure.field(DNSName())).terminator_test(dns_name_end_check)
+    RNAME = Sequence(structure.field(DNSName())).terminator_test(dns_name_end_check)
+    SERIAL = structure.integer(IntegerFormat(bytes=4))
+    REFRESH = structure.integer(IntegerFormat(bytes=4))
+    RETRY = structure.integer(IntegerFormat(bytes=4))
+    EXPIRE = structure.integer(IntegerFormat(bytes=4))
+
+
+RDATA_Types = LayerMapping(DNSResource.RDATA).by(DNSResource.TYPE, {
+    6: SOA_RDATA,
+})
+

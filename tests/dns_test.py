@@ -1,6 +1,7 @@
 import pathlib
 
-from framing.frame_types.dns_frames import DNSMessage, DNSHeader, DNSQuestion, DNSName, DNSResource
+from framing.frame_types.dns_frames import DNSMessage, DNSHeader, DNSQuestion, DNSName, DNSResource, RDATA_Types, \
+    SOA_RDATA
 from framing.frame_types.ethernet_frames import Ethernet_Payloads, EthernetII
 from framing.frame_types.ipv4_frames import IPv4, IP_Payloads
 from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads, PacketRecord
@@ -17,6 +18,8 @@ def test_decode_dns():
 
     raw = UDP.Data[PCAPFile.Packet_Records.item(pcap, 135) / PacketRecord.Packet_Data / EthernetII.data / IPv4.Payload]
     msg = DNSMessage(Frames.dissect(raw))
+    RDATA_Types.add_to(msg)
+
     qds = DNSMessage.Question[msg]
     ans = DNSMessage.Answer[msg]
     nss = DNSMessage.Authority[msg]
@@ -36,6 +39,10 @@ def test_decode_dns():
     assert DNSResource.TYPE[nss[0]] == 0x0006
     assert DNSResource.CLASS[nss[0]] == 0x0001
     assert DNSResource.TTL[nss[0]] == 0x110
+
+    soa = DNSResource.RDATA.as_frame(nss[0])
+    assert SOA_RDATA.EXPIRE[soa] == 0x127500
+
 
     # Frame 135
 
