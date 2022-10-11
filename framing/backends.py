@@ -120,11 +120,13 @@ class ComposingBackend(BackendImplementation):
     def get(self, field: Field[F, T]) -> T:
         v = self.field_values.get(field)
         if v is None:
+            assert field.structure == self.structure, f"{field.field_name} is not field of {self.structure_name()}"
             v = field.get_default_value(self.frame)
             self.field_values[field] = v
         return v
 
     def set(self, field: Field[F, T], value: T) -> Self:
+        assert field.structure == self.structure, f"{field.field_name} is not field of {self.structure_name()}"
         self.field_values[field] = value
         return self
 
@@ -189,6 +191,7 @@ class DissectorBackend(BackendImplementation):
     def get(self, field: Field[F, T]) -> T:
         v = self.field_values.get(field)
         if v is None:
+            assert field.structure == self.structure, f"{field.field_name} is not field of {self.structure_name()}"
             data, d_len = self.get_raw(field)
             layer_map = self.mappings.get_mappings(field)
             if layer_map:
@@ -225,6 +228,7 @@ class DissectorBackend(BackendImplementation):
         return RawFrame(self.factory(data))
 
     def set(self, field: Field[F, T], value: T) -> Self:
+        assert field.structure == self.structure, f"{field.field_name} is not field of {self.structure_name()}"
         self.field_values[field] = value
         return self
 
