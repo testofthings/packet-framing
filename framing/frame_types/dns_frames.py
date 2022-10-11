@@ -23,7 +23,8 @@ class DNSHeader(Frame):
     ARCOUNT = structure.integer(bits=16)
 
 
-class DNSName(RawField):
+class NameComponent(RawField):
+    """DNS name component"""
     def __init__(self):
         super().__init__(Raw.empty)
 
@@ -34,6 +35,19 @@ class DNSName(RawField):
     def decode(self, data: RawData, bit_length, backend: FrameBackend) -> RawData:
         fb = data.octet(0)
         return data.subBlock(0, fb + 1) if fb < 0xc0 else data.subBlock(0, 2)
+
+
+class DNSName(Sequence):
+    """Convenience field type for DNS name"""
+    def __init__(self, structure: Structure):
+        super().__init__(structure.field(NameComponent()))
+        self.terminator_test(self.end_check)
+
+    @classmethod
+    def end_check(cls, raw: RawData) -> bool:
+        """DNS name end check"""
+        fb = raw.octet(0)
+        return not (0 < fb < 0xc0)
 
     @classmethod
     def parse_string(cls, data: RawData, message: 'DNSMessage') -> List[str]:
@@ -66,16 +80,10 @@ class DNSName(RawField):
         return ".".join(s)
 
 
-def dns_name_end_check(raw: RawData) -> bool:
-    """DNS name end check"""
-    fb = raw.octet(0)
-    return not (0 < fb < 0xc0)
-
-
 class DNSQuestion(Frame):
     structure = Structure['DNSQuestion']()
 
-    QNAME = Sequence(structure.field(DNSName())).terminator_test(dns_name_end_check)
+    QNAME = DNSName(structure)
     QTYPE = structure.integer(bytes=2)
     QCLASS = structure.integer(bytes=2)
 
@@ -83,7 +91,7 @@ class DNSQuestion(Frame):
 class DNSResource(Frame):
     structure = Structure['DNSResource']()
 
-    NAME = Sequence(structure.field(DNSName())).terminator_test(dns_name_end_check)
+    NAME = DNSName(structure)
     TYPE = structure.integer(bytes=2)
     CLASS = structure.integer(bytes=2)
     TTL = structure.integer(bytes=4)
@@ -104,8 +112,8 @@ class DNSMessage(Frame):
 class SOA_RDATA(Frame):
     structure = Structure['SOA_RDATA']()
 
-    MNAME = Sequence(structure.field(DNSName())).terminator_test(dns_name_end_check)
-    RNAME = Sequence(structure.field(DNSName())).terminator_test(dns_name_end_check)
+    MNAME = DNSName(structure)
+    RNAME = DNSName(structure)
     SERIAL = structure.integer(bytes=4)
     REFRESH = structure.integer(bytes=4)
     RETRY = structure.integer(bytes=4)

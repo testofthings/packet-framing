@@ -4,7 +4,7 @@ import os
 import pathlib
 from typing import Dict, List, Tuple, Set
 
-from framing.frame_types.dns_frames import DNSMessage, DNSQuestion, DNSName
+from framing.frame_types.dns_frames import DNSMessage, DNSQuestion, NameComponent
 from framing.frame_types.ethernet_frames import Ethernet_Payloads, EthernetII
 from framing.frame_types.ipv4_frames import IPv4, IP_Payloads
 from framing.frame_types.tcp_frames import TCP, TCPFlag
@@ -78,7 +78,7 @@ class PCAPScanner:
                         udp_data = UDP.Data.as_frame(eth_data, default_frame=False)
                         if isinstance(udp_data, DNSMessage):
                             for qn in DNSMessage.Question[udp_data]:
-                                name = DNSName.string(qn, DNSQuestion.QNAME)
+                                name = NameComponent.string(qn, DNSQuestion.QNAME)
                                 self.dns_names.add(name)
                         src_ip = IPv4.Source_IP[ip].as_ip_address()
                         src_port = UDP.Source_port[eth_data]
