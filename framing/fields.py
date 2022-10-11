@@ -70,13 +70,21 @@ class PaddingValue(Calculator):
         return len_v
 
 
-class ValueOf:
+class CalculatorSource:
+    def calculator(self) -> Calculator:
+        raise NotImplementedError()
+
+
+class ValueOf(CalculatorSource):
     """Get value from the given field"""
     def __init__(self, field: 'FieldPointer[Any, int]'):
         if isinstance(field, IntField):
             self.end: Calculator = field
         else:
             self.end: Calculator = ValueFromPath(field)
+
+    def calculator(self) -> Calculator:
+        return self.end
 
     def __mul__(self, value: float) -> 'ValueOf':
         self.end = Multiplier(value, self.end)
@@ -91,13 +99,16 @@ class ValueOf:
         return self
 
 
-class FieldPath(FieldPointer[Frame, T]):
+class FieldPath(FieldPointer[Frame, T], CalculatorSource):
     def __init__(self, start: Field):
         self.path = [start]
 
     def __truediv__(self, other: Field[Any, T]) -> 'FieldPath[T]':
         self.path.append(other)
         return self
+
+    def calculator(self) -> Calculator:
+        return ValueFromPath(self)
 
     def get(self, frame: Frame) -> T:
         if frame.backend.structure.is_field_here(self.path[0]):
@@ -130,7 +141,7 @@ class ConfigurableField(Field[F, T]):
     def __truediv__(self, other: 'Field[Any, T]') -> 'FieldPath':
         return FieldPath(self) / other
 
-    def of(self, location: FieldPointer) -> FieldPath[int]:
+    def of(self, location: FieldPointer) -> FieldPath[T]:
         if isinstance(location, FieldPath):
             return location / self
         elif isinstance(location, Field):
@@ -138,8 +149,8 @@ class ConfigurableField(Field[F, T]):
         else:
             raise Exception(f"Cannot construct path from: {location}")
 
-    def length_by(self, value: ValueOf) -> Self:
-        self.length_resolver = Multiplier(8, value.end)
+    def length_by(self, value: CalculatorSource) -> Self:
+        self.length_resolver = Multiplier(8, value.calculator())
         field = self
 
         def procedure(frame: F):
@@ -154,8 +165,8 @@ class ConfigurableField(Field[F, T]):
         self.end_offset_resolver = FieldLengthByTerminator(self, value)
         return self
 
-    def end_offset_by(self, value: ValueOf) -> Self:
-        calc = Multiplier(8, value.end)
+    def end_offset_by(self, value: CalculatorSource) -> Self:
+        calc = Multiplier(8, value.calculator())
         self.end_offset_resolver = calc
         field = self
 
@@ -235,7 +246,7 @@ class RawField(ConfigurableField[F, RawData]):
         return data.subBlockBits(0, self.fixed_bit_length)
 
 
-class IntField(ConfigurableField[F, int], Calculator):
+class IntField(ConfigurableField[F, int], Calculator, CalculatorSource):
     """Integer field"""
     def __init__(self, codec: IntegerCodec, default_value: int):
         super().__init__("int", default_value)
@@ -259,6 +270,9 @@ class IntField(ConfigurableField[F, int], Calculator):
 
     def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> int:
         return self.codec.decode(data)
+
+    def calculator(self) -> Calculator:
+        return self
 
     def pull(self, backend: FrameBackend) -> float:
         return backend.get(self)
@@ -366,8 +380,8 @@ class Sequence(ConfigurableField[F, List[FT]]):
         self.terminator_call: Optional[Callable[[FT], bool]] = None
         sub.consumed_by = self
 
-    def count_by(self, value: ValueOf) -> Self:
-        self.count_resolver = value.end
+    def count_by(self, value: CalculatorSource) -> Self:
+        self.count_resolver = value.calculator()
         return self
 
     def terminator_test(self, test: Callable[[Any], bool]) -> Self:
@@ -497,8 +511,13 @@ class Structure(FrameStructure[F]):
         self.fields[fn] = f
         return f
 
-    def integer(self, int_format: IntegerFormat, default=0, name: str = None) -> IntField[F]:
+    def integer(self, int_format=IntegerFormat(), bytes=-1, bits=-1,
+                default=0, name: str = None) -> IntField[F]:
         fn = self._get_a_name(name)
+        if bytes > 0:
+            int_format = int_format.bytes(bytes)
+        if bits > 0:
+            int_format = int_format.bits(bits)
         codec = int_format.create_codec()
         f = IntField(codec, default)
         f.structure = self

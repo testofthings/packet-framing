@@ -1,8 +1,7 @@
 from typing import List
 
-from framing.base import Frame, F, T, FrameBackend, LayerMapping
-from framing.codecs import IntegerFormat
-from framing.fields import Structure, Sequence, ValueOf, LVField, RawField
+from framing.base import Frame, T, FrameBackend, LayerMapping
+from framing.fields import Structure, Sequence, ValueOf, RawField
 from framing.raw_data import Raw, RawData
 
 
@@ -11,17 +10,17 @@ class DNSHeader(Frame):
 
     ID = structure.raw(bits=16)
     QR = structure.raw(bits=1)
-    OPCODE = structure.integer(IntegerFormat(bits=4))
+    OPCODE = structure.integer(bits=4)
     AA = structure.raw(bits=1)
     TC = structure.raw(bits=1)
     RD = structure.raw(bits=1)
     RA = structure.raw(bits=1)
     Z = structure.raw(bits=3)
-    RCODE = structure.integer(IntegerFormat(bits=4))
-    QDCOUNT = structure.integer((IntegerFormat(bits=16)))
-    ANCOUNT = structure.integer((IntegerFormat(bits=16)))
-    NSCOUNT = structure.integer((IntegerFormat(bits=16)))
-    ARCOUNT = structure.integer((IntegerFormat(bits=16)))
+    RCODE = structure.integer(bits=4)
+    QDCOUNT = structure.integer(bits=16)
+    ANCOUNT = structure.integer(bits=16)
+    NSCOUNT = structure.integer(bits=16)
+    ARCOUNT = structure.integer(bits=16)
 
 
 class DNSName(RawField):
@@ -77,18 +76,18 @@ class DNSQuestion(Frame):
     structure = Structure['DNSQuestion']()
 
     QNAME = Sequence(structure.field(DNSName())).terminator_test(dns_name_end_check)
-    QTYPE = structure.integer(IntegerFormat(bytes=2))
-    QCLASS = structure.integer(IntegerFormat(bytes=2))
+    QTYPE = structure.integer(bytes=2)
+    QCLASS = structure.integer(bytes=2)
 
 
 class DNSResource(Frame):
     structure = Structure['DNSResource']()
 
     NAME = Sequence(structure.field(DNSName())).terminator_test(dns_name_end_check)
-    TYPE = structure.integer(IntegerFormat(bytes=2))
-    CLASS = structure.integer(IntegerFormat(bytes=2))
-    TTL = structure.integer(IntegerFormat(bytes=4))
-    RDLENGTH = structure.integer(IntegerFormat(bytes=2))
+    TYPE = structure.integer(bytes=2)
+    CLASS = structure.integer(bytes=2)
+    TTL = structure.integer(bytes=4)
+    RDLENGTH = structure.integer(bytes=2)
     RDATA = structure.raw().length_by(ValueOf(RDLENGTH))
 
 
@@ -96,10 +95,10 @@ class DNSMessage(Frame):
     structure = Structure['DNSMessage']()
 
     Header = structure.sub(DNSHeader)
-    Question = Sequence(structure.sub(DNSQuestion)).count_by(ValueOf(DNSHeader.QDCOUNT.of(Header)))
-    Answer = Sequence(structure.sub(DNSResource)).count_by(ValueOf(DNSHeader.ANCOUNT.of(Header)))
-    Authority = Sequence(structure.sub(DNSResource)).count_by(ValueOf(DNSHeader.NSCOUNT.of(Header)))
-    Additional = Sequence(structure.sub(DNSResource)).count_by(ValueOf(DNSHeader.ARCOUNT.of(Header)))
+    Question = Sequence(structure.sub(DNSQuestion)).count_by(DNSHeader.QDCOUNT.of(Header))
+    Answer = Sequence(structure.sub(DNSResource)).count_by(DNSHeader.ANCOUNT.of(Header))
+    Authority = Sequence(structure.sub(DNSResource)).count_by(DNSHeader.NSCOUNT.of(Header))
+    Additional = Sequence(structure.sub(DNSResource)).count_by(DNSHeader.ARCOUNT.of(Header))
 
 
 class SOA_RDATA(Frame):
@@ -107,10 +106,10 @@ class SOA_RDATA(Frame):
 
     MNAME = Sequence(structure.field(DNSName())).terminator_test(dns_name_end_check)
     RNAME = Sequence(structure.field(DNSName())).terminator_test(dns_name_end_check)
-    SERIAL = structure.integer(IntegerFormat(bytes=4))
-    REFRESH = structure.integer(IntegerFormat(bytes=4))
-    RETRY = structure.integer(IntegerFormat(bytes=4))
-    EXPIRE = structure.integer(IntegerFormat(bytes=4))
+    SERIAL = structure.integer(bytes=4)
+    REFRESH = structure.integer(bytes=4)
+    RETRY = structure.integer(bytes=4)
+    EXPIRE = structure.integer(bytes=4)
 
 
 RDATA_Types = LayerMapping(DNSResource.RDATA).by(DNSResource.TYPE, {
