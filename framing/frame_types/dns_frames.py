@@ -109,6 +109,24 @@ class DNSMessage(Frame):
     Additional = Sequence(structure.sub(DNSResource)).count_by(DNSHeader.ARCOUNT.of(Header))
 
 
+class Name_RDATA(Frame):
+    structure = Structure['Name_RDATA']()
+
+    Name = DNSName(structure)
+
+
+class A_RDATA(Frame):
+    structure = Structure['A_RDATA']()
+
+    ADDRESS = structure.raw(bytes=4)
+
+
+class AAAA_RDATA(Frame):
+    structure = Structure['AAAA_RDATA']()
+
+    ADDRESS = structure.raw(bytes=16)
+
+
 class SOA_RDATA(Frame):
     structure = Structure['SOA_RDATA']()
 
@@ -121,6 +139,10 @@ class SOA_RDATA(Frame):
 
 
 RDATA_Types = LayerMapping(DNSResource.RDATA).by(DNSResource.TYPE, {
+    1: A_RDATA,
+    2: Name_RDATA,
+    5: Name_RDATA,
     6: SOA_RDATA,
+    28: AAAA_RDATA,
 })
 
