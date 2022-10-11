@@ -91,9 +91,9 @@ class Field(FieldPointer[F, T]):
         v = frame.backend.get(self)
         return self.encoding_bit_length(frame.backend, v)
 
-    def as_frame(self, frame: F, frame_type: Optional[Type[F]] = None) -> 'Frame':
+    def as_frame(self, frame: F, frame_type: Optional[Type[F]] = None, default_frame=True) -> Optional['Frame']:
         """Return value as frame, use type information when available"""
-        return frame.backend.get_as_frame(self, frame_type)
+        return frame.backend.get_as_frame(self, frame_type, default_frame)
 
     def to_string(self, frame: F) -> str:
         """A string representation of current value, for unit tests"""
@@ -165,7 +165,8 @@ class FrameBackend:
         """Iterate sequence field values without storing them"""
         raise NotImplementedError()
 
-    def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type[F]] = None) -> 'Optional[Frame]':
+    def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type[F]] = None,
+                     default_frame=True) -> Optional['Frame']:
         """Get field value as frame, use implicit or explicit type"""
         raise NotImplementedError()
 

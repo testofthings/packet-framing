@@ -132,8 +132,11 @@ class ComposingBackend(BackendImplementation):
         val = self.get(sequence_field)
         return val[index]
 
-    def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type[F]] = None) -> Optional[Frame]:
+    def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type[F]] = None,
+                     default_frame=False) -> Optional[Frame]:
         # FIXME: Not implemented
+        if not default_frame:
+            return None
         return RawFrame(self.factory())
 
     def factory(self, decode: RawData = None) -> Callable[[Frame], FrameBackend]:
@@ -316,13 +319,16 @@ class DissectorBackend(BackendImplementation):
         off = self.get_bit_offset(sequence_field.offset)
         return ItemIterator(off, count)
 
-    def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type[F]] = None) -> Optional[Frame]:
+    def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type[F]] = None,
+                     default_frame=False) -> Optional[Frame]:
         if frame_type:
             raw_data, _ = self.get_raw(field)
             return frame_type(self.factory(raw_data))
         v = self.get(field)
         if isinstance(v, Frame):
             return v
+        if not default_frame:
+            return None
         if not isinstance(v, RawData):
             # need raw data for a raw frame
             v, _ = self.get_raw(field)

@@ -64,7 +64,7 @@ class PCAPScanner:
                     ip = EthernetII.data.as_frame(eth)
                     ip_td = IPv4.Protocol[ip]
                     self.ip_data_type_count[ip_td] = self.ip_data_type_count.get(ip_td, 0) + 1
-                    pay = IPv4.Payload.as_frame(ip)
+                    pay = IPv4.Payload.as_frame(ip, default_frame=False)
 
                     if isinstance(pay, TCP):
                         flags = TCP.Flags[pay]
@@ -75,7 +75,7 @@ class PCAPScanner:
                         ep = dst_ip, f"tcp:{dst_port}"
                         self.ip_endpoints[ep] = self.ip_endpoints.get(ep, 0) + 1
                     elif isinstance(pay, UDP):
-                        udp_pay = UDP.Data.as_frame(pay)
+                        udp_pay = UDP.Data.as_frame(pay, default_frame=False)
                         if isinstance(udp_pay, DNSMessage):
                             for qn in DNSMessage.Question[udp_pay]:
                                 name = DNSName.string(qn, DNSQuestion.QNAME)
