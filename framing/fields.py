@@ -72,8 +72,11 @@ class PaddingValue(Calculator):
 
 class ValueOf:
     """Get value from the given field"""
-    def __init__(self, field: 'IntField'):
-        self.end: Calculator = field
+    def __init__(self, field: 'FieldPointer[Any, int]'):
+        if isinstance(field, IntField):
+            self.end: Calculator = field
+        else:
+            self.end: Calculator = ValueFromPath(field)
 
     def __mul__(self, value: float) -> 'ValueOf':
         self.end = Multiplier(value, self.end)
@@ -88,7 +91,52 @@ class ValueOf:
         return self
 
 
+class FieldPath(FieldPointer[Frame, T]):
+    def __init__(self, start: Field):
+        self.path = [start]
+
+    def __truediv__(self, other: Field[Any, T]) -> 'FieldPath[T]':
+        self.path.append(other)
+        return self
+
+    def get(self, frame: Frame) -> T:
+        if frame.backend.structure.is_field_here(self.path[0]):
+            # resolve path
+            v = frame
+            for i, p in enumerate(self.path):
+                v = p.get(v)
+                if (i < len(self.path) - 1) and not isinstance(v, Frame):
+                    raise Exception(f"Bad field {p.field_name} in path: " + "/".join([p.field_name for p in self.path]))
+            return v
+        elif frame.backend.parent:
+            return self.get(frame.backend.parent.frame)
+        return None
+
+
+class ValueFromPath(Calculator):
+    def __init__(self, pointer: FieldPointer[Frame, int]):
+        super().__init__(None)
+        self.pointer = pointer
+
+    def pull(self, backend: 'FrameBackend') -> float:
+        return self.pointer.get(backend.frame)
+
+    def push(self, backend: 'FrameBackend', value: float) -> float:
+        raise NotImplementedError()
+
+
 class ConfigurableField(Field[F, T]):
+
+    def __truediv__(self, other: 'Field[Any, T]') -> 'FieldPath':
+        return FieldPath(self) / other
+
+    def of(self, location: FieldPointer) -> FieldPath[int]:
+        if isinstance(location, FieldPath):
+            return location / self
+        elif isinstance(location, Field):
+            return FieldPath(location) / self
+        else:
+            raise Exception(f"Cannot construct path from: {location}")
 
     def length_by(self, value: ValueOf) -> Self:
         self.length_resolver = Multiplier(8, value.end)
@@ -217,7 +265,6 @@ class IntField(ConfigurableField[F, int], Calculator):
 
     def push(self, backend: FrameBackend, value: float) -> float:
         return backend.set(self, int(value))
-
 
 FT = typing.TypeVar("FT", bound=Frame)
 

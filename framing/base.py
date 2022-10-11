@@ -52,7 +52,7 @@ class Calculator:
 
 class FieldPointer(typing.Generic[F, T]):
     """Path pointing to a field"""
-    def get(self, frame: F) -> T:
+    def get(self, frame: 'Frame') -> T:
         raise NotImplementedError()
 
 
@@ -99,9 +99,6 @@ class Field(FieldPointer[F, T]):
         """A string representation of current value, for unit tests"""
         enc = self.encode(self.get(frame), EncodingState())
         return f"{enc}"
-
-    def __truediv__(self, other: 'Field[Any, T]') -> 'FieldPath':
-        return FieldPath(self) / other
 
     def __repr__(self):
         return f"{self.field_name}: {self.type_name}"
@@ -307,28 +304,6 @@ class FrameStructure(typing.Generic[F]):
         for n, f in self.fields.items():
             r.append(f"{n}: {f}")
         return "\n".join(r)
-
-
-class FieldPath(FieldPointer[F, T]):
-    def __init__(self, start: Field[F, T]):
-        self.path = [start]
-
-    def __truediv__(self, other: Field[Any, T]) -> 'FieldPath':
-        self.path.append(other)
-        return self
-
-    def get(self, frame: F) -> T:
-        if frame.backend.structure.is_field_here(self.path[0]):
-            # resolve path
-            v = frame
-            for i, p in enumerate(self.path):
-                v = p.get(v)
-                if (i < len(self.path) - 1) and not isinstance(v, Frame):
-                    raise Exception(f"Bad field {p.field_name} in path: " + "/".join([p.field_name for p in self.path]))
-            return v
-        elif frame.backend.parent:
-            return self.get(frame.backend.parent.frame)
-        return None
 
 
 class LayerMapping:
