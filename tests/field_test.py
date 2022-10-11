@@ -21,7 +21,7 @@ class BFrame(Frame):
 class CFrame(Frame):
     structure = Structure['CFrame']()
 
-    s_field = Sequence(LVField(structure.raw(), IntegerFormat(bytes=2))).terminate_by(Raw.empty)
+    s_field = Sequence(LVField(structure.raw(), IntegerFormat(bytes=2))).terminator_test(lambda r: not r)
 
 
 class DFrame(Frame):

@@ -61,10 +61,15 @@ class DNSName(RawField):
         return ".".join(s)
 
 
+def dns_name_end_check(raw: RawData) -> bool:
+    fb = raw.octet(0)
+    return not (0 < fb < 0xc0)
+
+
 class DNSQuestion(Frame):
     structure = Structure['DNSQuestion']()
 
-    QNAME = Sequence(structure.field(DNSName())).terminate_by(Raw.octets(0))
+    QNAME = Sequence(structure.field(DNSName())).terminator_test(dns_name_end_check)
     QTYPE = structure.integer(IntegerFormat(bytes=2))
     QCLASS = structure.integer(IntegerFormat(bytes=2))
 
@@ -72,7 +77,7 @@ class DNSQuestion(Frame):
 class DNSResource(Frame):
     structure = Structure['DNSResource']()
 
-    NAME = Sequence(structure.field(DNSName())).terminate_by(Raw.octets(0))
+    NAME = Sequence(structure.field(DNSName())).terminator_test(dns_name_end_check)
     TYPE = structure.integer(IntegerFormat(bytes=2))
     CLASS = structure.integer(IntegerFormat(bytes=2))
     TTL = structure.integer(IntegerFormat(bytes=2))

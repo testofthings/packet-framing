@@ -33,6 +33,9 @@ def test_decode_dns():
     a_name = DNSName.string(nss[0], DNSResource.NAME)
     assert a_name == "mask.apple-dns.net"
 
+    assert DNSResource.TYPE[nss[0]] == 0x0006
+    assert DNSResource.CLASS[nss[0]] == 0x0001
+
     # Frame 135
 
     raw = UDP.Data[PCAPFile.Packet_Records.item(pcap, 134) / PacketRecord.Packet_Data / EthernetII.data / IPv4.Payload]

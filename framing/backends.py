@@ -282,7 +282,7 @@ class DissectorBackend(BackendImplementation):
         return f
 
     def iterate(self, sequence_field: Field, item_field: Field[F, FT],
-                count=-1, terminator: Optional[T] = None) -> Iterator[FT]:
+                count=-1, terminator: Optional[Callable[[T], bool]] = None) -> Iterator[FT]:
         v = self.field_values.get(sequence_field)
         if v is not None:
             return v.__iter__()  # already value in memory (we do not store it here)
@@ -312,7 +312,7 @@ class DissectorBackend(BackendImplementation):
                 v = item_field.decode(n_data, -1, backend)
                 self.items += 1
                 self.previous = v
-                if terminator == v:
+                if terminator is not None and terminator(v):
                     self.count = self.items
                 return v
 

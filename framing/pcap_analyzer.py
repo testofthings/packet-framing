@@ -24,7 +24,7 @@ class PCAPScanner:
         self.ethernet_data_type_count: Dict[int, int] = {}
         self.ip_data_type_count: Dict[int, int] = {}
         self.ip_endpoints: Dict[Tuple[IPAddress, str], int] = {}
-        self.dns_names: Set[str] = set()
+        self.dns_names: Dict[str, Set[IPAddress]] = {}
 
     def scan_files(self, file_list: List[pathlib.Path], limit=0):
         for file in file_list:
@@ -64,30 +64,30 @@ class PCAPScanner:
                     ip = EthernetII.data.as_frame(eth)
                     ip_td = IPv4.Protocol[ip]
                     self.ip_data_type_count[ip_td] = self.ip_data_type_count.get(ip_td, 0) + 1
-                    pay = IPv4.Payload.as_frame(ip, default_frame=False)
+                    eth_data = IPv4.Payload.as_frame(ip, default_frame=False)
 
-                    if isinstance(pay, TCP):
-                        flags = TCP.Flags[pay]
+                    if isinstance(eth_data, TCP):
+                        flags = TCP.Flags[eth_data]
                         if flags & TCPFlag.SYN == 0 or flags & TCPFlag.ACK != 0:
                             continue  # not initial handshake
                         src_ip, dst_ip = IPv4.Source_IP[ip].as_ip_address(), IPv4.Destination_IP[ip].as_ip_address()
-                        dst_port = TCP.Destination_port[pay]
+                        dst_port = TCP.Destination_port[eth_data]
                         ep = dst_ip, f"tcp:{dst_port}"
                         self.ip_endpoints[ep] = self.ip_endpoints.get(ep, 0) + 1
-                    elif isinstance(pay, UDP):
-                        udp_pay = UDP.Data.as_frame(pay, default_frame=False)
-                        if isinstance(udp_pay, DNSMessage):
-                            for qn in DNSMessage.Question[udp_pay]:
+                    elif isinstance(eth_data, UDP):
+                        udp_data = UDP.Data.as_frame(eth_data, default_frame=False)
+                        if isinstance(udp_data, DNSMessage):
+                            for qn in DNSMessage.Question[udp_data]:
                                 name = DNSName.string(qn, DNSQuestion.QNAME)
                                 self.dns_names.add(name)
                         src_ip = IPv4.Source_IP[ip].as_ip_address()
-                        src_port = UDP.Source_port[pay]
+                        src_port = UDP.Source_port[eth_data]
                         src_ep = src_ip, f"udp:{src_port}"
                         if src_ep in self.ip_endpoints:
                             # seen traffic _from_ here -> assume UDP client (FIXME: Could check addr-port pairs)
                             continue
                         dst_ip = IPv4.Destination_IP[ip].as_ip_address()
-                        dst_port = UDP.Destination_port[pay]
+                        dst_port = UDP.Destination_port[eth_data]
                         ep = dst_ip, f"udp:{dst_port}"
                         self.ip_endpoints[ep] = self.ip_endpoints.get(ep, 0) + 1
 

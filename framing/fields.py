@@ -316,21 +316,21 @@ class Sequence(ConfigurableField[F, List[FT]]):
         else:
             self.item_fixed_bit_length = self.sub.fixed_bit_length
         self.count_resolver: Optional[Calculator] = None
-        self.terminator_value: Optional[FT] = None
+        self.terminator_call: Optional[Callable[[FT], bool]] = None
         sub.consumed_by = self
 
     def count_by(self, value: ValueOf) -> Self:
         self.count_resolver = value.end
         return self
 
-    def terminate_by(self, value) -> Self:
-        self.terminator_value = value
+    def terminator_test(self, test: Callable[[FT], bool]) -> Self:
+        self.terminator_call = test
         return self
 
     def iterate(self, frame: F) -> Iterator[FT]:
         """Get item by index"""
         known_count = int(self.count_resolver.pull(frame.backend)) if self.count_resolver else -1
-        return frame.backend.iterate(self, self.sub, known_count, self.terminator_value)
+        return frame.backend.iterate(self, self.sub, known_count, self.terminator_call)
 
     def get_count(self, frame: F) -> int:
         if self.count_resolver:
@@ -385,7 +385,7 @@ class Sequence(ConfigurableField[F, List[FT]]):
         if b_len >= 0:
             return b_len
 
-        if known_count < 0 and self.terminator_value is None:
+        if known_count < 0 and self.terminator_call is None:
             return -1  # we decode everything...
 
         # The hard way...
@@ -401,9 +401,9 @@ class Sequence(ConfigurableField[F, List[FT]]):
             v_len = self.sub.decode_bit_length(b_data, 0, i_value, backend)
             assert v_len >= 0, "Sequence sub-value must know its length"
             b_off += v_len
-            if self.terminator_value is not None:
+            if self.terminator_call is not None:
                 v = self.sub.decode(b_data, v_len, backend)
-                if v == self.terminator_value:
+                if self.terminator_call(v):
                     break
             i += 1
         return b_off
@@ -422,7 +422,7 @@ class Sequence(ConfigurableField[F, List[FT]]):
                 break  # no more data to read
             v = self.sub.decode(data, -1, backend)
             items.append(v)  # Add terminator to the list
-            if v == self.terminator_value:
+            if self.terminator_call is not None and self.terminator_call(v):
                 break
             previous = v
         return items
