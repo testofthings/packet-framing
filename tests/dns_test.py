@@ -35,6 +35,7 @@ def test_decode_dns():
 
     assert DNSResource.TYPE[nss[0]] == 0x0006
     assert DNSResource.CLASS[nss[0]] == 0x0001
+    assert DNSResource.TTL[nss[0]] == 0x110
 
     # Frame 135
 

@@ -84,7 +84,7 @@ class DNSResource(Frame):
     NAME = Sequence(structure.field(DNSName())).terminator_test(dns_name_end_check)
     TYPE = structure.integer(IntegerFormat(bytes=2))
     CLASS = structure.integer(IntegerFormat(bytes=2))
-    TTL = structure.integer(IntegerFormat(bytes=2))
+    TTL = structure.integer(IntegerFormat(bytes=4))
     RDLENGTH = structure.integer(IntegerFormat(bytes=2))
     RDATA = structure.raw().length_by(ValueOf(RDLENGTH))
 
