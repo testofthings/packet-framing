@@ -37,14 +37,16 @@ class DNSName(RawField):
         return data.subBlock(0, fb + 1) if fb < 0xc0 else data.subBlock(0, 2)
 
     @classmethod
-    def parse_string(cls, data: RawData, message: FrameBackend) -> List[str]:
+    def parse_string(cls, data: RawData, message: 'DNSMessage') -> List[str]:
+        """Parse DNS encoded string"""
+        ba = message.backend
         fb = data.octet(0)
         r = []
         while fb > 0:
             if fb >= 0xc0:
                 # compressed
                 offset = fb & 0x3f << 8 | data.octet(1)
-                cs = cls.parse_string(message.input_data().tailBytes(offset), message)
+                cs = cls.parse_string(ba.input_data().tailBytes(offset), message)
                 r.extend(cs)
                 break
             else:
@@ -55,13 +57,15 @@ class DNSName(RawField):
 
     @classmethod
     def string(cls, frame: Frame, field: Sequence) -> str:
+        """Parse DNS name field value"""
         s = []
         for r in field.get(frame):
-            s.extend(cls.parse_string(r, frame.backend.parent))
+            s.extend(cls.parse_string(r, frame.backend.parent.frame))
         return ".".join(s)
 
 
 def dns_name_end_check(raw: RawData) -> bool:
+    """DNS name end check"""
     fb = raw.octet(0)
     return not (0 < fb < 0xc0)
 
