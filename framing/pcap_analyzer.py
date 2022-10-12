@@ -1,16 +1,15 @@
 import argparse
 import logging
-import os
 import pathlib
 from typing import Dict, List, Tuple, Set
 
-from framing.frame_types.dns_frames import DNSMessage, DNSQuestion, NameComponent
+from framing.frame_types.dns_frames import DNSMessage, DNSQuestion, NameComponent, DNSName
 from framing.frame_types.ethernet_frames import Ethernet_Payloads, EthernetII
 from framing.frame_types.ipv4_frames import IPv4, IP_Payloads
+from framing.frame_types.pcap_frames import PCAPFile, PacketRecord, FileHeader
 from framing.frame_types.tcp_frames import TCP, TCPFlag
 from framing.frame_types.udp_frames import UDP, UDP_Common_Payloads
 from framing.frames import Frames
-from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads, PacketRecord, FileHeader
 from framing.raw_data import Raw, IPAddress
 
 
@@ -24,7 +23,7 @@ class PCAPScanner:
         self.ethernet_data_type_count: Dict[int, int] = {}
         self.ip_data_type_count: Dict[int, int] = {}
         self.ip_endpoints: Dict[Tuple[IPAddress, str], int] = {}
-        self.dns_names: Dict[str, Set[IPAddress]] = {}
+        self.dns_names: Set[str] = set()
 
     def scan_files(self, file_list: List[pathlib.Path], limit=0):
         for file in file_list:
@@ -77,8 +76,8 @@ class PCAPScanner:
                     elif isinstance(eth_data, UDP):
                         udp_data = UDP.Data.as_frame(eth_data, default_frame=False)
                         if isinstance(udp_data, DNSMessage):
-                            for qn in DNSMessage.Question[udp_data]:
-                                name = NameComponent.string(qn, DNSQuestion.QNAME)
+                            for qn in DNSMessage.Question.iterate(udp_data):
+                                name = DNSName.string(qn, DNSQuestion.QNAME)
                                 self.dns_names.add(name)
                         src_ip = IPv4.Source_IP[ip].as_ip_address()
                         src_port = UDP.Source_port[eth_data]
