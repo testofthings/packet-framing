@@ -134,6 +134,10 @@ class ComposingBackend(BackendImplementation):
 
     def set(self, field: Field[F, T], value: T) -> Self:
         assert field.structure == self.structure, f"{field.field_name} is not field of {self.structure_name()}"
+        if self.choice:
+            # update the choice
+            self.field_values.pop(self.choice)
+            self.choice = field
         self.field_values[field] = value
         return self
 

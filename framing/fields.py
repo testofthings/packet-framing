@@ -296,12 +296,22 @@ class SubStructureField(ConfigurableField[F, FT]):
         """Configure the choice in field by given value"""
         assert isinstance(Structure.get_struct(self.sub_type), Selection), \
             f"Structure {Structure.get_struct(self.sub_type).structure_name} is not a selection"
-        self.choice_resolver = value.calculator()
+        choice_resolver = value.calculator()
+        self.choice_resolver = choice_resolver
+
+        def proc(f: Frame):
+            choice = self.get(f)
+            sel = typing.cast(Selection, choice.structure)
+            key = sel.reverse_map.get(choice.backend.structure, 0)
+            choice_resolver.push(f.backend, key)
+
+        self.structure.at_commit(proc)
         return self
 
     def select(self, frame: F, field: ConfigurableField[FT, Any]) -> FT:
         sub = self.sub_type(frame.backend.factory())
         sub.backend.choice = field
+        frame.backend.set(self, sub)
         return sub
 
     def get_default_value(self, frame: F) -> FT:
@@ -555,9 +565,11 @@ class Selection(Structure[F]):
         super().__init__()
         self.is_selection = True
         self.choice_map: Dict[Any, ConfigurableField] = {}
+        self.reverse_map: Dict[Structure, Any] = {}
 
     def choice(self, key, value: ConfigurableField[F, T]) -> ConfigurableField[F, T]:
         self.choice_map[key] = value
+        self.reverse_map[value.structure] = key
         return value
 
     def _resolve_offsets(self):
