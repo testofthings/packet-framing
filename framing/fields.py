@@ -489,6 +489,13 @@ class Sequence(ConfigurableField[F, List[FT]]):
         return items
 
 
+class Selection(ConfigurableField[F, T]):
+    def __init__(self, sub_type: Type[T] = Any, choices: Dict[Any, ConfigurableField[F, Any]] = None,
+                 choice_by: ValueOf = None):
+        super().__init__("selection", choices[0].default_value)
+        pass
+
+
 class Structure(FrameStructure[F]):
     """Frame structure definition"""
 

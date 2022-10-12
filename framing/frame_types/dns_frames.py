@@ -1,7 +1,7 @@
 from typing import List
 
 from framing.base import Frame, T, FrameBackend, LayerMapping
-from framing.fields import Structure, Sequence, ValueOf, RawField
+from framing.fields import Structure, Sequence, ValueOf, RawField, Selection
 from framing.raw_data import Raw, RawData
 
 
@@ -88,27 +88,6 @@ class DNSQuestion(Frame):
     QCLASS = structure.integer(bytes=2)
 
 
-class DNSResource(Frame):
-    structure = Structure['DNSResource']()
-
-    NAME = DNSName(structure)
-    TYPE = structure.integer(bytes=2)
-    CLASS = structure.integer(bytes=2)
-    TTL = structure.integer(bytes=4)
-    RDLENGTH = structure.integer(bytes=2)
-    RDATA = structure.raw().length_by(ValueOf(RDLENGTH))
-
-
-class DNSMessage(Frame):
-    structure = Structure['DNSMessage']()
-
-    Header = structure.sub(DNSHeader)
-    Question = Sequence(structure.sub(DNSQuestion)).count_by(DNSHeader.QDCOUNT.of(Header))
-    Answer = Sequence(structure.sub(DNSResource)).count_by(DNSHeader.ANCOUNT.of(Header))
-    Authority = Sequence(structure.sub(DNSResource)).count_by(DNSHeader.NSCOUNT.of(Header))
-    Additional = Sequence(structure.sub(DNSResource)).count_by(DNSHeader.ARCOUNT.of(Header))
-
-
 class Name_RDATA(Frame):
     structure = Structure['Name_RDATA']()
 
@@ -138,11 +117,28 @@ class SOA_RDATA(Frame):
     EXPIRE = structure.integer(bytes=4)
 
 
-RDATA_Types = LayerMapping(DNSResource.RDATA).by(DNSResource.TYPE, {
-    1: A_RDATA,
-    2: Name_RDATA,
-    5: Name_RDATA,
-    6: SOA_RDATA,
-    28: AAAA_RDATA,
-})
+class DNSResource(Frame):
+    structure = Structure['DNSResource']()
 
+    NAME = DNSName(structure)
+    TYPE = structure.integer(bytes=2)
+    CLASS = structure.integer(bytes=2)
+    TTL = structure.integer(bytes=4)
+    RDLENGTH = structure.integer(bytes=2)
+    RDATA = Selection(choice_by=ValueOf(TYPE), choices={
+        1: structure.sub(A_RDATA),
+        2: DNSName(structure),
+        5: DNSName(structure),
+        6: structure.sub(SOA_RDATA),
+        28: structure.sub(AAAA_RDATA),
+    }).length_by(ValueOf(RDLENGTH))
+
+
+class DNSMessage(Frame):
+    structure = Structure['DNSMessage']()
+
+    Header = structure.sub(DNSHeader)
+    Question = Sequence(structure.sub(DNSQuestion)).count_by(DNSHeader.QDCOUNT.of(Header))
+    Answer = Sequence(structure.sub(DNSResource)).count_by(DNSHeader.ANCOUNT.of(Header))
+    Authority = Sequence(structure.sub(DNSResource)).count_by(DNSHeader.NSCOUNT.of(Header))
+    Additional = Sequence(structure.sub(DNSResource)).count_by(DNSHeader.ARCOUNT.of(Header))
