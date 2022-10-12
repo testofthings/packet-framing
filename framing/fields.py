@@ -280,6 +280,7 @@ class IntField(ConfigurableField[F, int], Calculator, CalculatorSource):
     def push(self, backend: FrameBackend, value: float) -> float:
         return backend.set(self, int(value))
 
+
 FT = typing.TypeVar("FT", bound=Frame)
 
 
@@ -289,6 +290,19 @@ class SubStructureField(ConfigurableField[F, FT]):
         super().__init__("sub", None)
         self.sub_type = sub_type
         self.sub_structure = Structure.get_struct(sub_type)
+        self.choice_resolver: Optional[Calculator] = None
+
+    def choice_by(self, value: CalculatorSource) -> Self:
+        """Configure the choice in field by given value"""
+        assert isinstance(Structure.get_struct(self.sub_type), Selection), \
+            f"Structure {Structure.get_struct(self.sub_type).structure_name} is not a selection"
+        self.choice_resolver = value.calculator()
+        return self
+
+    def select(self, frame: F, field: ConfigurableField[FT, Any]) -> FT:
+        sub = self.sub_type(frame.backend.factory())
+        sub.backend.choice = field
+        return sub
 
     def get_default_value(self, frame: F) -> FT:
         return self.sub_type(frame.backend.factory())
@@ -489,13 +503,6 @@ class Sequence(ConfigurableField[F, List[FT]]):
         return items
 
 
-class Selection(ConfigurableField[F, T]):
-    def __init__(self, sub_type: Type[T] = Any, choices: Dict[Any, ConfigurableField[F, Any]] = None,
-                 choice_by: ValueOf = None):
-        super().__init__("selection", choices[0].default_value)
-        pass
-
-
 class Structure(FrameStructure[F]):
     """Frame structure definition"""
 
@@ -540,3 +547,19 @@ class Structure(FrameStructure[F]):
 
     def at_commit(self, update: Callable[[F], None]):
         self.commit_procedures.append((None, update))
+
+
+class Selection(Structure[F]):
+    """A frame which only the chosen field is present"""
+    def __init__(self):
+        super().__init__()
+        self.is_selection = True
+        self.choice_map: Dict[Any, ConfigurableField] = {}
+
+    def choice(self, key, value: ConfigurableField[F, T]) -> ConfigurableField[F, T]:
+        self.choice_map[key] = value
+        return value
+
+    def _resolve_offsets(self):
+        pass  # all zeroes ok
+

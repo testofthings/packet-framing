@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Any
 
 from framing.base import Frame, T, FrameBackend, LayerMapping
 from framing.fields import Structure, Sequence, ValueOf, RawField, Selection
@@ -117,6 +117,16 @@ class SOA_RDATA(Frame):
     EXPIRE = structure.integer(bytes=4)
 
 
+class RDATA(Frame):
+    structure = Selection['RDATA']()
+
+    A = structure.choice(1, structure.sub(A_RDATA))
+    NS = structure.choice(2, DNSName(structure))
+    CNAME = structure.choice(5, DNSName(structure))
+    SOA = structure.choice(6, structure.sub(A_RDATA))
+    AAAA = structure.choice(1, structure.sub(AAAA_RDATA))
+
+
 class DNSResource(Frame):
     structure = Structure['DNSResource']()
 
@@ -125,13 +135,7 @@ class DNSResource(Frame):
     CLASS = structure.integer(bytes=2)
     TTL = structure.integer(bytes=4)
     RDLENGTH = structure.integer(bytes=2)
-    RDATA = Selection(choice_by=ValueOf(TYPE), choices={
-        1: structure.sub(A_RDATA),
-        2: DNSName(structure),
-        5: DNSName(structure),
-        6: structure.sub(SOA_RDATA),
-        28: structure.sub(AAAA_RDATA),
-    }).length_by(ValueOf(RDLENGTH))
+    RDATA = structure.sub(RDATA).choice_by(TYPE).length_by(RDLENGTH)
 
 
 class DNSMessage(Frame):

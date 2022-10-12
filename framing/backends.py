@@ -23,7 +23,10 @@ class BackendImplementation(FrameBackend):
 
     def get_bit_length(self) -> int:
         if self.known_bit_length < 0:
-            self.known_bit_length = self.get_bit_offset(self.structure.fields_length)
+            if self.choice:
+                self.known_bit_length = self.choice.get_bit_length(self.frame)
+            else:
+                self.known_bit_length = self.get_bit_offset(self.structure.fields_length)
         return self.known_bit_length
 
     def add_mapping(self, mapping: 'LayerMapping') -> Self:
@@ -55,7 +58,11 @@ class BackendImplementation(FrameBackend):
 
         state = EncodingState()
         bit_off = bit_offset
-        for n, f in self.structure.fields.items():
+        if self.choice is None:
+            field_items = self.structure.fields.items()
+        else:
+            field_items = [(self.choice.field_name, self.choice)]
+        for n, f in field_items:
             v = self.get(f)
             if isinstance(f, Sequence) and isinstance(f.sub, SubStructureField):
                 # Sequence of frames
@@ -166,6 +173,9 @@ class ComposingBackend(BackendImplementation):
         self.known_bit_length = -1
         f_list = []
         state = EncodingState()
+        if self.choice:
+            v = self.get(self.choice)
+            return self.choice.encode(v, state)
         for f in self.structure.fields.values():
             v = self.get(f)
             f_list.append(f.encode(v, state))
@@ -175,6 +185,7 @@ class ComposingBackend(BackendImplementation):
         n_frame = copy.copy(self.frame)
         c = ComposingBackend(n_frame, self.mappings)
         c.parent = parent
+        c.choice = self.choice
         n_frame.backend = c
         c.field_values.update(self.field_values)
         return c
@@ -184,7 +195,6 @@ class DissectorBackend(BackendImplementation):
     """Backend to dissect frame from raw data"""
     def __init__(self, frame: Frame, mappings: LayerMapping, data: RawData):
         super().__init__(frame, mappings)
-        self.is_decoding = True
         self.data = data
         self.end_offset_cache: Dict[Field, int] = {}
 
@@ -361,6 +371,7 @@ class DissectorBackend(BackendImplementation):
         n_frame = copy.copy(self.frame)
         c = DissectorBackend(n_frame, self.mappings, limited_data)
         c.parent = parent
+        c.choice = self.choice
         n_frame.backend = c
         c.field_values.update(self.field_values)
         return c

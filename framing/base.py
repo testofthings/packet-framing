@@ -140,9 +140,9 @@ class FrameBackend:
     def __init__(self, frame: 'Frame'):
         self.frame = frame
         self.structure = FrameStructure.get_struct(frame)
-        self.is_decoding = False
         if not self.structure.built:
             self.structure.finish_building(frame)
+        self.choice: Optional[Field] = self.structure.get_first_field() if self.structure.is_selection else None
         self.parent: Optional[FrameBackend] = None
 
     def structure_name(self) -> str:
@@ -232,6 +232,7 @@ class FrameStructure(typing.Generic[F]):
     """Frame structure definition"""
     def __init__(self):
         self.structure_name = "Unnamed"
+        self.is_selection = False
         self.fields: typing.Dict[str, Field] = {}
         self.fields_length = FieldOffset()
         self.commit_procedures: List[typing.Tuple[Optional[Field], Callable[[F], None]]] = []
@@ -254,6 +255,9 @@ class FrameStructure(typing.Generic[F]):
         f = self.fields.get(field.field_name)
         return f == field
 
+    def get_first_field(self) -> Field[F, Any]:
+        return self.fields.values().__iter__().__next__()
+
     def _get_a_name(self, override: Optional[str]) -> str:
         """Get name or temporary name for a field"""
         return override if override else f"__{len(self.fields)}"
@@ -275,9 +279,11 @@ class FrameStructure(typing.Generic[F]):
             nn = i_names[v] if n.startswith("__") else n
             self.fields[nn] = v
             v.field_name = nn
+        self._resolve_offsets()
         self.built = True
 
-        # resolve offsets
+    def _resolve_offsets(self):
+        """Resolve offsets"""
         prefix = None
         prefix_offset = 0
         for f in self.fields.values():
