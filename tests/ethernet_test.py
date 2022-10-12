@@ -88,4 +88,4 @@ def test_decode_eth_and_ip():
     ip = eth / EthernetII.data
     assert isinstance(ip, IPv4)
 
-    pcap.close()
+    Frames.close(pcap)

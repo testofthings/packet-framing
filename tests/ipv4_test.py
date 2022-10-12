@@ -54,7 +54,7 @@ def test_decode_ip():
     a = IPv4.Payload[ip]
     assert BackendImplementation.list_resolved_fields(ip) == [IPv4.IHL, IPv4.Payload, IPv4.Total_Length]
 
-    pcap.close()
+    Frames.close(pcap)
 
 
 def test_decode_payload():
@@ -66,4 +66,4 @@ def test_decode_payload():
     assert isinstance(ip, IPv4)
     assert isinstance(pl, TCP)
 
-    pcap.close()
+    Frames.close(pcap)

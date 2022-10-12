@@ -216,11 +216,6 @@ class Frame(LengthEntity):
         """Encode the frame into bytes"""
         return self.backend.encode()
 
-    def close(self) -> Self:
-        """Close underlying open files if any"""
-        self.backend.close()
-        return self
-
     def __truediv__(self, field: Field[Self, TF]) -> TF:
         return field.as_frame(self)
 
