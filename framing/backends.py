@@ -358,7 +358,10 @@ class DissectorBackend(BackendImplementation):
 
     def get_bit_length(self) -> int:
         if self.known_bit_length < 0:
-            rl = self.get_bit_offset(self.structure.fields_length)
+            if self.choice is not None:
+                rl = self.choice.get_bit_length(self.frame)
+            else:
+                rl = self.get_bit_offset(self.structure.fields_length)
             if 0 <= self.data.bit_length() < rl:
                 # input data is known to be shorter...
                 rl = self.data.bit_length()

@@ -142,7 +142,7 @@ class FrameBackend:
         self.structure = FrameStructure.get_struct(frame)
         if not self.structure.built:
             self.structure.finish_building(frame)
-        self.choice: Optional[Field] = self.structure.get_first_field() if self.structure.is_selection else None
+        self.choice: Optional[Field] = self.structure.get_field_by() if self.structure.is_selection else None
         self.parent: Optional[FrameBackend] = None
 
     def structure_name(self) -> str:
@@ -255,7 +255,12 @@ class FrameStructure(typing.Generic[F]):
         f = self.fields.get(field.field_name)
         return f == field
 
-    def get_first_field(self) -> Field[F, Any]:
+    def get_field_by(self, key=None) -> Field[F, Any]:
+        """The field by key or the default field, used for selections"""
+        if key is not None:
+            f = self.fields.get(key)
+            if f:
+                return f
         return self.fields.values().__iter__().__next__()
 
     def _get_a_name(self, override: Optional[str]) -> str:

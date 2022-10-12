@@ -330,11 +330,18 @@ class SubStructureField(ConfigurableField[F, FT]):
         b_len = super().decode_bit_length(data, bit_offset, None, backend)
         if b_len >= 0:
             return b_len
+        # if self.choice_resolver: ... not trying to resolve, as we would need to create the backend for it
         v = self.decode(data.tailBits(bit_offset), -1, backend)
         return v.bit_length()
 
     def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> FT:
-        return self.sub_type(backend.factory(decode=data))
+        sub_f = self.sub_type(backend.factory(decode=data))
+        if self.choice_resolver:
+            # make the choice
+            key = self.choice_resolver.pull(backend)
+            sub_field = sub_f.backend.structure.get_field_by(key)
+            sub_f.backend.choice = sub_field
+        return sub_f
 
 
 class LengthOfLV(Calculator):
@@ -571,6 +578,13 @@ class Selection(Structure[F]):
         self.choice_map[key] = value
         self.reverse_map[value.structure] = key
         return value
+
+    def get_field_by(self, key=None) -> Field[F, Any]:
+        if key is not None:
+            f = self.choice_map.get(key)
+            if f:
+                return f
+        return super().get_field_by(key)
 
     def _resolve_offsets(self):
         pass  # all zeroes ok
