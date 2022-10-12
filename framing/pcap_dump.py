@@ -2,14 +2,12 @@ import argparse
 import logging
 import os
 import pathlib
-from typing import Dict
 
-from framing.frame_types.dns_frames import RDATA_Types
 from framing.frame_types.ethernet_frames import Ethernet_Payloads
 from framing.frame_types.ipv4_frames import IP_Payloads
+from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads
 from framing.frame_types.udp_frames import UDP_Common_Payloads
 from framing.frames import Frames
-from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads
 from framing.raw_data import Raw
 
 if __name__ == "__main__":
@@ -35,9 +33,6 @@ if __name__ == "__main__":
         Ethernet_Payloads.add_to(pcap)
         IP_Payloads.add_to(pcap)
         UDP_Common_Payloads.add_to(pcap)
-
-        # FIXME: Too much work to include all these
-        RDATA_Types.add_to(pcap)
 
         hdr = PCAPFile.File_Header[pcap]
         if not silent:

@@ -575,6 +575,8 @@ class Selection(Structure[F]):
         self.reverse_map: Dict[Structure, Any] = {}
 
     def choice(self, key, value: ConfigurableField[F, T]) -> ConfigurableField[F, T]:
+        if key in self.choice_map or value in self.reverse_map:
+            raise Exception(f"Duplicate entry for key {key}")
         self.choice_map[key] = value
         self.reverse_map[value.structure] = key
         return value

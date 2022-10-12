@@ -120,11 +120,12 @@ class SOA_RDATA(Frame):
 class RDATA(Frame):
     structure = Selection['RDATA']()
 
+    Other = structure.raw()  # the default
     A = structure.choice(1, structure.sub(A_RDATA))
     NS = structure.choice(2, DNSName(structure))
     CNAME = structure.choice(5, DNSName(structure))
-    SOA = structure.choice(6, structure.sub(A_RDATA))
-    AAAA = structure.choice(1, structure.sub(AAAA_RDATA))
+    SOA = structure.choice(6, structure.sub(SOA_RDATA))
+    AAAA = structure.choice(28, structure.sub(AAAA_RDATA))
 
 
 class DNSResource(Frame):
