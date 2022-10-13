@@ -1,8 +1,11 @@
 import argparse
 import logging
 import pathlib
-from typing import Dict, List, Tuple, Set
+from typing import Dict, List, Tuple, Set, Type, Callable
 
+from typing_extensions import Self
+
+from framing.base import Frame
 from framing.frame_types.dns_frames import DNSMessage, DNSQuestion, NameComponent, DNSName
 from framing.frame_types.ethernet_frames import Ethernet_Payloads, EthernetII
 from framing.frame_types.ipv4_frames import IPv4, IP_Payloads
@@ -64,7 +67,6 @@ class PCAPScanner:
                     ip_td = IPv4.Protocol[ip]
                     self.ip_data_type_count[ip_td] = self.ip_data_type_count.get(ip_td, 0) + 1
                     eth_data = IPv4.Payload.as_frame(ip, default_frame=False)
-
                     if isinstance(eth_data, TCP):
                         flags = TCP.Flags[eth_data]
                         if flags & TCPFlag.SYN == 0 or flags & TCPFlag.ACK != 0:
@@ -74,11 +76,10 @@ class PCAPScanner:
                         ep = dst_ip, f"tcp:{dst_port}"
                         self.ip_endpoints[ep] = self.ip_endpoints.get(ep, 0) + 1
                     elif isinstance(eth_data, UDP):
-                        udp_data = UDP.Data.as_frame(eth_data, default_frame=False)
-                        if isinstance(udp_data, DNSMessage):
-                            for qn in DNSMessage.Question.iterate(udp_data):
-                                name = DNSName.string(qn, DNSQuestion.QNAME)
-                                self.dns_names.add(name)
+                        udp_procs = {
+                            DNSMessage: lambda f: self.scan_dns(f),
+                        }
+                        UDP.Data.process(eth_data, udp_procs)
                         src_ip = IPv4.Source_IP[ip].as_ip_address()
                         src_port = UDP.Source_port[eth_data]
                         src_ep = src_ip, f"udp:{src_port}"
@@ -90,9 +91,13 @@ class PCAPScanner:
                         ep = dst_ip, f"udp:{dst_port}"
                         self.ip_endpoints[ep] = self.ip_endpoints.get(ep, 0) + 1
 
-
         finally:
             raw_data.close()
+
+    def scan_dns(self, frame: DNSMessage):
+        for qn in DNSMessage.Question.iterate(frame):
+            name = DNSName.string(qn, DNSQuestion.QNAME)
+            self.dns_names.add(name)
 
     def __repr__(self):
         r = []

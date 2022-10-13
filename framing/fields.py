@@ -136,6 +136,10 @@ class ValueFromPath(Calculator):
         raise NotImplementedError()
 
 
+FT = typing.TypeVar("FT", bound=Frame)
+V = typing.TypeVar("V")
+
+
 class ConfigurableField(Field[F, T]):
 
     def __truediv__(self, other: 'Field[Any, T]') -> 'FieldPath':
@@ -221,6 +225,11 @@ class RawField(ConfigurableField[F, RawData]):
     def __getitem__(self, frame: F) -> RawData:
         return self.get(frame)
 
+    def process(self, frame: F, procedures: Dict[Type[Frame], Callable[[Any], V]]) -> Optional[V]:
+        v = self.as_frame(frame)
+        proc = procedures.get(type(v))
+        return proc(v) if proc else None
+
     def get_bit_length(self, frame: F) -> int:
         """Get bit length for a value"""
         v = frame.backend.get(self)
@@ -279,9 +288,6 @@ class IntField(ConfigurableField[F, int], Calculator, CalculatorSource):
 
     def push(self, backend: FrameBackend, value: float) -> float:
         return backend.set(self, int(value))
-
-
-FT = typing.TypeVar("FT", bound=Frame)
 
 
 class SubStructureField(ConfigurableField[F, FT]):
