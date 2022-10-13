@@ -66,33 +66,39 @@ class PCAPScanner:
                     ip = EthernetII.data.as_frame(eth)
                     ip_td = IPv4.Protocol[ip]
                     self.ip_data_type_count[ip_td] = self.ip_data_type_count.get(ip_td, 0) + 1
-                    eth_data = IPv4.Payload.as_frame(ip, default_frame=False)
-                    if isinstance(eth_data, TCP):
-                        flags = TCP.Flags[eth_data]
-                        if flags & TCPFlag.SYN == 0 or flags & TCPFlag.ACK != 0:
-                            continue  # not initial handshake
-                        src_ip, dst_ip = IPv4.Source_IP[ip].as_ip_address(), IPv4.Destination_IP[ip].as_ip_address()
-                        dst_port = TCP.Destination_port[eth_data]
-                        ep = dst_ip, f"tcp:{dst_port}"
-                        self.ip_endpoints[ep] = self.ip_endpoints.get(ep, 0) + 1
-                    elif isinstance(eth_data, UDP):
-                        udp_procs = {
-                            DNSMessage: lambda f: self.scan_dns(f),
-                        }
-                        UDP.Data.process(eth_data, udp_procs)
-                        src_ip = IPv4.Source_IP[ip].as_ip_address()
-                        src_port = UDP.Source_port[eth_data]
-                        src_ep = src_ip, f"udp:{src_port}"
-                        if src_ep in self.ip_endpoints:
-                            # seen traffic _from_ here -> assume UDP client (FIXME: Could check addr-port pairs)
-                            continue
-                        dst_ip = IPv4.Destination_IP[ip].as_ip_address()
-                        dst_port = UDP.Destination_port[eth_data]
-                        ep = dst_ip, f"udp:{dst_port}"
-                        self.ip_endpoints[ep] = self.ip_endpoints.get(ep, 0) + 1
+                    procs = {
+                        TCP: lambda f: self.scan_tcp(ip, f),
+                        UDP: lambda f: self.scan_udp(ip, f),
+                    }
+                    IPv4.Payload.process_frame(ip, procs)
 
         finally:
             raw_data.close()
+
+    def scan_tcp(self, ip: IPv4, tcp: TCP):
+        flags = TCP.Flags[tcp]
+        if flags & TCPFlag.SYN == 0 or flags & TCPFlag.ACK != 0:
+            return  # not initial handshake
+        src_ip, dst_ip = IPv4.Source_IP[ip].as_ip_address(), IPv4.Destination_IP[ip].as_ip_address()
+        dst_port = TCP.Destination_port[tcp]
+        ep = dst_ip, f"tcp:{dst_port}"
+        self.ip_endpoints[ep] = self.ip_endpoints.get(ep, 0) + 1
+
+    def scan_udp(self, ip: IPv4, udp: TCP):
+        procs = {
+            DNSMessage: self.scan_dns,
+        }
+        UDP.Data.process_frame(udp, procs)
+        src_ip = IPv4.Source_IP[ip].as_ip_address()
+        src_port = UDP.Source_port[udp]
+        src_ep = src_ip, f"udp:{src_port}"
+        if src_ep in self.ip_endpoints:
+            # seen traffic _from_ here -> assume UDP client (FIXME: Could check addr-port pairs)
+            return
+        dst_ip = IPv4.Destination_IP[ip].as_ip_address()
+        dst_port = UDP.Destination_port[udp]
+        ep = dst_ip, f"udp:{dst_port}"
+        self.ip_endpoints[ep] = self.ip_endpoints.get(ep, 0) + 1
 
     def scan_dns(self, frame: DNSMessage):
         for qn in DNSMessage.Question.iterate(frame):

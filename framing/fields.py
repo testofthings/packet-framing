@@ -225,8 +225,9 @@ class RawField(ConfigurableField[F, RawData]):
     def __getitem__(self, frame: F) -> RawData:
         return self.get(frame)
 
-    def process(self, frame: F, procedures: Dict[Type[Frame], Callable[[Any], V]]) -> Optional[V]:
-        v = self.as_frame(frame)
+    def process_frame(self, frame: F, procedures: Dict[Type[Frame], Callable[[Any], V]]) -> Optional[V]:
+        """Process frame here differentiating by frame type"""
+        v = self.as_frame(frame, default_frame=False)
         proc = procedures.get(type(v))
         return proc(v) if proc else None
 
