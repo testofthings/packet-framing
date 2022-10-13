@@ -1,7 +1,7 @@
 import argparse
 import logging
 import pathlib
-from typing import Dict, List, Tuple, Set
+from typing import Dict, List, Tuple, Set, Union, Optional
 
 from framing.frame_types.dns_frames import DNSMessage, DNSQuestion, DNSName, RDATA, DNSResource
 from framing.frame_types.ethernet_frames import Ethernet_Payloads, EthernetII
@@ -13,6 +13,26 @@ from framing.frames import Frames
 from framing.raw_data import Raw, IPAddress
 
 
+class Description:
+    def __init__(self):
+        self.count = 0
+        self.sub: Dict[str, Description] = {}
+
+    def get_description(self, key: str, create_if_needed=True) -> Optional['Description']:
+        if not create_if_needed and key not in self.sub:
+            return None
+        return self.sub.setdefault(key, Description())
+
+    def __repr__(self):
+        r = []
+        for key, d in self.sub.items():
+            sub_s = d.__repr__()
+            ind = " " * len(key)
+            for i, s in enumerate(sub_s.split("\n")):
+                r.append((key if i == 0 else ind) + f" {s}")
+        return "\n".join(r)
+
+
 class PCAPScanner:
     """Scan PCAPs for attack surface measurements"""
     def __init__(self, name=""):
@@ -20,10 +40,9 @@ class PCAPScanner:
         self.name = name
         self.file_count = 0
         self.pcap_frame_count = 0
+        self.description = Description()
         self.ethernet_data_type_count: Dict[int, int] = {}
         self.ip_data_type_count: Dict[int, int] = {}
-        self.ip_endpoints: Dict[Tuple[IPAddress, str], int] = {}
-        self.dns_names: Dict[str, Set[IPAddress]] = {}
 
     def scan_files(self, file_list: List[pathlib.Path], limit=0):
         for file in file_list:
@@ -76,26 +95,29 @@ class PCAPScanner:
         flags = TCP.Flags[tcp]
         if flags & TCPFlag.SYN == 0 or flags & TCPFlag.ACK != 0:
             return  # not initial handshake
-        src_ip, dst_ip = IPv4.Source_IP[ip].as_ip_address(), IPv4.Destination_IP[ip].as_ip_address()
+        dst_ip = IPv4.Destination_IP[ip].as_ip_address()
+        dst_d = self.description.get_description(f"{dst_ip}")
         dst_port = TCP.Destination_port[tcp]
-        ep = dst_ip, f"tcp:{dst_port}"
-        self.ip_endpoints[ep] = self.ip_endpoints.get(ep, 0) + 1
+        ep_d = dst_d.get_description(f"tcp:{dst_port}")
+        ep_d.count += 1
 
     def scan_udp(self, ip: IPv4, udp: TCP):
-        procs = {
-            DNSMessage: self.scan_dns,
-        }
-        UDP.Data.process_frame(udp, procs)
+        #procs = {
+        #    DNSMessage: self.scan_dns,
+        #}
+        #UDP.Data.process_frame(udp, procs)
         src_ip = IPv4.Source_IP[ip].as_ip_address()
         src_port = UDP.Source_port[udp]
-        src_ep = src_ip, f"udp:{src_port}"
-        if src_ep in self.ip_endpoints:
+        src_ip_d = self.description.get_description(f"{src_ip}")
+        src_ep_d = src_ip_d.get_description(f"udp:{src_port}", create_if_needed=False)
+        if src_ep_d:
             # seen traffic _from_ here -> assume UDP client (FIXME: Could check addr-port pairs)
             return
         dst_ip = IPv4.Destination_IP[ip].as_ip_address()
-        dst_port = UDP.Destination_port[udp]
-        ep = dst_ip, f"udp:{dst_port}"
-        self.ip_endpoints[ep] = self.ip_endpoints.get(ep, 0) + 1
+        dst_port = UDP.Source_port[udp]
+        dst_ip_d = self.description.get_description(f"{dst_ip}")
+        ep_d = dst_ip_d.get_description(f"udp:{dst_port}")
+        ep_d.count += 1
 
     def scan_dns(self, frame: DNSMessage):
         for qn in DNSMessage.Question.iterate(frame):
@@ -126,12 +148,8 @@ class PCAPScanner:
         r.append("IP payload types and addresses:")
         for t, c in sorted(self.ip_data_type_count.items()):
             r.append(f"  0x{t:02x}: {c}")
-        for a, c in sorted(self.ip_endpoints.items(), key=lambda x: f"{x[0]}"):
-            r.append(f"  {a[0]}:{a[1]}: {c}")
 
-        r.append("DNS names:")
-        for n, ips in sorted(self.dns_names.items()):
-            r.append(f"  {n}: " + " ".join([f"{i}" for i in ips]))
+        r.append(f"{self.description}")
         return "\n".join(r)
 
 
