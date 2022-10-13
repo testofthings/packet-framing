@@ -123,7 +123,7 @@ class PCAPScanner:
         src_ip = IPv4.Source_IP[ip].as_ip_address()
         src_port = UDP.Source_port[udp]
         dst_ip = IPv4.Destination_IP[ip].as_ip_address()
-        dst_port = UDP.Source_port[udp]
+        dst_port = UDP.Destination_port[udp]
 
         r_key = dst_ip, dst_port, src_ip, src_port
         if r_key in self.udp_sessions:
