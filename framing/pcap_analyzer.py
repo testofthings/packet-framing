@@ -1,12 +1,9 @@
 import argparse
 import logging
 import pathlib
-from typing import Dict, List, Tuple, Set, Type, Callable
+from typing import Dict, List, Tuple, Set
 
-from typing_extensions import Self
-
-from framing.base import Frame
-from framing.frame_types.dns_frames import DNSMessage, DNSQuestion, NameComponent, DNSName
+from framing.frame_types.dns_frames import DNSMessage, DNSQuestion, DNSName, RDATA, DNSResource
 from framing.frame_types.ethernet_frames import Ethernet_Payloads, EthernetII
 from framing.frame_types.ipv4_frames import IPv4, IP_Payloads
 from framing.frame_types.pcap_frames import PCAPFile, PacketRecord, FileHeader
@@ -26,7 +23,7 @@ class PCAPScanner:
         self.ethernet_data_type_count: Dict[int, int] = {}
         self.ip_data_type_count: Dict[int, int] = {}
         self.ip_endpoints: Dict[Tuple[IPAddress, str], int] = {}
-        self.dns_names: Set[str] = set()
+        self.dns_names: Dict[str, Set[IPAddress]] = {}
 
     def scan_files(self, file_list: List[pathlib.Path], limit=0):
         for file in file_list:
@@ -103,7 +100,15 @@ class PCAPScanner:
     def scan_dns(self, frame: DNSMessage):
         for qn in DNSMessage.Question.iterate(frame):
             name = DNSName.string(qn, DNSQuestion.QNAME)
-            self.dns_names.add(name)
+            self.dns_names.setdefault(name, set())
+
+        for rd in DNSMessage.Answer.iterate(frame):
+            name = DNSName.string(rd, DNSResource.NAME)
+            proc_rd = {
+                RDATA.A: lambda f: self.dns_names.setdefault(name, set()).add(f.as_ip_address()),
+                RDATA.AAAA: lambda f: self.dns_names.setdefault(name, set()).add(f.as_ip_address()),
+            }
+            DNSResource.RDATA.process_frame(rd, proc_rd)
 
     def __repr__(self):
         r = []
@@ -125,8 +130,8 @@ class PCAPScanner:
             r.append(f"  {a[0]}:{a[1]}: {c}")
 
         r.append("DNS names:")
-        for n in sorted(self.dns_names):
-            r.append(f"  {n}")
+        for n, ips in sorted(self.dns_names.items()):
+            r.append(f"  {n}: " + " ".join([f"{i}" for i in ips]))
         return "\n".join(r)
 
 

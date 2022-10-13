@@ -59,7 +59,7 @@ class RawData:
             return ipaddress.IPv4Address(self.as_bytes(0, 4))
         if bl == 128:
             return ipaddress.IPv6Address(self.as_bytes(0, 16))
-        raise ValueError("Raw data is not IP address: " + self.to_hex())
+        raise ValueError(f"Raw data ({self.bit_length()} bits) is not IP address: " + self.to_hex())
 
     def as_string(self, encoding='ascii') -> str:
         return self.as_bytes(0, self.byte_length()).decode(encoding)

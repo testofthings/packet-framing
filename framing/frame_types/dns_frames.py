@@ -88,24 +88,6 @@ class DNSQuestion(Frame):
     QCLASS = structure.integer(bytes=2)
 
 
-class Name_RDATA(Frame):
-    structure = Structure['Name_RDATA']()
-
-    Name = DNSName(structure)
-
-
-class A_RDATA(Frame):
-    structure = Structure['A_RDATA']()
-
-    ADDRESS = structure.raw(bytes=4)
-
-
-class AAAA_RDATA(Frame):
-    structure = Structure['AAAA_RDATA']()
-
-    ADDRESS = structure.raw(bytes=16)
-
-
 class SOA_RDATA(Frame):
     structure = Structure['SOA_RDATA']()
 
@@ -121,11 +103,11 @@ class RDATA(Frame):
     structure = Selection['RDATA']()
 
     Other = structure.raw()  # the default
-    A = structure.choice(1, structure.sub(A_RDATA))
+    A = structure.choice(1, structure.raw(bytes=4))
     NS = structure.choice(2, DNSName(structure))
     CNAME = structure.choice(5, DNSName(structure))
     SOA = structure.choice(6, structure.sub(SOA_RDATA))
-    AAAA = structure.choice(28, structure.sub(AAAA_RDATA))
+    AAAA = structure.choice(28, structure.raw(bytes=16))
 
 
 class DNSResource(Frame):

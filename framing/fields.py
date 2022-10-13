@@ -321,6 +321,19 @@ class SubStructureField(ConfigurableField[F, FT]):
         frame.backend.set(self, sub)
         return sub
 
+    def process_frame(self, frame: F, procedures: Dict[Type, Callable[[Any], V]]) -> Optional[V]:
+        """Process frame here differentiating by frame type"""
+        v = self.get(frame)
+        if v.structure.is_selection:
+            # let's assume that the selection choices are the keys
+            field = v.backend.choice
+            proc = procedures.get(field)
+            if proc:
+                v = field.get(v)
+        else:
+            proc = procedures.get(type(v))
+        return proc(v) if proc else None
+
     def get_default_value(self, frame: F) -> FT:
         return self.sub_type(frame.backend.factory())
 
