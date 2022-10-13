@@ -27,9 +27,17 @@ class Description:
         r = []
         for key, d in self.sub.items():
             sub_s = d.__repr__()
-            ind = " " * len(key)
-            for i, s in enumerate(sub_s.split("\n")):
-                r.append((key if i == 0 else ind) + f" {s}")
+            if "\n" not in sub_s:
+                r.append(f"{key} {sub_s}")
+                continue
+            r.append(key)
+            if not sub_s:
+                continue
+            for s in sub_s.split("\n"):
+                r.append(f"  {s}")
+            #ind = " " * len(key)
+            #for i, s in enumerate(sub_s.split("\n")):
+            #    r.append((key if i == 0 else ind) + f" {s}")
         return "\n".join(r)
 
 
@@ -43,6 +51,8 @@ class PCAPScanner:
         self.description = Description()
         self.ethernet_data_type_count: Dict[int, int] = {}
         self.ip_data_type_count: Dict[int, int] = {}
+        self.dns_names: Dict[IPAddress, str] = {}
+        self.asked_dns_names: Set[str] = set()
 
     def scan_files(self, file_list: List[pathlib.Path], limit=0):
         for file in file_list:
@@ -82,30 +92,37 @@ class PCAPScanner:
                     ip = EthernetII.data.as_frame(eth)
                     ip_td = IPv4.Protocol[ip]
                     self.ip_data_type_count[ip_td] = self.ip_data_type_count.get(ip_td, 0) + 1
+
+                    dst_ip = IPv4.Destination_IP[ip].as_ip_address()
+                    dst_name = self.dns_names.get(dst_ip)
+                    if dst_name:
+                        dst_d = self.description.get_description(f"{dst_name}").get_description(f"{dst_ip}")
+                    else:
+                        dst_d = self.description.get_description(f"{dst_ip}")
+
                     procs = {
-                        TCP: lambda f: self.scan_tcp(ip, f),
-                        UDP: lambda f: self.scan_udp(ip, f),
+                        TCP: lambda f: self.scan_tcp(dst_d, ip, f),
+                        UDP: lambda f: self.scan_udp(dst_d, ip, f),
                     }
                     IPv4.Payload.process_frame(ip, procs)
 
         finally:
             raw_data.close()
 
-    def scan_tcp(self, ip: IPv4, tcp: TCP):
+    def scan_tcp(self, host: Description, ip: IPv4, tcp: TCP):
         flags = TCP.Flags[tcp]
         if flags & TCPFlag.SYN == 0 or flags & TCPFlag.ACK != 0:
             return  # not initial handshake
-        dst_ip = IPv4.Destination_IP[ip].as_ip_address()
-        dst_d = self.description.get_description(f"{dst_ip}")
         dst_port = TCP.Destination_port[tcp]
-        ep_d = dst_d.get_description(f"tcp:{dst_port}")
+        ep_d = host.get_description(f"tcp:{dst_port}")
         ep_d.count += 1
 
-    def scan_udp(self, ip: IPv4, udp: TCP):
-        #procs = {
-        #    DNSMessage: self.scan_dns,
-        #}
-        #UDP.Data.process_frame(udp, procs)
+    def scan_udp(self, host: Description, ip: IPv4, udp: TCP):
+        procs = {
+            DNSMessage: self.scan_dns,
+        }
+        UDP.Data.process_frame(udp, procs)
+
         src_ip = IPv4.Source_IP[ip].as_ip_address()
         src_port = UDP.Source_port[udp]
         src_ip_d = self.description.get_description(f"{src_ip}")
@@ -113,24 +130,25 @@ class PCAPScanner:
         if src_ep_d:
             # seen traffic _from_ here -> assume UDP client (FIXME: Could check addr-port pairs)
             return
-        dst_ip = IPv4.Destination_IP[ip].as_ip_address()
         dst_port = UDP.Source_port[udp]
-        dst_ip_d = self.description.get_description(f"{dst_ip}")
-        ep_d = dst_ip_d.get_description(f"udp:{dst_port}")
+        ep_d = host.get_description(f"udp:{dst_port}")
         ep_d.count += 1
 
     def scan_dns(self, frame: DNSMessage):
         for qn in DNSMessage.Question.iterate(frame):
             name = DNSName.string(qn, DNSQuestion.QNAME)
-            self.dns_names.setdefault(name, set())
+            self.asked_dns_names.add(name)
 
         for rd in DNSMessage.Answer.iterate(frame):
             name = DNSName.string(rd, DNSResource.NAME)
             proc_rd = {
-                RDATA.A: lambda f: self.dns_names.setdefault(name, set()).add(f.as_ip_address()),
-                RDATA.AAAA: lambda f: self.dns_names.setdefault(name, set()).add(f.as_ip_address()),
+                RDATA.A: lambda r: self.learn_dns_name(name, r.as_ip_address()),
+                RDATA.AAAA: lambda r: self.learn_dns_name(name, r.as_ip_address()),
             }
             DNSResource.RDATA.process_frame(rd, proc_rd)
+
+    def learn_dns_name(self, name: str, ip: IPAddress):
+        self.dns_names[ip] = name
 
     def __repr__(self):
         r = []
