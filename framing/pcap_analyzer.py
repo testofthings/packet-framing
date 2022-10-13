@@ -10,7 +10,7 @@ from framing.frame_types.pcap_frames import PCAPFile, PacketRecord, FileHeader
 from framing.frame_types.tcp_frames import TCP, TCPFlag
 from framing.frame_types.udp_frames import UDP, UDP_Common_Payloads
 from framing.frames import Frames
-from framing.raw_data import Raw, IPAddress
+from framing.raw_data import Raw, IPAddress, RawData
 
 
 class Description:
@@ -94,32 +94,41 @@ class PCAPScanner:
                     ip_td = IPv4.Protocol[ip]
                     self.ip_data_type_count[ip_td] = self.ip_data_type_count.get(ip_td, 0) + 1
                     procs = {
-                        TCP: lambda f: self.scan_tcp(ip, f),
-                        UDP: lambda f: self.scan_udp(ip, f),
+                        TCP: lambda f: self.scan_tcp(eth, ip, f),
+                        UDP: lambda f: self.scan_udp(eth, ip, f),
                     }
                     IPv4.Payload.process_frame(ip, procs)
 
         finally:
             raw_data.close()
 
-    def get_description(self, for_ip: IPAddress) -> Description:
+    def get_description(self, for_ip: IPAddress, hw_address: RawData) -> Description:
         d_name = self.dns_names.get(for_ip)
         if d_name:
             return self.description.get_description(d_name).get_description(f"{for_ip}")
+        elif not for_ip.is_global:
+            # local address
+            return self.description.get_description(hw_address.as_hw_address()).get_description(f"{for_ip}")
         else:
             return self.description.get_description(f"{for_ip}")
 
-    def scan_tcp(self, ip: IPv4, tcp: TCP):
+    def scan_tcp(self, eth: EthernetII, ip: IPv4, tcp: TCP):
         flags = TCP.Flags[tcp]
         if flags & TCPFlag.SYN == 0 or flags & TCPFlag.ACK != 0:
             return  # not initial handshake
+        eth_dst = EthernetII.destination[eth]
         dst_ip = IPv4.Destination_IP[ip].as_ip_address()
         dst_port = TCP.Destination_port[tcp]
-        dst_d = self.get_description(dst_ip)
+        dst_d = self.get_description(dst_ip, eth_dst)
         ep_d = dst_d.get_description(f"tcp:{dst_port}")
         ep_d.count += 1
 
-    def scan_udp(self, ip: IPv4, udp: TCP):
+    def scan_udp(self, eth: EthernetII, ip: IPv4, udp: TCP):
+        procs = {
+            DNSMessage: self.scan_dns,
+        }
+        UDP.Data.process_frame(udp, procs)
+
         src_ip = IPv4.Source_IP[ip].as_ip_address()
         src_port = UDP.Source_port[udp]
         dst_ip = IPv4.Destination_IP[ip].as_ip_address()
@@ -131,17 +140,8 @@ class PCAPScanner:
         key = src_ip, src_port, dst_ip, dst_port
         self.udp_sessions.add(key)
 
-        procs = {
-            DNSMessage: self.scan_dns,
-        }
-        UDP.Data.process_frame(udp, procs)
-
-        src_ip_d = self.description.get_description(f"{src_ip}")
-        src_ep_d = src_ip_d.get_description(f"udp:{src_port}", create_if_needed=False)
-        if src_ep_d:
-            # seen traffic _from_ here -> assume UDP client (FIXME: Could check addr-port pairs)
-            return
-        dst_d = self.get_description(dst_ip)
+        eth_dst = EthernetII.destination[eth]
+        dst_d = self.get_description(dst_ip, eth_dst)
         ep_d = dst_d.get_description(f"udp:{dst_port}")
         ep_d.count += 1
 
