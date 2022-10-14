@@ -134,8 +134,7 @@ class PCAPScanner:
         #if flags & TCPFlag.SYN == 0 or flags & TCPFlag.ACK != 0:
         #    return  # not initial handshake
 
-        rev_dir = self.session_for(("tcp", src_ip, src_port, dst_ip, dst_port))
-        self.update_transport("tcp", src_hw, src_ip, src_port, dst_hw, dst_ip, dst_port, rev_dir)
+        self.update_transport("tcp", src_hw, src_ip, src_port, dst_hw, dst_ip, dst_port)
 
     def scan_udp(self, eth: EthernetII, ip: IPv4, udp: TCP):
         procs = {
@@ -150,12 +149,19 @@ class PCAPScanner:
         dst_ip = IPv4.Destination_IP[ip].as_ip_address()
         dst_port = UDP.Destination_port[udp]
 
-        rev_dir = self.session_for(("udp", src_ip, src_port, dst_ip, dst_port))
-        self.update_transport("udp", src_hw, src_ip, src_port, dst_hw, dst_ip, dst_port, rev_dir)
+        self.update_transport("udp", src_hw, src_ip, src_port, dst_hw, dst_ip, dst_port)
 
     def update_transport(self, protocol: str, src_hw: RawData, src_ip: IPAddress, src_port: int,
-                         dst_hw: RawData, dst_ip: IPAddress, dst_port: int, reverse: bool):
-        if reverse:
+                         dst_hw: RawData, dst_ip: IPAddress, dst_port: int):
+        rev_dir, new_s = self.session_for((protocol, src_ip, src_port, dst_ip, dst_port))
+
+        if new_s:
+            if src_ip.is_global and not dst_ip.is_global:
+                self.logger.warning("Connection %s => %s from global to private, ignoring", src_ip, dst_ip)
+                self.sessions.remove((protocol, src_ip, src_port, dst_ip, dst_port))
+                return
+
+        if rev_dir:
             # going toward client
             src_d = self.get_description(dst_ip, dst_hw)
             # src_d.source = True
@@ -171,14 +177,16 @@ class PCAPScanner:
             ep_d = dst_d.get_description(f"{protocol}:{dst_port}")
             ep_d.out_frames += 1
 
-    def session_for(self, connection: Tuple[str, IPAddress, int, IPAddress, int]) -> bool:
+    def session_for(self, connection: Tuple[str, IPAddress, int, IPAddress, int]) -> Tuple[bool, bool]:
         r_key = connection[0], connection[3], connection[4], connection[1], connection[2]
         dir_in = r_key in self.sessions
         if dir_in:
             self.sessions.add(r_key)
+            return True, False
         else:
+            new_s = connection not in self.sessions
             self.sessions.add(connection)
-        return dir_in
+            return dir_in, new_s
 
     def scan_dns(self, frame: DNSMessage):
         for qn in DNSMessage.Question.iterate(frame):
