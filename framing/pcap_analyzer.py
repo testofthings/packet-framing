@@ -1,4 +1,5 @@
 import argparse
+import datetime
 import logging
 import pathlib
 import sys
@@ -34,6 +35,7 @@ class PCAPScanner:
         self.logger = logging.getLogger("scanner")
         self.name = name
         self.source: Tuple[str, int] = "", -1
+        self.time_range = datetime.datetime.now(), datetime.datetime.fromtimestamp(0)
         self.file_count = 0
         self.pcap_frame_count = 0
         self.description = Description()
@@ -76,6 +78,11 @@ class PCAPScanner:
                 frame_num += 1
                 self.source = file_name, frame_num
                 self.pcap_frame_count += 1
+
+                ts_s = PacketRecord.Timestamp[rec]
+                ts = datetime.datetime.fromtimestamp(ts_s)
+                self.time_range = min(ts, self.time_range[0]), max(ts, self.time_range[1])
+
                 eth = PacketRecord.Packet_Data.as_frame(rec, frame_type=EthernetII)
                 eth_dt = EthernetII.type[eth]
                 self.ethernet_data_type_count[eth_dt] = self.ethernet_data_type_count.get(eth_dt, 0) + 1
@@ -223,6 +230,8 @@ class PCAPScanner:
         r.extend([
             f"PCAP files:   {self.file_count}",
             f"PCAP frames:  {self.pcap_frame_count}",
+            f"Oldest frame: {self.time_range[0]}",
+            f"Newest frame: {self.time_range[1]}",
         ])
 
         r.append("Ethernet payload types:")
