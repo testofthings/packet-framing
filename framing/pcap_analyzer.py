@@ -15,6 +15,7 @@ from framing.raw_data import Raw, IPAddress, RawData
 
 class Description:
     def __init__(self):
+        self.source = False
         self.out_frames = 0
         self.in_frames = 0
         self.sub: Dict[str, Description] = {}
@@ -29,15 +30,20 @@ class Description:
         if self.in_frames or self.out_frames:
             r.append(f"inf={self.in_frames} ouf={self.out_frames}")
         for key, d in self.sub.items():
+            dir_s = ""
+            ind_s = "  "
+            if self.source and not d.source:
+                dir_s = "=> "
+                ind_s += "   "
             sub_s = d.__repr__()
             if "\n" not in sub_s:
-                r.append(f"{key} {sub_s}")
+                r.append(f"{dir_s}{key} {sub_s}")
                 continue
-            r.append(key)
+            r.append(f"{dir_s}{key}")
             if not sub_s:
                 continue
             for s in sub_s.split("\n"):
-                r.append(f"  {s}")
+                r.append(f"{ind_s}{s}")
 
         return "\n".join(r)
 
@@ -103,15 +109,17 @@ class PCAPScanner:
         finally:
             raw_data.close()
 
-    def get_description(self, for_ip: IPAddress, hw_address: RawData) -> Description:
+    def get_description(self, for_ip: IPAddress, hw_address: RawData, parent: Description = None) -> Description:
+        if parent is None:
+            parent = self.description
         d_name = self.dns_names.get(for_ip)
         if d_name:
-            return self.description.get_description(d_name).get_description(f"{for_ip}")
+            return parent.get_description(d_name).get_description(f"{for_ip}")
         elif not for_ip.is_global:
             # local address
-            return self.description.get_description(hw_address.as_hw_address()).get_description(f"{for_ip}")
+            return parent.get_description(hw_address.as_hw_address()).get_description(f"{for_ip}")
         else:
-            return self.description.get_description(f"{for_ip}")
+            return parent.get_description(f"{for_ip}")
 
     def scan_tcp(self, eth: EthernetII, ip: IPv4, tcp: TCP):
         flags = TCP.Flags[tcp]
@@ -129,26 +137,35 @@ class PCAPScanner:
         }
         UDP.Data.process_frame(udp, procs)
 
+        src_hw = EthernetII.source[eth]
         src_ip = IPv4.Source_IP[ip].as_ip_address()
         src_port = UDP.Source_port[udp]
+        dst_hw = EthernetII.destination[eth]
         dst_ip = IPv4.Destination_IP[ip].as_ip_address()
         dst_port = UDP.Destination_port[udp]
 
-        r_key = "udp", dst_ip, dst_port, src_ip, src_port
-        dir_in = r_key in self.sessions
-        if dir_in:
-            key = r_key  # reverse direction for "UDP session"
-        else:
-            key = "udp", src_ip, src_port, dst_ip, dst_port
-        self.sessions.add(key)
+        rev_dir = self.session_for(("udp", src_ip, src_port, dst_ip, dst_port))
 
-        eth_dst = EthernetII.destination[eth]
-        dst_d = self.get_description(dst_ip, eth_dst)
+        src_d = self.get_description(src_ip, src_hw)
+        src_d.source = True
+
+        dst_d = self.get_description(dst_ip, dst_hw, parent=src_d)
         ep_d = dst_d.get_description(f"udp:{dst_port}")
-        if dir_in:
+        if rev_dir:
+            # going toward client
             ep_d.in_frames += 1
         else:
+            # going towards server
             ep_d.out_frames += 1
+
+    def session_for(self, connection: Tuple[str, IPAddress, int, IPAddress, int]) -> bool:
+        r_key = connection[0], connection[3], connection[4], connection[1], connection[2]
+        dir_in = r_key in self.sessions
+        if dir_in:
+            self.sessions.add(r_key)
+        else:
+            self.sessions.add(connection)
+        return dir_in
 
     def scan_dns(self, frame: DNSMessage):
         for qn in DNSMessage.Question.iterate(frame):
