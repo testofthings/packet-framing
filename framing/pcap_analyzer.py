@@ -15,7 +15,8 @@ from framing.raw_data import Raw, IPAddress, RawData
 
 class Description:
     def __init__(self):
-        self.count = 0
+        self.out_frames = 0
+        self.in_frames = 0
         self.sub: Dict[str, Description] = {}
 
     def get_description(self, key: str, create_if_needed=True) -> Optional['Description']:
@@ -25,6 +26,8 @@ class Description:
 
     def __repr__(self):
         r = []
+        if self.in_frames or self.out_frames:
+            r.append(f"inf={self.in_frames} ouf={self.out_frames}")
         for key, d in self.sub.items():
             sub_s = d.__repr__()
             if "\n" not in sub_s:
@@ -35,9 +38,7 @@ class Description:
                 continue
             for s in sub_s.split("\n"):
                 r.append(f"  {s}")
-            #ind = " " * len(key)
-            #for i, s in enumerate(sub_s.split("\n")):
-            #    r.append((key if i == 0 else ind) + f" {s}")
+
         return "\n".join(r)
 
 
@@ -51,7 +52,7 @@ class PCAPScanner:
         self.description = Description()
         self.ethernet_data_type_count: Dict[int, int] = {}
         self.ip_data_type_count: Dict[int, int] = {}
-        self.udp_sessions: Set[Tuple[IPAddress, int, IPAddress, int]] = set()
+        self.sessions: Set[Tuple[str, IPAddress, int, IPAddress, int]] = set()
         self.dns_names: Dict[IPAddress, str] = {}
         self.asked_dns_names: Set[str] = set()
 
@@ -121,7 +122,6 @@ class PCAPScanner:
         dst_port = TCP.Destination_port[tcp]
         dst_d = self.get_description(dst_ip, eth_dst)
         ep_d = dst_d.get_description(f"tcp:{dst_port}")
-        ep_d.count += 1
 
     def scan_udp(self, eth: EthernetII, ip: IPv4, udp: TCP):
         procs = {
@@ -134,16 +134,21 @@ class PCAPScanner:
         dst_ip = IPv4.Destination_IP[ip].as_ip_address()
         dst_port = UDP.Destination_port[udp]
 
-        r_key = dst_ip, dst_port, src_ip, src_port
-        if r_key in self.udp_sessions:
-            return  # reverse direction for "UDP session"
-        key = src_ip, src_port, dst_ip, dst_port
-        self.udp_sessions.add(key)
+        r_key = "udp", dst_ip, dst_port, src_ip, src_port
+        dir_in = r_key in self.sessions
+        if dir_in:
+            key = r_key  # reverse direction for "UDP session"
+        else:
+            key = "udp", src_ip, src_port, dst_ip, dst_port
+        self.sessions.add(key)
 
         eth_dst = EthernetII.destination[eth]
         dst_d = self.get_description(dst_ip, eth_dst)
         ep_d = dst_d.get_description(f"udp:{dst_port}")
-        ep_d.count += 1
+        if dir_in:
+            ep_d.in_frames += 1
+        else:
+            ep_d.out_frames += 1
 
     def scan_dns(self, frame: DNSMessage):
         for qn in DNSMessage.Question.iterate(frame):
