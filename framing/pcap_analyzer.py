@@ -63,7 +63,7 @@ class PCAPScanner:
         self.asked_dns_names: Set[str] = set()
 
     def scan_files(self, file_list: List[pathlib.Path], limit=0):
-        for file in file_list:
+        for file in sorted(file_list):
             if limit and self.file_count >= limit:
                 return
             if file.is_dir():
