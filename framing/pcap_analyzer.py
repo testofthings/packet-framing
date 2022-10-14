@@ -19,40 +19,21 @@ class Description:
         self.out_frames = 0
         self.in_frames = 0
         self.sub: Dict[str, Description] = {}
+        self.locations: List[Tuple[str, int]] = []
 
     def get_description(self, key: str, create_if_needed=True) -> Optional['Description']:
         if not create_if_needed and key not in self.sub:
             return None
         return self.sub.setdefault(key, Description())
 
-    def __repr__(self):
-        r = []
-        if self.in_frames or self.out_frames:
-            r.append(f"inf={self.in_frames} ouf={self.out_frames}")
-        for key, d in self.sub.items():
-            dir_s = ""
-            ind_s = "  "
-            if self.source and not d.source:
-                dir_s = "=> "
-                ind_s += "   "
-            sub_s = d.__repr__()
-            if "\n" not in sub_s:
-                r.append(f"{dir_s}{key} {sub_s}")
-                continue
-            r.append(f"{dir_s}{key}")
-            if not sub_s:
-                continue
-            for s in sub_s.split("\n"):
-                r.append(f"{ind_s}{s}")
-
-        return "\n".join(r)
-
 
 class PCAPScanner:
     """Scan PCAPs for attack surface measurements"""
     def __init__(self, name=""):
         self.logger = logging.getLogger("scanner")
+        self.location_file = pathlib.Path("locations.txt")
         self.name = name
+        self.source: Tuple[str, int] = "", -1
         self.file_count = 0
         self.pcap_frame_count = 0
         self.description = Description()
@@ -77,6 +58,7 @@ class PCAPScanner:
             self.scan_pcap_file(file)
 
     def scan_pcap_file(self, file: pathlib.Path):
+        file_name = file.as_posix()
         raw_data = Raw.file(file)
         try:
             pcap = PCAPFile(Frames.dissect(raw_data))
@@ -92,6 +74,7 @@ class PCAPScanner:
             frame_num = 0
             for i, rec in enumerate(PCAPFile.Packet_Records.iterate(pcap)):
                 frame_num += 1
+                self.source = file_name, frame_num
                 self.pcap_frame_count += 1
                 eth = PacketRecord.Packet_Data.as_frame(rec, frame_type=EthernetII)
                 eth_dt = EthernetII.type[eth]
@@ -177,6 +160,8 @@ class PCAPScanner:
             ep_d = dst_d.get_description(f"{protocol}:{dst_port}")
             ep_d.out_frames += 1
 
+        ep_d.locations.append(self.source)
+
     def session_for(self, connection: Tuple[str, IPAddress, int, IPAddress, int]) -> Tuple[bool, bool]:
         r_key = connection[0], connection[3], connection[4], connection[1], connection[2]
         dir_in = r_key in self.sessions
@@ -204,6 +189,34 @@ class PCAPScanner:
     def learn_dns_name(self, name: str, ip: IPAddress):
         self.dns_names[ip] = name
 
+    def list_descriptions(self) -> List[Description]:
+        """List descriptions with capture locations"""
+        r = []
+
+        def list_em(d: Description):
+            if d.locations:
+                r.append(d)
+            for s in d.sub.values():
+                list_em(s)
+        list_em(self.description)
+        return r
+
+    def print_output(self):
+        """Print analysis output"""
+        print(f"{self}")
+
+        d_list = self.list_descriptions()
+        d_numbers = {d: i + 1 for i, d in enumerate(d_list)}
+        for p, s in self.to_string(self.description, d_numbers):
+            print((f"{p:04}" if p else "    ") + f" {s}")
+
+        # location mapping file
+        with self.location_file.open("wt") as f:
+            for d in d_list:
+                num = d_numbers.get(d, 0)
+                for loc in d.locations:
+                    f.write(f"{num:04} " + loc[0].replace(' ', r'\ ') + f" {loc[1]}\n")
+
     def __repr__(self):
         r = []
         if self.name:
@@ -220,9 +233,28 @@ class PCAPScanner:
         r.append("IP payload types and addresses:")
         for t, c in sorted(self.ip_data_type_count.items()):
             r.append(f"  0x{t:02x}: {c}")
-
-        r.append(f"{self.description}")
         return "\n".join(r)
+
+    def to_string(self, description: Description, numbering: Dict['Description', int]) -> List[Tuple[int, str]]:
+        r = []
+        num = numbering.get(description, 0)
+        if num > 0 or description.in_frames or description.out_frames:
+            r.append((num, f"inf={description.in_frames} ouf={description.out_frames}"))
+        for key, d in description.sub.items():
+            dir_s = ""
+            ind_s = f"  "
+            if description.source and not d.source:
+                dir_s = "=> "
+                ind_s += "   "
+            sub_s = self.to_string(d, numbering)
+            if not r and len(sub_s) == 1:
+                r.append((sub_s[0][0], f"{dir_s}{key} {sub_s[0][1]}"))
+                continue
+            r.append((0, f"{dir_s}{key}"))
+            for s in sub_s:
+                r.append((s[0], f"{ind_s}{s[1]}"))
+
+        return r
 
 
 def separate_scans_by_directory(roots: List[pathlib.Path], limit=0) -> List[PCAPScanner]:
@@ -254,9 +286,9 @@ if __name__ == "__main__":
     if args.by_dir:
         scans = separate_scans_by_directory(files, limit)
         for s in scans:
-            print(f"{s}")
+            s.print_output()
     else:
         scanner = PCAPScanner()
         scanner.scan_files(files, limit)
-        print(f"{scanner}")
+        scanner.print_output()
 
