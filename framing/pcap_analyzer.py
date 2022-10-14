@@ -122,14 +122,36 @@ class PCAPScanner:
             return parent.get_description(f"{for_ip}")
 
     def scan_tcp(self, eth: EthernetII, ip: IPv4, tcp: TCP):
-        flags = TCP.Flags[tcp]
-        if flags & TCPFlag.SYN == 0 or flags & TCPFlag.ACK != 0:
-            return  # not initial handshake
-        eth_dst = EthernetII.destination[eth]
+        src_hw = EthernetII.source[eth]
+        src_ip = IPv4.Source_IP[ip].as_ip_address()
+        src_port = TCP.Source_port[tcp]
+        dst_hw = EthernetII.destination[eth]
         dst_ip = IPv4.Destination_IP[ip].as_ip_address()
         dst_port = TCP.Destination_port[tcp]
-        dst_d = self.get_description(dst_ip, eth_dst)
-        ep_d = dst_d.get_description(f"tcp:{dst_port}")
+
+        rev_dir = self.session_for(("udp", src_ip, src_port, dst_ip, dst_port))
+
+        # FIXME: Expect SYN?
+        #flags = TCP.Flags[tcp]
+        #if flags & TCPFlag.SYN == 0 or flags & TCPFlag.ACK != 0:
+        #    return  # not initial handshake
+
+        if rev_dir:
+            # going toward client
+            src_d = self.get_description(dst_ip, dst_hw)
+            # src_d.source = True
+            dst_d = self.get_description(src_ip, src_hw, parent=src_d)
+            ep_d = dst_d.get_description(f"tcp:{src_port}")
+
+            ep_d.in_frames += 1
+        else:
+            # going towards server
+            src_d = self.get_description(src_ip, src_hw)
+            src_d.source = True
+            dst_d = self.get_description(dst_ip, dst_hw, parent=src_d)
+            ep_d = dst_d.get_description(f"tcp:{dst_port}")
+
+            ep_d.out_frames += 1
 
     def scan_udp(self, eth: EthernetII, ip: IPv4, udp: TCP):
         procs = {
@@ -146,16 +168,20 @@ class PCAPScanner:
 
         rev_dir = self.session_for(("udp", src_ip, src_port, dst_ip, dst_port))
 
-        src_d = self.get_description(src_ip, src_hw)
-        src_d.source = True
-
-        dst_d = self.get_description(dst_ip, dst_hw, parent=src_d)
-        ep_d = dst_d.get_description(f"udp:{dst_port}")
         if rev_dir:
             # going toward client
+            src_d = self.get_description(dst_ip, dst_hw)
+            # src_d.source = True
+            dst_d = self.get_description(src_ip, src_hw, parent=src_d)
+            ep_d = dst_d.get_description(f"udp:{src_port}")
             ep_d.in_frames += 1
         else:
             # going towards server
+            src_d = self.get_description(src_ip, src_hw)
+            src_d.source = True
+
+            dst_d = self.get_description(dst_ip, dst_hw, parent=src_d)
+            ep_d = dst_d.get_description(f"udp:{dst_port}")
             ep_d.out_frames += 1
 
     def session_for(self, connection: Tuple[str, IPAddress, int, IPAddress, int]) -> bool:
