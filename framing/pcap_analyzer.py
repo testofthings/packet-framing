@@ -1,7 +1,8 @@
 import argparse
 import logging
 import pathlib
-from typing import Dict, List, Tuple, Set, Union, Optional
+import sys
+from typing import Dict, List, Tuple, Set, Union, Optional, TextIO
 
 from framing.frame_types.dns_frames import DNSMessage, DNSQuestion, DNSName, RDATA, DNSResource
 from framing.frame_types.ethernet_frames import Ethernet_Payloads, EthernetII
@@ -29,9 +30,8 @@ class Description:
 
 class PCAPScanner:
     """Scan PCAPs for attack surface measurements"""
-    def __init__(self, name=""):
+    def __init__(self, name="default"):
         self.logger = logging.getLogger("scanner")
-        self.location_file = pathlib.Path("locations.txt")
         self.name = name
         self.source: Tuple[str, int] = "", -1
         self.file_count = 0
@@ -201,21 +201,20 @@ class PCAPScanner:
         list_em(self.description)
         return r
 
-    def print_output(self):
+    def print_output(self, write_to: TextIO):
         """Print analysis output"""
-        print(f"{self}")
-
+        write_to.write(f"{self}\n")
         d_list = self.list_descriptions()
         d_numbers = {d: i + 1 for i, d in enumerate(d_list)}
         for p, s in self.to_string(self.description, d_numbers):
-            print((f"{p:04}" if p else "    ") + f" {s}")
+            write_to.write((f"{p:04}" if p else "    ") + f" {s}\n")
 
-        # location mapping file
-        with self.location_file.open("wt") as f:
-            for d in d_list:
-                num = d_numbers.get(d, 0)
-                for loc in d.locations:
-                    f.write(f"{num:04} " + loc[0].replace(' ', r'\ ') + f" {loc[1]}\n")
+        # location mapping
+        write_to.write(f"Mappings:\n")
+        for d in d_list:
+            num = d_numbers.get(d, 0)
+            for loc in d.locations:
+                write_to.write(f"{num:04} " + loc[0].replace(' ', r'\ ') + f" {loc[1]}\n")
 
     def __repr__(self):
         r = []
@@ -247,7 +246,7 @@ class PCAPScanner:
                 dir_s = "=> "
                 ind_s += "   "
             sub_s = self.to_string(d, numbering)
-            if not r and len(sub_s) == 1:
+            if len(sub_s) == 1:
                 r.append((sub_s[0][0], f"{dir_s}{key} {sub_s[0][1]}"))
                 continue
             r.append((0, f"{dir_s}{key}"))
@@ -257,18 +256,23 @@ class PCAPScanner:
         return r
 
 
-def separate_scans_by_directory(roots: List[pathlib.Path], limit=0) -> List[PCAPScanner]:
-    r = []
+def separate_scans_by_directory(roots: List[pathlib.Path], output_dir: pathlib.Path, limit=0):
+    s_count = 0
     for rf in roots:
         if not rf.is_dir():
             continue
         for f in rf.iterdir():
-            if limit and len(r) >= limit:
-                return r
-            scn = PCAPScanner(f.name)
+            s_count += 1
+            if limit and s_count > limit:
+                return
+            file_name = f.name
+            scn = PCAPScanner(file_name)
             scn.scan_files(list(f.iterdir()))
-            r.append(scn)
-    return r
+            output_dir.mkdir(parents=True, exist_ok=True)
+            report_f = output_dir / file_name
+            print(f"Output to {report_f.as_posix()}")
+            with report_f.open("wt") as rf:
+                scn.print_output(rf)
 
 
 if __name__ == "__main__":
@@ -284,11 +288,9 @@ if __name__ == "__main__":
     limit = args.limit
 
     if args.by_dir:
-        scans = separate_scans_by_directory(files, limit)
-        for s in scans:
-            s.print_output()
+        separate_scans_by_directory(files, pathlib.Path("pcap-analysis"), limit)
     else:
         scanner = PCAPScanner()
         scanner.scan_files(files, limit)
-        scanner.print_output()
+        scanner.print_output(sys.stdout)
 
