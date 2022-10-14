@@ -129,29 +129,13 @@ class PCAPScanner:
         dst_ip = IPv4.Destination_IP[ip].as_ip_address()
         dst_port = TCP.Destination_port[tcp]
 
-        rev_dir = self.session_for(("udp", src_ip, src_port, dst_ip, dst_port))
-
         # FIXME: Expect SYN?
         #flags = TCP.Flags[tcp]
         #if flags & TCPFlag.SYN == 0 or flags & TCPFlag.ACK != 0:
         #    return  # not initial handshake
 
-        if rev_dir:
-            # going toward client
-            src_d = self.get_description(dst_ip, dst_hw)
-            # src_d.source = True
-            dst_d = self.get_description(src_ip, src_hw, parent=src_d)
-            ep_d = dst_d.get_description(f"tcp:{src_port}")
-
-            ep_d.in_frames += 1
-        else:
-            # going towards server
-            src_d = self.get_description(src_ip, src_hw)
-            src_d.source = True
-            dst_d = self.get_description(dst_ip, dst_hw, parent=src_d)
-            ep_d = dst_d.get_description(f"tcp:{dst_port}")
-
-            ep_d.out_frames += 1
+        rev_dir = self.session_for(("tcp", src_ip, src_port, dst_ip, dst_port))
+        self.update_transport("tcp", src_hw, src_ip, src_port, dst_hw, dst_ip, dst_port, rev_dir)
 
     def scan_udp(self, eth: EthernetII, ip: IPv4, udp: TCP):
         procs = {
@@ -167,13 +151,16 @@ class PCAPScanner:
         dst_port = UDP.Destination_port[udp]
 
         rev_dir = self.session_for(("udp", src_ip, src_port, dst_ip, dst_port))
+        self.update_transport("udp", src_hw, src_ip, src_port, dst_hw, dst_ip, dst_port, rev_dir)
 
-        if rev_dir:
+    def update_transport(self, protocol: str, src_hw: RawData, src_ip: IPAddress, src_port: int,
+                         dst_hw: RawData, dst_ip: IPAddress, dst_port: int, reverse: bool):
+        if reverse:
             # going toward client
             src_d = self.get_description(dst_ip, dst_hw)
             # src_d.source = True
             dst_d = self.get_description(src_ip, src_hw, parent=src_d)
-            ep_d = dst_d.get_description(f"udp:{src_port}")
+            ep_d = dst_d.get_description(f"{protocol}:{src_port}")
             ep_d.in_frames += 1
         else:
             # going towards server
@@ -181,7 +168,7 @@ class PCAPScanner:
             src_d.source = True
 
             dst_d = self.get_description(dst_ip, dst_hw, parent=src_d)
-            ep_d = dst_d.get_description(f"udp:{dst_port}")
+            ep_d = dst_d.get_description(f"{protocol}:{dst_port}")
             ep_d.out_frames += 1
 
     def session_for(self, connection: Tuple[str, IPAddress, int, IPAddress, int]) -> bool:
