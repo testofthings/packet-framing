@@ -43,4 +43,13 @@ class RawDataQueue:
 
     def forward(self, length) -> Self:
         """Forward offset from beginning of the queue"""
+        assert length < self.head.fixed.byte_length(), "Forwarding queue too fast"
+        self.head = self.head.tailBytes(length)
+        self.offset += length
         return self
+
+    def pull(self, length) -> Self:
+        """Pull data from beginning of the queue"""
+        r = self.head.subBlock(0, length)
+        self.forward(length)
+        return r

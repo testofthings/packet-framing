@@ -25,3 +25,9 @@ def test_data_queue():
 
     q.push(Raw.octets(5, 6, 7, 8, 9, 20), 5)
     assert q.head == Raw.octets(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 20, 11, 12, 13)
+    assert q.offset == 0
+
+    r = q.pull(10)
+    assert q.offset == 10
+    assert r == Raw.octets(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+    assert q.head == Raw.octets(20, 11, 12, 13)
