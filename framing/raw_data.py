@@ -251,7 +251,7 @@ class RawDataSequence(RawData):
             if off >= bit_offset:
                 if off >= end_offset:
                     return Raw.sequence(nc)
-                s = max(0, off - bit_offset)
+                s = max(0, bit_offset - off)
                 e = min(c_len, end_offset - off)
                 nc.append(c.subBlockBits(s, e))
             off += c_len
