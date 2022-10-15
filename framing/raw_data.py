@@ -3,6 +3,7 @@ import mmap
 import pathlib
 from typing import Iterable, List, BinaryIO, Union
 
+from typing_extensions import Self
 
 # IP address, shouldn't this be defined by Python?
 IPAddress = Union[ipaddress.IPv6Address, ipaddress.IPv4Address]
@@ -373,6 +374,54 @@ class FileData(ByteData):
 
     def close(self):
         self.file.close()
+
+
+class AppendableRawData(RawData):
+    def __init__(self, fixed: RawData):
+        self.fixed = fixed
+        self.closed = False
+
+    def append(self, data: RawData) -> Self:
+        """Append new block to the chain"""
+        assert not self.closed, "Cannot append to closed data"
+        self.fixed = Raw.sequence([self.fixed, data])
+        return self
+
+    def bit_length(self) -> int:
+        return self.fixed.bit_length() if self.closed else -1
+
+    def byte_length(self) -> int:
+        return self.fixed.byte_length() if self.closed else -1
+
+    def octet(self, byte_offset: int) -> int:
+        return self.fixed.octet(byte_offset)
+
+    def bit(self, bit_offset: int) -> int:
+        return self.fixed.bit(bit_offset)
+
+    def subBlockBits(self, bit_offset: int, bit_length: int) -> 'RawData':
+        return self.fixed.subBlockBits(bit_offset, bit_length)
+
+    def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
+        return self.fixed.subBlock(byte_offset, byte_length)
+
+    def tailBits(self, bit_offset: int) -> 'RawData':
+        f = self.fixed.tailBits(bit_offset)
+        return f if self.closed else AppendableRawData(f)
+
+    def tailBytes(self, byte_offset: int) -> 'RawData':
+        f = self.fixed.tailBytes(byte_offset)
+        return f if self.closed else AppendableRawData(f)
+
+    def close(self) -> 'RawData':
+        self.closed = True
+        return self
+
+    def __repr__(self):
+        return self.fixed.__repr__()
+
+    def __eq__(self, other):
+        return self.fixed == other
 
 
 class Raw:
