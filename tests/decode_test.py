@@ -15,6 +15,7 @@ def test_partial_decode():
 
     full_ip = IPv4(Frames.dissect(ip_raw))
     assert full_ip.byte_length() == 52
+    assert full_ip.bit_length() == 52 * 8
 
     ip = IPv4(Frames.dissect(Raw.empty))
     ip_s = f"{ip}"
@@ -43,8 +44,12 @@ def test_partial_decode():
     ip_s = f"{ip}"
     assert IPv4.Source_IP[ip] == Raw.hex("")
     assert IPv4.Destination_IP[ip] == Raw.hex("")
+    with pytest.raises(EOFError):
+        ip_len = ip.bit_length()
 
     ip = IPv4(Frames.dissect(ip_raw.subBlock(0, 14)))
     ip_s = f"{ip}"
     assert IPv4.Source_IP[ip] == Raw.hex("12c2")
     assert IPv4.Destination_IP[ip] == Raw.hex("")
+    with pytest.raises(EOFError):
+        ip_len = ip.bit_length()

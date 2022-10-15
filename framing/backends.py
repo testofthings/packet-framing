@@ -369,9 +369,16 @@ class DissectorBackend(BackendImplementation):
                 rl = self.choice.get_bit_length(self.frame)
             else:
                 rl = self.get_bit_offset(self.structure.fields_length)
-            if 0 <= self.data.bit_length() < rl:
-                # input data is known to be shorter...
-                rl = self.data.bit_length()
+            data_len = self.data.bit_length()
+            if data_len >= 0:
+                if data_len < rl:
+                    # input data is known to be shorter...
+                    raise EOFError(f"Only {self.data.byte_length()} bytes available for " + self.structure_name())
+            elif rl > 0:
+                # length of data is not known
+                last_d = self.data.octet(rl // 8 - 1) if rl % 8 == 0 else self.data.bit(rl - 1)
+                if last_d < 0:
+                    raise EOFError(f"Not enough data for " + self.structure_name())
             self.known_bit_length = rl
         return self.known_bit_length
 
