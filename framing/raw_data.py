@@ -218,6 +218,8 @@ class RawDataSequence(RawData):
                         # next component buffer
                         off = 0
                         ci += 1
+                        if ci >= len(self.components):
+                            return -1  # run out of data
                         c = self.components[ci]
                         c_len = c.bit_length()
                     v <<= 1

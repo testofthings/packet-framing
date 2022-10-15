@@ -76,9 +76,13 @@ class FixedByteIntegerCodec(IntegerCodec):
 
     def decode(self, data: RawData) -> int:
         v = 0
+        d = 0
         for i in self.reverse:
             v <<= 8
-            v |= data.octet(i)
+            d = data.octet(i)
+            v |= d
+        if d < 0:
+            raise EOFError()  # only check the last part to minimize impact
         return v
 
     def get_bit_length(self, value: int) -> int:

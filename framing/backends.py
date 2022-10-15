@@ -63,7 +63,11 @@ class BackendImplementation(FrameBackend):
         else:
             field_items = [(self.choice.field_name, self.choice)]
         for n, f in field_items:
-            v = self.get(f)
+            try:
+                v = self.get(f)
+            except EOFError as e:
+                r.append(f"<<< {e}")
+                break
             if isinstance(f, Sequence) and isinstance(f.sub, SubStructureField):
                 # Sequence of frames
                 for num, i in enumerate(v):
@@ -208,11 +212,14 @@ class DissectorBackend(BackendImplementation):
             assert field.structure == self.structure, f"{field.field_name} is not field of {self.structure_name()}"
             data, d_len = self.get_raw(field)
             layer_map = self.mappings.get_mappings(field)
-            if layer_map:
-                # override field to decode as payload frame
-                v = self.decode_as_frame(field, layer_map, data)
-            else:
-                v = field.decode(data, d_len, self)
+            try:
+                if layer_map:
+                    # override field to decode as payload frame
+                    v = self.decode_as_frame(field, layer_map, data)
+                else:
+                    v = field.decode(data, d_len, self)
+            except EOFError:
+                raise EOFError(f"EOF in '{field.field_name}'")
             self.field_values[field] = v
         return v
 
