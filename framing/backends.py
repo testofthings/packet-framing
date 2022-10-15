@@ -66,7 +66,7 @@ class BackendImplementation(FrameBackend):
             try:
                 v = self.get(f)
             except EOFError as e:
-                r.append(f"<<< {e}")
+                r.append(f"<<<<<< {e}")
                 break
             if isinstance(f, Sequence) and isinstance(f.sub, SubStructureField):
                 # Sequence of frames
@@ -96,7 +96,11 @@ class BackendImplementation(FrameBackend):
                 print_line(bit_off, f"{n} ({be.structure_name()})")
                 v_s = be.dump(bit_offset=bit_off, indent=indent + '  ', width=width, copy_sub_frames=copy_sub_frames)
                 r.append(v_s)
-                bit_off += be.frame.bit_length()
+                try:
+                    bit_off += be.frame.bit_length()
+                except EOFError as e:
+                    r.append(f"<<<<<< {e}")
+                    bit_off += be.input_data().bit_length()
                 continue
             ev = f.encode(v, state)
             if ev.bit_length() == 0:
