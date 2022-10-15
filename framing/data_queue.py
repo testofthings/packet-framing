@@ -8,6 +8,7 @@ from framing.raw_data import RawData, AppendableRawData
 class RawDataQueue:
     def __init__(self, prefix: RawData, offset=0):
         self.offset = offset  # bytes
+        self.offset_mod = 0  # possible modulus to wrap offset
         self.head = AppendableRawData(prefix)
         # fragment offset relative to self.offset
         self.fragments: List[Tuple[int, RawData]] = []
@@ -15,6 +16,9 @@ class RawDataQueue:
     def push(self, data: RawData, offset: int) -> Self:
         """Push data to end of the queue"""
         off = offset - self.offset
+        if self.offset_mod and off < -self.offset_mod / 2:
+            # wrap around
+            off += self.offset_mod
         fix_length = self.head.fixed.byte_length()
         if off < fix_length:
             # part of the data already in
@@ -46,6 +50,8 @@ class RawDataQueue:
         assert length < self.head.fixed.byte_length(), "Forwarding queue too fast"
         self.head = self.head.tailBytes(length)
         self.offset += length
+        if self.offset_mod:
+            self.offset = self.offset % self.offset_mod
         return self
 
     def pull(self, length) -> Self:
