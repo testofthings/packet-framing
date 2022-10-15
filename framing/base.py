@@ -203,7 +203,7 @@ TF = typing.TypeVar("TF", bound='Frame')
 
 class Frame(LengthEntity):
     """Base class for frames"""
-    def __init__(self, backend_factory: Callable[['Frame'], FrameBackend]):
+    def __init__(self, backend_factory: Callable[['Frame'], FrameBackend]) -> object:
         self.backend = backend_factory(self)
 
     def bit_length(self) -> int:
