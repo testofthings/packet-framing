@@ -68,8 +68,7 @@ def test_decode_short_ethernet():
     eth = EthernetII(Frames.dissect(data))
     assert EthernetII.data[eth] == Raw.hex("10111213")
     assert EthernetII.padding[eth] == Raw.empty
-    with pytest.raises(EOFError):
-        eth.byte_length()  # fails
+    assert eth.byte_length() == 18
 
 
 def test_decode_eth_and_ip():

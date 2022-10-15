@@ -139,6 +139,7 @@ class FrameBackend:
     """Base class for frame backend"""
     def __init__(self, frame: 'Frame'):
         self.frame = frame
+        self.is_decoder = False
         self.structure = FrameStructure.get_struct(frame)
         if not self.structure.built:
             self.structure.finish_building(frame)

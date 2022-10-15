@@ -207,6 +207,7 @@ class DissectorBackend(BackendImplementation):
     """Backend to dissect frame from raw data"""
     def __init__(self, frame: Frame, mappings: LayerMapping, data: RawData):
         super().__init__(frame, mappings)
+        self.is_decoder = True
         self.data = data
         self.end_offset_cache: Dict[Field, int] = {}
 

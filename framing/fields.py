@@ -65,6 +65,9 @@ class PaddingValue(Calculator):
         self.target_length = target_length * 8  # target_length in bytes
 
     def pull(self, backend: FrameBackend) -> float:
+        if backend.is_decoder:
+            # No padding on decoding
+            return 0
         value = self.next_step.pull(backend)
         len_v = max(0, self.target_length - int(value))
         return len_v
