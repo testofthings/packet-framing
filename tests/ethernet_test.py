@@ -1,5 +1,7 @@
 import pathlib
 
+import pytest
+
 from framing.base import *
 from framing.frame_types.ipv4_frames import IPv4
 from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads, PacketRecord
@@ -66,7 +68,8 @@ def test_decode_short_ethernet():
     eth = EthernetII(Frames.dissect(data))
     assert EthernetII.data[eth] == Raw.hex("10111213")
     assert EthernetII.padding[eth] == Raw.empty
-    assert eth.byte_length() == 18
+    with pytest.raises(EOFError):
+        eth.byte_length()  # fails
 
 
 def test_decode_eth_and_ip():
