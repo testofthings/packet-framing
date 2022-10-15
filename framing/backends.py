@@ -289,7 +289,7 @@ class DissectorBackend(BackendImplementation):
                     p_len = prefix.field.decode_bit_length(self.data, off, None, self)
                     if p_len < 0:
                         # no length information, assuming all available
-                        p_len = self.data.read_all().bit_length()
+                        p_len = self.data.read_all().bit_length() - off
                         if prefix.field.offset.min_tail_length:
                             # data limited by space required by later field(s)
                             p_len = max(0, p_len - prefix.field.offset.min_tail_length)
