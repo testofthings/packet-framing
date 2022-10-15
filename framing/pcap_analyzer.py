@@ -1,6 +1,7 @@
 import argparse
 import datetime
 import logging
+import math
 import pathlib
 import sys
 from typing import Dict, List, Tuple, Set, Union, Optional, TextIO
@@ -21,7 +22,7 @@ class Description:
         self.out_frames = 0
         self.in_frames = 0
         self.sub: Dict[str, Description] = {}
-        self.locations: List[Tuple[str, int]] = []
+        self.locations: List[Tuple[str, int, datetime.datetime]] = []
 
     def get_description(self, key: str, create_if_needed=True) -> Optional['Description']:
         if not create_if_needed and key not in self.sub:
@@ -35,7 +36,11 @@ class PCAPScanner:
         self.logger = logging.getLogger("scanner")
         self.name = name
         self.source: Tuple[str, int] = "", -1
+        self.now = datetime.datetime.now()
         self.time_range = datetime.datetime.now(), datetime.datetime.fromtimestamp(0)
+        # self.time_unit = datetime.timedelta(days=1)
+        self.time_unit = datetime.timedelta(hours=6)
+        self.time_unit_count = -1
         self.file_count = 0
         self.pcap_frame_count = 0
         self.description = Description()
@@ -81,6 +86,7 @@ class PCAPScanner:
 
                 ts_s = PacketRecord.Timestamp[rec]
                 ts = datetime.datetime.fromtimestamp(ts_s)
+                self.now = ts
                 self.time_range = min(ts, self.time_range[0]), max(ts, self.time_range[1])
 
                 eth = PacketRecord.Packet_Data.as_frame(rec, frame_type=EthernetII)
@@ -167,7 +173,7 @@ class PCAPScanner:
             ep_d = dst_d.get_description(f"{protocol}:{dst_port}")
             ep_d.out_frames += 1
 
-        ep_d.locations.append(self.source)
+        ep_d.locations.append((self.source[0], self.source[1], self.now))
 
     def session_for(self, connection: Tuple[str, IPAddress, int, IPAddress, int]) -> Tuple[bool, bool]:
         r_key = connection[0], connection[3], connection[4], connection[1], connection[2]
@@ -210,6 +216,8 @@ class PCAPScanner:
 
     def print_output(self, write_to: TextIO):
         """Print analysis output"""
+        self.time_unit_count = math.ceil((self.time_range[1] - self.time_range[0]) / self.time_unit)
+
         write_to.write(f"{self}\n")
         d_list = self.list_descriptions()
         d_numbers = {d: i + 1 for i, d in enumerate(d_list)}
@@ -227,11 +235,14 @@ class PCAPScanner:
         r = []
         if self.name:
             r.append(f"## {self.name} ##")
+
+        t_units = math.ceil((self.time_range[1] - self.time_range[0]) / self.time_unit)
         r.extend([
             f"PCAP files:   {self.file_count}",
             f"PCAP frames:  {self.pcap_frame_count}",
             f"Oldest frame: {self.time_range[0]}",
             f"Newest frame: {self.time_range[1]}",
+            f"Time units:   {t_units} (unit {self.time_unit})",
         ])
 
         r.append("Ethernet payload types:")
@@ -247,7 +258,12 @@ class PCAPScanner:
         r = []
         num = numbering.get(description, 0)
         if num > 0 or description.in_frames or description.out_frames:
-            r.append((num, f"inf={description.in_frames} ouf={description.out_frames}"))
+            ts_set = set([round((loc[2] - self.time_range[0]) / self.time_unit) for loc in description.locations])
+            ts_str = "".join([("x" if t in ts_set else "-") for t in range(0, self.time_unit_count)])
+
+            r.append((num, f"inf={description.in_frames} ouf={description.out_frames} times={ts_str}"))
+
+
         for key, d in description.sub.items():
             dir_s = ""
             ind_s = f"  "
