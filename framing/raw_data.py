@@ -194,7 +194,7 @@ class RawDataSequence(RawData):
         for c in components:
             if isinstance(c, RawDataSequence):
                 cs.extend(c.components)
-            else:
+            elif c.bit_length() > 0:
                 cs.append(c)
         self.components = cs
         self.length = sum([c.bit_length() for c in components])
