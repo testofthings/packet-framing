@@ -15,9 +15,11 @@ if __name__ == "__main__":
     parser.add_argument("files", action="append", help="PCAPs file to read")
     parser.add_argument("-l", "--log", dest="log_level", choices=['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
                         help="Set the logging level", default=None)
+    parser.add_argument("--frame", type=int, default=-1, help="Start from given frame")
     parser.add_argument("--silent", action="store_true", help="Run silent (for performance analysis?)")
     args = parser.parse_args()
     silent = args.silent
+    start_frame = args.frame
     logging.basicConfig(format='%(message)s', level=getattr(logging, args.log_level or 'INFO'))
 
     try:
@@ -35,11 +37,13 @@ if __name__ == "__main__":
         UDP_Common_Payloads.add_to(pcap)
 
         hdr = PCAPFile.File_Header[pcap]
-        if not silent:
+        if not silent and start_frame == -1:
             print(f"{Frames.dump(hdr, bit_offset=offset, width=wid)}")
         offset += hdr.bit_length()
 
         for i, rec in enumerate(PCAPFile.Packet_Records.iterate(pcap)):
+            if start_frame - 1 > i:
+                continue
             if not silent:
                 print(f"=== #{i + 1} ===")
                 print(f"{Frames.dump(rec, bit_offset=offset, width=wid, indent='  ')}")

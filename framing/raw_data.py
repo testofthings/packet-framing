@@ -96,6 +96,15 @@ class RawData:
         """Get raw data tail, empty if beyond data"""
         raise NotImplementedError()
 
+    def joint_head(self, other: 'RawData') -> 'RawData':
+        """Get data head shared with given data"""
+        i = 0
+        d0 = self.octet(i)
+        while d0 >= 0 and d0 == other.octet(i):
+            i += 1
+            d0 = self.octet(i)
+        return self.subBlock(0, i)
+
     def __repr__(self):
         return self.dump()
 

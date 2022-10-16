@@ -17,17 +17,26 @@ from framing.raw_data import Raw, IPAddress, RawData
 
 
 class Description:
+    """Description of an endpoint"""
     def __init__(self):
         self.source = False
         self.out_frames = 0
         self.in_frames = 0
         self.sub: Dict[str, Description] = {}
         self.locations: List[Tuple[str, int, datetime.datetime]] = []
+        self.head: Optional[RawData] = None
 
     def get_description(self, key: str, create_if_needed=True) -> Optional['Description']:
         if not create_if_needed and key not in self.sub:
             return None
         return self.sub.setdefault(key, Description())
+
+
+class Session:
+    """A TCP or UDP session"""
+    def __init__(self):
+        self.head: Optional[RawData] = None
+        self.description: Optional[Description] = None
 
 
 class PCAPScanner:
@@ -46,7 +55,7 @@ class PCAPScanner:
         self.description = Description()
         self.ethernet_data_type_count: Dict[int, int] = {}
         self.ip_data_type_count: Dict[int, int] = {}
-        self.sessions: Set[Tuple[str, IPAddress, int, IPAddress, int]] = set()
+        self.sessions: Dict[Tuple[str, IPAddress, int, IPAddress, int], Session] = {}
         self.dns_names: Dict[IPAddress, str] = {}
         self.asked_dns_names: Set[str] = set()
 
@@ -125,12 +134,23 @@ class PCAPScanner:
         dst_ip = IPv4.Destination_IP[ip].as_ip_address()
         dst_port = TCP.Destination_port[tcp]
 
-        # FIXME: Expect SYN?
+        # FIXME: Expect SYN as otherwise head inspection is not done for real first data!
         #flags = TCP.Flags[tcp]
         #if flags & TCPFlag.SYN == 0 or flags & TCPFlag.ACK != 0:
         #    return  # not initial handshake
 
-        self.update_transport("tcp", src_hw, src_ip, src_port, dst_hw, dst_ip, dst_port)
+        ses = self.update_transport("tcp", src_hw, src_ip, src_port, dst_hw, dst_ip, dst_port)
+
+        if ses and ses.head is None:
+            # pick session head, update description head
+            d = ses.description
+            head = TCP.Data[tcp].subBlock(0, 16)
+            if head:
+                ses.head = head
+                if d.head is None:
+                    d.head = head
+                else:
+                    d.head = d.head.joint_head(head)
 
     def scan_udp(self, eth: EthernetII, ip: IPv4, udp: TCP):
         procs = {
@@ -144,47 +164,65 @@ class PCAPScanner:
         dst_hw = EthernetII.destination[eth]
         dst_ip = IPv4.Destination_IP[ip].as_ip_address()
         dst_port = UDP.Destination_port[udp]
+        ses = self.update_transport("udp", src_hw, src_ip, src_port, dst_hw, dst_ip, dst_port)
 
-        self.update_transport("udp", src_hw, src_ip, src_port, dst_hw, dst_ip, dst_port)
+        if ses and ses.head is None:
+            # pick session head, update description head
+            d = ses.description
+            head = UDP.Data[udp].subBlock(0, 16)
+            if head:
+                ses.head = head
+                if d.head is None:
+                    d.head = head
+                else:
+                    d.head = d.head.joint_head(head)
 
     def update_transport(self, protocol: str, src_hw: RawData, src_ip: IPAddress, src_port: int,
-                         dst_hw: RawData, dst_ip: IPAddress, dst_port: int):
-        rev_dir, new_s = self.session_for((protocol, src_ip, src_port, dst_ip, dst_port))
+                         dst_hw: RawData, dst_ip: IPAddress, dst_port: int) -> Optional[Session]:
+        ses, rev_dir, new_s = self.session_for((protocol, src_ip, src_port, dst_ip, dst_port))
 
         if new_s:
             if src_ip.is_global and not dst_ip.is_global:
                 self.logger.warning("Connection %s => %s from global to private, ignoring", src_ip, dst_ip)
-                self.sessions.remove((protocol, src_ip, src_port, dst_ip, dst_port))
-                return
+                del self.sessions[(protocol, src_ip, src_port, dst_ip, dst_port)]
+                return None
 
-        if rev_dir:
-            # going toward client
-            src_d = self.get_description(dst_ip, dst_hw)
-            # src_d.source = True
-            dst_d = self.get_description(src_ip, src_hw, parent=src_d)
-            ep_d = dst_d.get_description(f"{protocol}:{src_port}")
-            ep_d.in_frames += 1
-        else:
-            # going towards server
-            src_d = self.get_description(src_ip, src_hw)
-            src_d.source = True
+        ep_d = ses.description
+        if not ep_d:
+            # session not resolved
+            if rev_dir:
+                # going toward client
+                src_d = self.get_description(dst_ip, dst_hw)
+                # src_d.source = True
+                dst_d = self.get_description(src_ip, src_hw, parent=src_d)
+                ep_d = dst_d.get_description(f"{protocol}:{src_port}")
+                ep_d.in_frames += 1
+            else:
+                # going towards server
+                src_d = self.get_description(src_ip, src_hw)
+                src_d.source = True
 
-            dst_d = self.get_description(dst_ip, dst_hw, parent=src_d)
-            ep_d = dst_d.get_description(f"{protocol}:{dst_port}")
-            ep_d.out_frames += 1
+                dst_d = self.get_description(dst_ip, dst_hw, parent=src_d)
+                ep_d = dst_d.get_description(f"{protocol}:{dst_port}")
+                ep_d.out_frames += 1
+            ses.description = ep_d
 
         ep_d.locations.append((self.source[0], self.source[1], self.now))
+        return ses
 
-    def session_for(self, connection: Tuple[str, IPAddress, int, IPAddress, int]) -> Tuple[bool, bool]:
+    def session_for(self, connection: Tuple[str, IPAddress, int, IPAddress, int]) -> Tuple[Session, bool, bool]:
         r_key = connection[0], connection[3], connection[4], connection[1], connection[2]
-        dir_in = r_key in self.sessions
-        if dir_in:
-            self.sessions.add(r_key)
-            return True, False
+        ses = self.sessions.get(r_key)
+        if ses:
+            return ses, True, False  # reverse direction
         else:
-            new_s = connection not in self.sessions
-            self.sessions.add(connection)
-            return dir_in, new_s
+            ses = self.sessions.get(connection)
+            new_s = ses is None
+            if new_s:
+                # new session
+                ses = Session()
+                self.sessions[connection] = ses
+            return ses, False, new_s  # forward direction
 
     def scan_dns(self, frame: DNSMessage):
         for qn in DNSMessage.Question.iterate(frame):
@@ -258,11 +296,11 @@ class PCAPScanner:
         r = []
         num = numbering.get(description, 0)
         if num > 0 or description.in_frames or description.out_frames:
-            ts_set = set([round((loc[2] - self.time_range[0]) / self.time_unit) for loc in description.locations])
-            ts_str = "".join([("x" if t in ts_set else "-") for t in range(0, self.time_unit_count)])
+            # ts_set = set([round((loc[2] - self.time_range[0]) / self.time_unit) for loc in description.locations])
+            # ts_str = "".join([("x" if t in ts_set else "-") for t in range(0, self.time_unit_count)])
 
-            r.append((num, f"inf={description.in_frames} ouf={description.out_frames} times={ts_str}"))
-
+            head_s = f" head={description.head}" if description.head is not None else ""
+            r.append((num, f"inf={description.in_frames} ouf={description.out_frames}{head_s}"))
 
         for key, d in description.sub.items():
             dir_s = ""
