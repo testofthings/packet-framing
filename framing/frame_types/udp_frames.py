@@ -11,7 +11,7 @@ class UDP(Frame):
     Destination_port = structure.integer(IntegerFormat(bits=16))
     Length = structure.integer(IntegerFormat(bits=16))
     Checksum = structure.raw(bits=16)
-    Data = structure.raw().end_offset_by(ValueOf(Destination_port))
+    Data = structure.raw().end_offset_by(ValueOf(Length))
 
 
 # Well-known UDP port mappings
