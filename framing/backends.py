@@ -119,7 +119,7 @@ class BackendImplementation(FrameBackend):
 
     def __repr__(self):
         # create a copy to show, so that we do not update state (parent not copied)
-        return self.copy().dump(copy_sub_frames=True)
+        return f"{self.structure_name()}\n{self.copy().dump(copy_sub_frames=True)}"
 
 
 class RawFrame(Frame):
