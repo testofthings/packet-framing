@@ -144,7 +144,7 @@ class PCAPScanner:
         if ses and ses.head is None:
             # pick session head, update description head
             d = ses.description
-            head = TCP.Data[tcp].subBlock(0, 16)
+            head = TCP.Data[tcp].subBlock(0, 8)
             if head:
                 ses.head = head
                 if d.head is None:
@@ -169,7 +169,7 @@ class PCAPScanner:
         if ses and ses.head is None:
             # pick session head, update description head
             d = ses.description
-            head = UDP.Data[udp].subBlock(0, 16)
+            head = UDP.Data[udp].subBlock(0, 8)
             if head:
                 ses.head = head
                 if d.head is None:
