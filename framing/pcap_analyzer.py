@@ -20,6 +20,7 @@ class Description:
     """Description of an endpoint"""
     def __init__(self):
         self.source = False
+        self.sessions = 0
         self.out_frames = 0
         self.in_frames = 0
         self.sub: Dict[str, Description] = {}
@@ -205,8 +206,13 @@ class PCAPScanner:
                 dst_d = self.get_description(dst_ip, dst_hw, parent=src_d)
                 ep_d = dst_d.get_description(f"{protocol}:{dst_port}")
                 ep_d.out_frames += 1
+            ep_d.sessions += 1
             ses.description = ep_d
-
+        else:
+            if rev_dir:
+                ep_d.in_frames += 1
+            else:
+                ep_d.out_frames += 1
         ep_d.locations.append((self.source[0], self.source[1], self.now))
         return ses
 
@@ -299,8 +305,9 @@ class PCAPScanner:
             # ts_set = set([round((loc[2] - self.time_range[0]) / self.time_unit) for loc in description.locations])
             # ts_str = "".join([("x" if t in ts_set else "-") for t in range(0, self.time_unit_count)])
 
-            head_s = f" head={description.head}" if description.head is not None else ""
-            r.append((num, f"inf={description.in_frames} ouf={description.out_frames}{head_s}"))
+            d = description
+            head_s = f" head={d.head}" if d.head is not None else ""
+            r.append((num, f"ses={d.sessions} inf={d.in_frames} ouf={d.out_frames}{head_s}"))
 
         for key, d in description.sub.items():
             dir_s = ""
