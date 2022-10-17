@@ -21,8 +21,8 @@ class Description:
     def __init__(self):
         self.source = False
         self.sessions = 0
-        self.out_frames = 0
-        self.in_frames = 0
+        self.out_data = 0, 0, 0  # frames, data packets, data length
+        self.in_data = 0, 0, 0  # ditto
         self.sub: Dict[str, Description] = {}
         self.locations: List[Tuple[str, int, datetime.datetime]] = []
         self.head: Optional[RawData] = None
@@ -32,6 +32,13 @@ class Description:
             return None
         return self.sub.setdefault(key, Description())
 
+    def update_data(self, reverse: bool, data_bytes: int):
+        if reverse:
+            d = self.in_data
+            self.in_data = d[0] + 1, d[1] + (1 if data_bytes else 0), d[2] + data_bytes
+        else:
+            d = self.out_data
+            self.out_data = d[0] + 1, d[1] + (1 if data_bytes else 0), d[2] + data_bytes
 
 class Session:
     """A TCP or UDP session"""
@@ -140,7 +147,11 @@ class PCAPScanner:
         #if flags & TCPFlag.SYN == 0 or flags & TCPFlag.ACK != 0:
         #    return  # not initial handshake
 
-        ses = self.update_transport("tcp", src_hw, src_ip, src_port, dst_hw, dst_ip, dst_port)
+        rev, ses = self.update_transport("tcp", src_hw, src_ip, src_port, dst_hw, dst_ip, dst_port)
+
+        data_len = TCP.Data.get_bit_length(tcp) // 8
+        if ses:
+            ses.description.update_data(rev, data_len)
 
         if ses and ses.head is None:
             # pick session head, update description head
@@ -165,7 +176,11 @@ class PCAPScanner:
         dst_hw = EthernetII.destination[eth]
         dst_ip = IPv4.Destination_IP[ip].as_ip_address()
         dst_port = UDP.Destination_port[udp]
-        ses = self.update_transport("udp", src_hw, src_ip, src_port, dst_hw, dst_ip, dst_port)
+        rev, ses = self.update_transport("udp", src_hw, src_ip, src_port, dst_hw, dst_ip, dst_port)
+
+        data_len = UDP.Data.get_bit_length(udp) // 8
+        if ses:
+            ses.description.update_data(rev, data_len)
 
         if ses and ses.head is None:
             # pick session head, update description head
@@ -179,14 +194,14 @@ class PCAPScanner:
                     d.head = d.head.joint_head(head)
 
     def update_transport(self, protocol: str, src_hw: RawData, src_ip: IPAddress, src_port: int,
-                         dst_hw: RawData, dst_ip: IPAddress, dst_port: int) -> Optional[Session]:
+                         dst_hw: RawData, dst_ip: IPAddress, dst_port: int) -> Tuple[bool, Optional[Session]]:
         ses, rev_dir, new_s = self.session_for((protocol, src_ip, src_port, dst_ip, dst_port))
 
         if new_s:
             if src_ip.is_global and not dst_ip.is_global:
                 self.logger.warning("Connection %s => %s from global to private, ignoring", src_ip, dst_ip)
                 del self.sessions[(protocol, src_ip, src_port, dst_ip, dst_port)]
-                return None
+                return False, None
 
         ep_d = ses.description
         if not ep_d:
@@ -197,7 +212,6 @@ class PCAPScanner:
                 # src_d.source = True
                 dst_d = self.get_description(src_ip, src_hw, parent=src_d)
                 ep_d = dst_d.get_description(f"{protocol}:{src_port}")
-                ep_d.in_frames += 1
             else:
                 # going towards server
                 src_d = self.get_description(src_ip, src_hw)
@@ -205,16 +219,10 @@ class PCAPScanner:
 
                 dst_d = self.get_description(dst_ip, dst_hw, parent=src_d)
                 ep_d = dst_d.get_description(f"{protocol}:{dst_port}")
-                ep_d.out_frames += 1
             ep_d.sessions += 1
             ses.description = ep_d
-        else:
-            if rev_dir:
-                ep_d.in_frames += 1
-            else:
-                ep_d.out_frames += 1
         ep_d.locations.append((self.source[0], self.source[1], self.now))
-        return ses
+        return rev_dir, ses
 
     def session_for(self, connection: Tuple[str, IPAddress, int, IPAddress, int]) -> Tuple[Session, bool, bool]:
         r_key = connection[0], connection[3], connection[4], connection[1], connection[2]
@@ -301,13 +309,17 @@ class PCAPScanner:
     def to_string(self, description: Description, numbering: Dict['Description', int]) -> List[Tuple[int, str]]:
         r = []
         num = numbering.get(description, 0)
-        if num > 0 or description.in_frames or description.out_frames:
+        if num > 0:
             # ts_set = set([round((loc[2] - self.time_range[0]) / self.time_unit) for loc in description.locations])
             # ts_str = "".join([("x" if t in ts_set else "-") for t in range(0, self.time_unit_count)])
 
             d = description
             head_s = f" head={d.head}" if d.head is not None else ""
-            r.append((num, f"ses={d.sessions} inf={d.in_frames} ouf={d.out_frames}{head_s}"))
+            di = d.in_data
+            do = d.out_data
+            di_size = round(di[2] / di[1]) if di[1] else 0
+            do_size = round(do[2] / do[1]) if do[1] else 0
+            r.append((num, f"ses={d.sessions} inf={di[0]} ouf={do[0]} isize={di_size} osize={do_size}{head_s}"))
 
         for key, d in description.sub.items():
             dir_s = ""
