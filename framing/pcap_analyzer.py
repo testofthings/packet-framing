@@ -11,7 +11,7 @@ from framing.frame_types.dns_frames import DNSMessage, DNSQuestion, DNSName, RDA
 from framing.frame_types.ethernet_frames import Ethernet_Payloads, EthernetII
 from framing.frame_types.ipv4_frames import IPv4, IP_Payloads
 from framing.frame_types.pcap_frames import PCAPFile, PacketRecord, FileHeader
-from framing.frame_types.tcp_frames import TCP, TCPFlag
+from framing.frame_types.tcp_frames import TCP, TCPFlag, TCPDataQueue
 from framing.frame_types.udp_frames import UDP, UDP_Common_Payloads
 from framing.frames import Frames
 from framing.raw_data import Raw, IPAddress, RawData
@@ -46,8 +46,8 @@ class Session:
     def __init__(self):
         self.enabled = True
         self.head: Optional[RawData] = None
-        self.in_queue: Optional[RawDataQueue] = None  # for stream data
-        self.out_queue: Optional[RawDataQueue] = None  # for stream data
+        self.in_queue: Optional[TCPDataQueue] = None
+        self.out_queue: Optional[TCPDataQueue] = None
         self.description: Optional[Description] = None
 
 
@@ -159,26 +159,25 @@ class PCAPScanner:
                 ses.enabled = False  # not initial handshake
             else:
                 # start collecting data
-                ses.out_queue = RawDataQueue(offset=TCP.Sequence_number[tcp] + 1, modulus=2 ^ 32)
+                ses.out_queue = TCPDataQueue(tcp)
         if not ses.in_queue and rev:
             if flags & TCPFlag.SYN == 0:
                 self.logger.warning("continuation TCP stream ignored at %s %d", self.source[0], self.source[1])
                 ses.enabled = False  # not initial handshake
             else:
-                ses.in_queue = RawDataQueue(offset=TCP.Sequence_number[tcp] + 1, modulus=2 ^ 32)
+                ses.in_queue = TCPDataQueue(tcp)
 
         if not ses.enabled:
             return
 
         data_len = TCP.Data.get_bit_length(tcp) // 8
         ses.description.update_data(rev, data_len)
-        if data_len:
-            off = TCP.Sequence_number[tcp]
-            data = TCP.Data[tcp]
-            if not rev:
-                ses.out_queue.push(data, offset=off)
-            else:
-                ses.in_queue.push(data, offset=off)
+        if not rev:
+            if not ses.out_queue.is_closed():
+                ses.out_queue.push_frame(tcp)
+        else:
+            if not ses.in_queue.is_closed():
+                ses.in_queue.push_frame(tcp)
 
         if ses.head is None:
             # pick session head, update description head
@@ -193,7 +192,10 @@ class PCAPScanner:
 
         if flags & TCPFlag.FIN or flags & TCPFlag.RST:
             # end of data
-            s = ses
+            if not rev:
+                ses.out_queue.close()
+            else:
+                ses.in_queue.close()
 
     def scan_udp(self, eth: EthernetII, ip: IPv4, udp: TCP):
         procs = {
