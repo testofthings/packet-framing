@@ -2,20 +2,20 @@ from typing import Tuple, List
 
 from typing_extensions import Self
 
-from framing.raw_data import RawData, AppendableRawData
+from framing.raw_data import RawData, AppendableRawData, Raw
 
 
 class RawDataQueue:
-    def __init__(self, prefix: RawData, offset=0):
+    def __init__(self, prefix: RawData = None, offset=0, modulus=2 ** 32):
         self.offset = offset  # bytes
-        self.modulus = 2 ^ 32
-        self.head = AppendableRawData(prefix)
+        self.modulus = modulus
+        self.head = AppendableRawData(prefix or Raw.empty)
         # fragment offset relative to self.offset
         self.fragments: List[Tuple[int, RawData]] = []
 
     # FIXME: Offset wrapping is not working, especially with forwarding!!!
 
-    def push(self, data: RawData, offset: int) -> Self:
+    def push(self, data: RawData, offset: int) -> RawData:
         """Push data to end of the queue"""
         # avoid off-set wrapping, trust Python has enough bits in int
         off = (offset + self.modulus - self.offset) % self.modulus
@@ -24,7 +24,7 @@ class RawDataQueue:
             # part of the data already in
             data = data.tailBytes(fix_length - off)
             if data.byte_length() == 0:
-                return self
+                return data
             off = fix_length
         # add into fragments, do not worry about overlaps for now
         f_i = 0
@@ -33,6 +33,7 @@ class RawDataQueue:
             if off <= f_off:
                 self.fragments.insert(f_i, (off, data))
                 break
+            f_i += 1
         else:
             self.fragments.append((off, data))
         # check if more stuff to head
@@ -43,7 +44,7 @@ class RawDataQueue:
             self.head.append(add_data)
             self.fragments = self.fragments[1:]
             head_len += add_data.byte_length()
-        return self
+        return data
 
     def forward(self, length) -> Self:
         """Forward offset from beginning of the queue"""
@@ -61,3 +62,19 @@ class RawDataQueue:
         r = self.head.subBlock(0, length)
         self.forward(length)
         return r
+
+    def close(self):
+        self.head.closed = True
+
+    def is_closed(self) -> bool:
+        return self.head.closed
+
+    def __repr__(self):
+        r = [
+            f"offset={self.offset} length={self.head.bytes_available()}",
+            f"{self.head}"
+        ]
+        for off, f in self.fragments:
+            r.append(f"offset=+{off} length={f.byte_length()}")
+            r.append(f"{f}")
+        return "\n".join(r)

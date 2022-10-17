@@ -3,7 +3,9 @@ from typing import Tuple
 
 from framing.base import Frame
 from framing.codecs import IntegerFormat
+from framing.data_queue import RawDataQueue
 from framing.fields import Structure, ValueOf
+from framing.raw_data import RawData
 
 
 # https://www.ietf.org/rfc/rfc793.txt
@@ -46,3 +48,19 @@ class TCPFlag(enum.IntFlag):
 TCP.Flags.flag_values(TCPFlag)
 
 
+class TCPDataQueue(RawDataQueue):
+    """TCP data queue, one connection to one direction"""
+    def __init__(self, start: TCP):
+        super().__init__(offset=TCP.Sequence_number[start], modulus=2 ** 32)
+        if TCP.Flags[start] & TCPFlag.SYN:
+            self.offset += 1
+
+    def push_frame(self, tcp: TCP) -> RawData:
+        data = TCP.Data[tcp]
+        if not data:
+            return data
+        super().push(data, offset=TCP.Sequence_number[tcp])
+        flags = TCP.Flags[tcp]
+        if flags & TCPFlag.FIN or flags & TCPFlag.RST:
+            self.head.close()
+        return data

@@ -1,9 +1,11 @@
+import ipaddress
+import math
 import pathlib
 
 from framing.frame_types.ethernet_frames import Ethernet_Payloads, EthernetII
 from framing.frame_types.ipv4_frames import IPv4, IP_Payloads
 from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads, PacketRecord
-from framing.frame_types.tcp_frames import TCP, TCPFlag
+from framing.frame_types.tcp_frames import TCP, TCPFlag, TCPDataQueue
 from framing.frames import Frames
 from framing.raw_data import Raw
 
@@ -28,9 +30,14 @@ def test_decode_tcp():
 
 
 def test_decode_tcp_payload():
-    pcap = PCAPFile.open_file(pathlib.Path("samples/sample-1-head.pcap"),
+    pcap = PCAPFile.open_file(pathlib.Path("samples/sample-1.pcap"),
                               mappings=PCAP_Payloads + Ethernet_Payloads + IP_Payloads)
+
+    conns = {}
+
+    f_number = 0
     for pcap_r in PCAPFile.Packet_Records.iterate(pcap):
+        f_number += 1
         ip = PacketRecord.Packet_Data.as_frame(pcap_r) / EthernetII.data
         if not isinstance(ip, IPv4):
             continue
@@ -38,4 +45,22 @@ def test_decode_tcp_payload():
         if not isinstance(tcp, TCP):
             continue
         k = ip.get_addresses(), tcp.get_ports()
+        c = conns.get(k)
+        if c is None:
+            if TCP.Flags[tcp] & TCPFlag.SYN:
+                c = TCPDataQueue(tcp)
+                conns[k] = c
+        elif not c.is_closed():
+            c.push_frame(tcp)
+
+    for q in conns.values():
+        q.close()
+
+    assert len(conns) == 26
+
+    q = conns[((ipaddress.ip_address("192.168.4.16"), ipaddress.ip_address("17.253.39.208")), (64982, 443))]
+    assert q.head.byte_length() == 1695
+
+    q = conns[((ipaddress.ip_address("17.253.39.208"), ipaddress.ip_address("192.168.4.16")), (443, 64982))]
+    assert q.head.byte_length() == 6723
 

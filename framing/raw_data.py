@@ -402,6 +402,12 @@ class AppendableRawData(RawData):
     def byte_length(self) -> int:
         return self.fixed.byte_length() if self.closed else -1
 
+    def bits_available(self) -> int:
+        return self.fixed.bit_length()
+
+    def bytes_available(self) -> int:
+        return self.fixed.byte_length()
+
     def octet(self, byte_offset: int) -> int:
         return self.fixed.octet(byte_offset)
 

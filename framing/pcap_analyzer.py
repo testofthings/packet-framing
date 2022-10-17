@@ -6,6 +6,7 @@ import pathlib
 import sys
 from typing import Dict, List, Tuple, Set, Union, Optional, TextIO
 
+from framing.data_queue import RawDataQueue
 from framing.frame_types.dns_frames import DNSMessage, DNSQuestion, DNSName, RDATA, DNSResource
 from framing.frame_types.ethernet_frames import Ethernet_Payloads, EthernetII
 from framing.frame_types.ipv4_frames import IPv4, IP_Payloads
@@ -43,7 +44,10 @@ class Description:
 class Session:
     """A TCP or UDP session"""
     def __init__(self):
+        self.enabled = True
         self.head: Optional[RawData] = None
+        self.in_queue: Optional[RawDataQueue] = None  # for stream data
+        self.out_queue: Optional[RawDataQueue] = None  # for stream data
         self.description: Optional[Description] = None
 
 
@@ -142,18 +146,41 @@ class PCAPScanner:
         dst_ip = IPv4.Destination_IP[ip].as_ip_address()
         dst_port = TCP.Destination_port[tcp]
 
-        # FIXME: Expect SYN as otherwise head inspection is not done for real first data!
-        #flags = TCP.Flags[tcp]
-        #if flags & TCPFlag.SYN == 0 or flags & TCPFlag.ACK != 0:
-        #    return  # not initial handshake
-
         rev, ses = self.update_transport("tcp", src_hw, src_ip, src_port, dst_hw, dst_ip, dst_port)
+        if not ses:
+            return
+
+        flags = TCP.Flags[tcp]
+
+        if not ses.out_queue:
+            # fresh session, check that starts with handshake
+            if flags & TCPFlag.SYN == 0:
+                self.logger.warning("continuation TCP stream ignored at %s %d", self.source[0], self.source[1])
+                ses.enabled = False  # not initial handshake
+            else:
+                # start collecting data
+                ses.out_queue = RawDataQueue(offset=TCP.Sequence_number[tcp] + 1, modulus=2 ^ 32)
+        if not ses.in_queue and rev:
+            if flags & TCPFlag.SYN == 0:
+                self.logger.warning("continuation TCP stream ignored at %s %d", self.source[0], self.source[1])
+                ses.enabled = False  # not initial handshake
+            else:
+                ses.in_queue = RawDataQueue(offset=TCP.Sequence_number[tcp] + 1, modulus=2 ^ 32)
+
+        if not ses.enabled:
+            return
 
         data_len = TCP.Data.get_bit_length(tcp) // 8
-        if ses:
-            ses.description.update_data(rev, data_len)
+        ses.description.update_data(rev, data_len)
+        if data_len:
+            off = TCP.Sequence_number[tcp]
+            data = TCP.Data[tcp]
+            if not rev:
+                ses.out_queue.push(data, offset=off)
+            else:
+                ses.in_queue.push(data, offset=off)
 
-        if ses and ses.head is None:
+        if ses.head is None:
             # pick session head, update description head
             d = ses.description
             head = TCP.Data[tcp].subBlock(0, 8)
@@ -163,6 +190,10 @@ class PCAPScanner:
                     d.head = head
                 else:
                     d.head = d.head.joint_head(head)
+
+        if flags & TCPFlag.FIN or flags & TCPFlag.RST:
+            # end of data
+            s = ses
 
     def scan_udp(self, eth: EthernetII, ip: IPv4, udp: TCP):
         procs = {
@@ -199,9 +230,13 @@ class PCAPScanner:
 
         if new_s:
             if src_ip.is_global and not dst_ip.is_global:
-                self.logger.warning("Connection %s => %s from global to private, ignoring", src_ip, dst_ip)
+                self.logger.warning("Global => private %s => %s ignored at %s %d", src_ip, dst_ip,
+                                    self.source[0], self.source[1])
                 del self.sessions[(protocol, src_ip, src_port, dst_ip, dst_port)]
                 return False, None
+
+        if not ses.enabled:
+            return False, None  # disabled session
 
         ep_d = ses.description
         if not ep_d:

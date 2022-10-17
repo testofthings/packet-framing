@@ -5,7 +5,7 @@ from framing.codecs import IntegerFormat
 from framing.fields import Structure, ValueOf
 from framing.frame_types.tcp_frames import TCP
 from framing.frame_types.udp_frames import UDP
-from framing.raw_data import RawData
+from framing.raw_data import IPAddress
 
 
 class IPv4(Frame):
@@ -29,9 +29,9 @@ class IPv4(Frame):
 
     Payload = structure.raw().end_offset_by(ValueOf(Total_Length))
 
-    def get_addresses(self) -> Tuple[RawData, RawData]:
+    def get_addresses(self) -> Tuple[IPAddress, IPAddress]:
         """Quick access to source and destination address"""
-        return self.backend.get(self.Source_IP), self.backend.get(self.Destination_IP)
+        return self.backend.get(self.Source_IP).as_ip_address(), self.backend.get(self.Destination_IP).as_ip_address()
 
 # Define IP protocol type mappings
 IP_Payloads = LayerMapping(IPv4.Payload).by(IPv4.Protocol, {
