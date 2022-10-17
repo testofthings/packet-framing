@@ -35,12 +35,20 @@ def test_data_queue():
 
 def test_data_queue_modulus():
     q = RawDataQueue(Raw.empty, offset=95)
-    q.offset_mod = 100
+    q.modulus = 100
 
     q.push(Raw.octets(0, 1, 2, 3, 4, 5), 95)
-    q.push(Raw.octets(6, 7), 1)
-    r = q.pull(7)
+    q.push(Raw.octets(7), 2)
+    r = q.pull(3)
+    assert q.offset == 98
+    assert r == Raw.octets(0, 1, 2)
+    assert q.head == Raw.octets(3, 4, 5)
+
+    q.push(Raw.octets(6), 1)
+    assert q.head == Raw.octets(3, 4, 5, 6, 7)
+
+    r = q.pull(4)
     assert q.offset == 2
-    assert r == Raw.octets(0, 1, 2, 3, 4, 5, 6)
+    assert r == Raw.octets(3, 4, 5, 6)
     assert q.head == Raw.octets(7)
 
