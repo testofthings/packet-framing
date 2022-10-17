@@ -1,4 +1,5 @@
 import enum
+from typing import Tuple
 
 from framing.base import Frame
 from framing.codecs import IntegerFormat
@@ -23,6 +24,10 @@ class TCP(Frame):
     Options = structure.raw().end_offset_by(ValueOf(Data_offset) * 4)
     #Padding = structure.raw().end_offset_by(ValueOf(Data_offset) * 4)
     Data = structure.raw()
+
+    def get_ports(self) -> Tuple[int, int]:
+        """Quick access to source and destination ports"""
+        return self.backend.get(self.Source_port), self.backend.get(self.Destination_port)
 
 
 class TCPFlag(enum.IntFlag):
