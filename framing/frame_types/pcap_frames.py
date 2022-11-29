@@ -58,8 +58,5 @@ class PCAPRecordIterator(Iterator[PacketRecord]):
     def __init__(self, file: PCAPFile):
         self.source = PCAPFile.Packet_Records.iterate(file)
 
-    def ethernet(self) -> Iterator[EthernetII]:
-        pass
-
     def __next__(self) -> PacketRecord:
         return self.source.__next__()
