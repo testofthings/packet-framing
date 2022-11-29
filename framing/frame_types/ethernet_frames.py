@@ -20,3 +20,4 @@ class EthernetII(Frame):
 Ethernet_Payloads = LayerMapping(EthernetII.data).by(EthernetII.type, {
     0x0800: IPv4,
 })
+

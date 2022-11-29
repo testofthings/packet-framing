@@ -1,5 +1,5 @@
 import pathlib
-from typing import Optional
+from typing import Optional, Iterator
 
 from framing.base import Frame, LayerMapping
 from framing.codecs import IntegerFormat
@@ -51,3 +51,15 @@ class PCAPFile(Frame):
 PCAP_Payloads = LayerMapping(PacketRecord.Packet_Data).by(PCAPFile.File_Header / FileHeader.LinkType, {
     1: EthernetII,
 })
+
+
+class PCAPRecordIterator(Iterator[PacketRecord]):
+    """Record iterator"""
+    def __init__(self, file: PCAPFile):
+        self.source = PCAPFile.Packet_Records.iterate(file)
+
+    def ethernet(self) -> Iterator[EthernetII]:
+        pass
+
+    def __next__(self) -> PacketRecord:
+        return self.source.__next__()

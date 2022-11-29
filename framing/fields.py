@@ -418,6 +418,41 @@ class LVField(ConfigurableField[F, T]):
         backend.set(self.sub, value)
 
 
+class FrameIterator(Iterator[FT]):
+    """Frame iterator"""
+    def __init__(self, source: Iterator[FT]):
+        self.source = source
+
+    def field(self, field: ConfigurableField[FT, T], as_frame=False) -> 'FieldIterator[T]':
+        i = FieldIterator(field, self.source)
+        i.frame_value = as_frame
+        return i
+
+    def __next__(self) -> FT:
+        return self.source.__next__()
+
+
+class FieldIterator(typing.Generic[F, T], Iterator[T]):
+    def __init__(self, field: ConfigurableField[F, T], source: Iterator[T]):
+        self.it_field = field
+        self.source = source
+        self.frame_value = False
+
+    def field(self, field: ConfigurableField[FT, T], as_frame=False) -> 'FieldIterator[T]':
+        self.frame_value = True
+        i = FieldIterator(field, self)
+        i.frame_value = as_frame
+        return i
+
+    def __next__(self) -> FT:
+        f = self.source.__next__()
+        v = self.it_field.as_frame(f) if self.frame_value else self.field.get(f)
+        while v is None:
+            f = self.source.__next__()
+            v = self.it_field.as_frame(f) if self.frame_value else self.field.get(f)
+        return v
+
+
 class Sequence(ConfigurableField[F, List[FT]]):
     """Field of sequence of values"""
     def __init__(self, sub: Field[F, FT]):
@@ -442,10 +477,11 @@ class Sequence(ConfigurableField[F, List[FT]]):
         self.terminator_call = test
         return self
 
-    def iterate(self, frame: F) -> Iterator[FT]:
+    def iterate(self, frame: F) -> FrameIterator[FT]:
         """Get item by index"""
         known_count = int(self.count_resolver.pull(frame.backend)) if self.count_resolver else -1
-        return frame.backend.iterate(self, self.sub, known_count, self.terminator_call)
+        s = frame.backend.iterate(self, self.sub, known_count, self.terminator_call)
+        return FrameIterator(s)
 
     def get_count(self, frame: F) -> int:
         if self.count_resolver:
