@@ -117,6 +117,11 @@ class BackendImplementation(FrameBackend):
     def copy(self, parent: Optional[FrameBackend] = None) -> Self:
         raise NotImplementedError()
 
+    def _bad_field_access(self, field: Field) -> str:
+        """Create assertion text for field accessing wrong frame"""
+        # NOTE: If the field is for non-built frame, we cannot give the proper error message
+        return f"{field.structure.structure_name}.{field.field_name} is not field of {self.structure_name()}"
+
     def __repr__(self):
         # create a copy to show, so that we do not update state (parent not copied)
         return f"{self.structure_name()}\n{self.copy().dump(copy_sub_frames=True)}"
@@ -135,13 +140,13 @@ class ComposingBackend(BackendImplementation):
     def get(self, field: Field[F, T]) -> T:
         v = self.field_values.get(field)
         if v is None:
-            assert field.structure == self.structure, f"{field.field_name} is not field of {self.structure_name()}"
+            assert field.structure == self.structure, self._bad_field_access(field)
             v = field.get_default_value(self.frame)
             self.field_values[field] = v
         return v
 
     def set(self, field: Field[F, T], value: T) -> Self:
-        assert field.structure == self.structure, f"{field.field_name} is not field of {self.structure_name()}"
+        assert field.structure == self.structure, self._bad_field_access(field)
         if self.choice:
             # update the choice
             self.field_values.pop(self.choice)
@@ -214,7 +219,7 @@ class DissectorBackend(BackendImplementation):
     def get(self, field: Field[F, T]) -> T:
         v = self.field_values.get(field)
         if v is None:
-            assert field.structure == self.structure, f"{field.field_name} is not field of {self.structure_name()}"
+            assert field.structure == self.structure, self._bad_field_access(field)
             data, d_len = self.get_raw(field)
             layer_map = self.mappings.get_mappings(field)
             try:
@@ -254,7 +259,7 @@ class DissectorBackend(BackendImplementation):
         return RawFrame(self.factory(data))
 
     def set(self, field: Field[F, T], value: T) -> Self:
-        assert field.structure == self.structure, f"{field.field_name} is not field of {self.structure_name()}"
+        assert field.structure == self.structure, self._bad_field_access(field)
         self.field_values[field] = value
         return self
 
