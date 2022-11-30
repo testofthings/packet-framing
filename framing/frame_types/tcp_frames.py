@@ -11,7 +11,7 @@ from framing.raw_data import RawData
 # https://www.ietf.org/rfc/rfc793.txt
 
 class TCP(Frame):
-    structure = Structure()
+    structure = Structure['TCP']()
 
     Source_port = structure.integer(IntegerFormat(bits=16))
     Destination_port = structure.integer(IntegerFormat(bits=16))
@@ -24,7 +24,7 @@ class TCP(Frame):
     Checksum = structure.raw(bits=16)
     Urgent_Pointer = structure.integer(IntegerFormat(bits=16))
     Options = structure.raw().end_offset_by(ValueOf(Data_offset) * 4)
-    #Padding = structure.raw().end_offset_by(ValueOf(Data_offset) * 4)
+    # Padding = structure.raw().end_offset_by(ValueOf(Data_offset) * 4)
     Data = structure.raw()
 
     def get_ports(self) -> Tuple[int, int]:
