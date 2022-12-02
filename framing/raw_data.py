@@ -65,8 +65,8 @@ class RawData:
     def as_hw_address(self) -> str:
         return ":".join([f"{self.octet(i):02x}" for i in range(0, self.byte_length())])
 
-    def as_string(self, encoding='ascii') -> str:
-        return self.as_bytes(0, self.byte_length()).decode(encoding)
+    def as_string(self, encoding='ascii', errors='strict') -> str:
+        return self.as_bytes(0, self.byte_length()).decode(encoding, errors=errors)
 
     def bit(self, bit_offset: int) -> int:
         """Get bit by offset or -1 if past EOF"""
