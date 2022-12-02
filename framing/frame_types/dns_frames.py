@@ -58,8 +58,9 @@ class DNSName(Sequence):
         while fb > 0:
             if fb >= 0xc0:
                 # compressed
-                offset = fb & 0x3f << 8 | data.octet(1)
-                cs = cls.parse_string(ba.input_data().tailBytes(offset), message)
+                offset = (fb & 0x3f) << 8 | data.octet(1)
+                cin = ba.input_data().tailBytes(offset)
+                cs = cls.parse_string(cin, message)
                 r.extend(cs)
                 break
             else:
