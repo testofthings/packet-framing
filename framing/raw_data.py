@@ -52,7 +52,7 @@ class RawData:
             if v < 0:
                 raise EOFError("Not enough bytes available")
             b[i] = v
-        return b
+        return bytes(b)
 
     def as_ip_address(self) -> IPAddress:
         bl = self.bit_length()
