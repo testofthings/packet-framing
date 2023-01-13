@@ -73,6 +73,22 @@ def test_file():
     assert b.byte_length() == 14
 
 
+def test_stream():
+    b = Raw.stream(pathlib.Path("samples/hello-world.txt").open("rb"))
+    b.request_size = 5
+    assert b.bytes_available() == 0
+    assert b.octet(1) == 0x65
+    assert b.bytes_available() == 5
+    assert b.octet(4) == 0x6f
+    assert b.bytes_available() == 5
+    assert b.octet(5) == 0x2c
+    assert b.bytes_available() == 10
+
+    assert b == Raw.hex("48 65 6c 6c 6f 2c 20 77 6f 72 6c 64 21 0a")
+    assert b.bytes_available() == 14
+    assert b.byte_length() == 14
+
+
 def test_ip_address():
     assert Raw.hex("01020304").as_ip_address() == ipaddress.ip_address("1.2.3.4")
     assert Raw.hex("00000000 00000000 00000000 00000001").as_ip_address() == ipaddress.ip_address("::1")

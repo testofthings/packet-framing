@@ -375,6 +375,7 @@ class BitAlignedData(RawData):
 
 
 class FileData(ByteData):
+    """A file"""
     def __init__(self, file: BinaryIO, file_path: pathlib.Path):
         b = mmap.mmap(file.fileno(), 0, mmap.MAP_PRIVATE)
         super().__init__(b, 0, len(b))
@@ -439,6 +440,62 @@ class AppendableRawData(RawData):
         return self.fixed == other
 
 
+class StreamData(RawData):
+    """Stream data, input stream should be in blocking mode"""
+    def __init__(self, stream: BinaryIO, name: str):
+        self.stream = stream
+        self.stream_name = name
+        self.buffer = AppendableRawData(Raw.empty)
+        self.request_size = 256
+
+    def _read_until(self, to_byte_length: int):
+        """Read until given data length or EOF (-1 to read until EOF)"""
+        while not self.buffer.closed:
+            if 0 <= to_byte_length <= self.buffer.fixed.bytes_available():
+                break
+            buf = self.stream.read(self.request_size)
+            if not buf:
+                self.buffer.close()
+                break
+            self.buffer.append(Raw.bytes(buf))
+
+    def bit_length(self) -> int:
+        self._read_until(-1)
+        return self.buffer.bits_available()
+
+    def byte_length(self) -> int:
+        self._read_until(-1)
+        return self.buffer.bytes_available()
+
+    def bits_available(self) -> int:
+        return self.buffer.bits_available()
+
+    def bytes_available(self) -> int:
+        return self.buffer.bytes_available()
+
+    def octet(self, byte_offset: int) -> int:
+        self._read_until(byte_offset + 1)
+        return self.buffer.octet(byte_offset)
+
+    def bit(self, bit_offset: int) -> int:
+        self._read_until(bit_offset // 8 + 1)
+        return self.buffer.bit(bit_offset)
+
+    def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
+        self._read_until(byte_offset + byte_length)
+        return self.subBlock(byte_offset, byte_length)
+
+    def tailBytes(self, byte_offset: int) -> 'RawData':
+        self._read_until(-1)
+        return self.tailBytes(byte_offset)
+
+    def close(self):
+        self.stream.close()
+        self.buffer.close()
+
+    def __repr__(self):
+        return f"{self.stream_name} read={self.buffer.bytes_available()}\n{self.buffer}"
+
 class Raw:
     """Raw data factory"""
 
@@ -497,3 +554,7 @@ class Raw:
     def file(cls, file_path: pathlib.Path) -> FileData:
         f = file_path.open("rb")
         return FileData(f, file_path)
+
+    @classmethod
+    def stream(cls, stream: BinaryIO, name="stream") -> StreamData:
+        return StreamData(stream, name)
