@@ -55,10 +55,16 @@ def test_merged_data():
     b2 = b.tailBytes(10)
     assert b2 == Raw.empty
 
+    assert b.subBlockBits(0, 8) == Raw.octets(0x01)
+    assert b.subBlockBits(8, 8) == Raw.octets(0x02)
+    assert b.subBlockBits(16, 8) == Raw.octets(0x03)
+    assert b.subBlockBits(24, 8) == Raw.octets(0x04)
+    assert b.subBlockBits(32, 8) == Raw.octets(0x05)
+
     assert b.subBlockBits(5, 0) == Raw.empty
-    assert b.subBlockBits(5, 5) == Raw.empty
+    assert b.subBlockBits(5, 5) == Raw.bits("00100")
     assert b.subBlockBits(10, 0) == Raw.empty
-    assert b.subBlockBits(10, 2) == Raw.empty
+    assert b.subBlockBits(10, 2) == Raw.bits("00")
     assert b.tailBits(5 * 8) == Raw.empty
     assert b.tailBits(15 * 8) == Raw.empty
 

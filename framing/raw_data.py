@@ -171,6 +171,8 @@ class ByteData(RawData):
         self.data = data
         self.start = byte_start
         self.length = byte_length
+        assert byte_start >= 0
+        assert byte_length >= 0
 
     def bit_length(self) -> int:
         return self.length * 8
@@ -255,14 +257,17 @@ class RawDataSequence(RawData):
         off = 0
         end_offset = min(bit_offset + bit_length, self.bit_length())
         nc = []
+        got = 0
         for c in self.components:
             c_len = c.bit_length()
-            if off >= bit_offset:
-                if off >= end_offset:
+            if off + c_len > bit_offset:
+                st = max(0, bit_offset - off)
+                ln = min(c_len - st, bit_length - got)
+                nc.append(c.subBlockBits(st, ln))
+                got += ln
+                if got >= bit_length:
                     return Raw.sequence(nc)
-                s = max(0, bit_offset - off)
-                e = min(c_len, end_offset - off)
-                nc.append(c.subBlockBits(s, e))
+
             off += c_len
         return Raw.sequence(nc)
 
@@ -495,6 +500,7 @@ class StreamData(RawData):
 
     def __repr__(self):
         return f"{self.stream_name} read={self.buffer.bytes_available()}\n{self.buffer}"
+
 
 class Raw:
     """Raw data factory"""
