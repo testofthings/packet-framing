@@ -483,11 +483,11 @@ class StreamData(RawData):
 
     def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
         self._read_until(byte_offset + byte_length)
-        return self.subBlock(byte_offset, byte_length)
+        return self.buffer.subBlock(byte_offset, byte_length)
 
     def tailBytes(self, byte_offset: int) -> 'RawData':
         self._read_until(-1)
-        return self.tailBytes(byte_offset)
+        return self.buffer.tailBytes(byte_offset)
 
     def close(self):
         self.stream.close()
