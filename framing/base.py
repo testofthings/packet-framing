@@ -1,8 +1,6 @@
 import inspect
 import typing
-from typing import Optional, Callable, List, Type, Any, Dict
-
-from typing_extensions import Self
+from typing import Optional, Callable, List, Type, Any, Dict, Self
 
 from framing.codecs import IntegerCodec, IntegerFormat, ValueCodec
 from framing.raw_data import Raw, RawData, LengthEntity

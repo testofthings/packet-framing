@@ -1,7 +1,5 @@
 import copy
-from typing import Dict, Any, Callable, Iterator, Optional, List, cast, Type, Tuple
-
-from typing_extensions import Self
+from typing import Dict, Any, Callable, Iterator, Optional, List, cast, Type, Tuple, Self
 
 from framing.base import FrameBackend, Frame, EncodingState, Field, F, T, LayerMapping, FieldOffset, FieldPointer
 from framing.fields import Sequence, FT, Structure, SubStructureField

@@ -1,6 +1,4 @@
-from typing import Tuple, List
-
-from typing_extensions import Self
+from typing import Tuple, List, Self
 
 from framing.raw_data import RawData, AppendableRawData, Raw
 

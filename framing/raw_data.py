@@ -1,9 +1,7 @@
 import ipaddress
 import mmap
 import pathlib
-from typing import Iterable, List, BinaryIO, Union
-
-from typing_extensions import Self
+from typing import Iterable, List, BinaryIO, Union, Self
 
 # IP address, shouldn't this be defined by Python?
 IPAddress = Union[ipaddress.IPv6Address, ipaddress.IPv4Address]
