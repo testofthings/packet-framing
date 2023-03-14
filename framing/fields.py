@@ -291,7 +291,8 @@ class IntField(ConfigurableField[F, int], Calculator, CalculatorSource):
         return backend.get(self)
 
     def push(self, backend: FrameBackend, value: float) -> float:
-        return backend.set(self, int(value))
+        backend.set(self, int(value))
+        return value
 
 
 class SubStructureField(ConfigurableField[F, FT]):
