@@ -1,5 +1,7 @@
 import pathlib
 
+import pytest
+
 from framing.frame_types.dns_frames import DNSMessage, DNSHeader, DNSQuestion, DNSName, DNSResource, \
     SOA_RDATA, RDATA
 from framing.frame_types.ethernet_frames import Ethernet_Payloads, EthernetII
@@ -90,3 +92,29 @@ def test_decode_complex_dns():
 
     ns = sorted(set(names))
     assert ns == ['awsota.linkplay.com', 'd1enchupjctwud.cloudfront.net', 'ns-317.awsdns-39.com']
+
+
+def test_malformed_dns():
+    pcap = PCAPFile.open_file(pathlib.Path("samples/malformed-dns.pcap"),
+                              mappings=PCAP_Payloads + Ethernet_Payloads + IP_Payloads)
+
+    raw = UDP.Data[PCAPFile.Packet_Records.item(pcap, 0) / PacketRecord.Packet_Data / EthernetII.data / IPv4.Payload]
+    msg0 = DNSMessage(Frames.dissect(raw))
+    assert msg0.byte_length() == 90
+
+    for rd in DNSMessage.Question.iterate(msg0):
+        name = DNSName.string(rd, DNSQuestion.QNAME)
+        print(f"name={name}")
+
+    raw = UDP.Data[PCAPFile.Packet_Records.item(pcap, 1) / PacketRecord.Packet_Data / EthernetII.data / IPv4.Payload]
+    msg1 = DNSMessage(Frames.dissect(raw))
+
+    with pytest.raises(EOFError):
+        assert msg1.byte_length() == 90
+
+    # failure when trying to get Qnames
+    with pytest.raises(ValueError):
+        for rd in DNSMessage.Question.iterate(msg1):
+            name = DNSName.string(rd, DNSQuestion.QNAME)
+            print(f"name={name}")
+
