@@ -50,7 +50,7 @@ class DNSName(Sequence):
         return not (0 < fb < 0xc0)
 
     @classmethod
-    def parse_string(cls, data: RawData, message: 'DNSMessage') -> List[str]:
+    def parse_string(cls, data: RawData, message: 'DNSMessage', previous_offset=-1) -> List[str]:
         """Parse DNS encoded string"""
         ba = message.backend
         fb = data.octet(0)
@@ -59,8 +59,10 @@ class DNSName(Sequence):
             if fb >= 0xc0:
                 # compressed
                 offset = (fb & 0x3f) << 8 | data.octet(1)
+                if previous_offset == offset:
+                    raise ValueError(f"DNS compression error (offset={offset})")
                 cin = ba.input_data().tailBytes(offset)
-                cs = cls.parse_string(cin, message)
+                cs = cls.parse_string(cin, message, offset)
                 r.extend(cs)
                 break
             else:
