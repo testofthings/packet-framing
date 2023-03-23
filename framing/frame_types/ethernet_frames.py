@@ -2,6 +2,7 @@ from framing.base import Frame, LayerMapping
 from framing.codecs import IntegerFormat
 from framing.fields import Structure
 from framing.frame_types.ipv4_frames import IPv4
+from framing.frame_types.ipv6_frames import IPv6
 
 
 class EthernetII(Frame):
@@ -19,5 +20,6 @@ class EthernetII(Frame):
 # Define Ethernet payload type mappings
 Ethernet_Payloads = LayerMapping(EthernetII.data).by(EthernetII.type, {
     0x0800: IPv4,
+    0x86dd: IPv6,
 })
 
