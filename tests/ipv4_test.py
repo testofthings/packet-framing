@@ -4,7 +4,8 @@ import pathlib
 from framing.backends import BackendImplementation
 from framing.frame_processors import PCAP2Ethernet, Ethernet2IP, IP2UDP
 from framing.frame_types.ethernet_frames import EthernetII, Ethernet_Payloads
-from framing.frame_types.ipv4_frames import IPv4, IP_Payloads, IPv4Reassembler
+from framing.frame_types.ipv4_frames import IPv4, IP_Payloads
+from framing.frame_types.ipv6_frames import IPReassembler
 from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads, PacketRecord, PCAPRecordIterator
 from framing.frame_types.tcp_frames import TCP
 from framing.frame_types.udp_frames import UDP
@@ -76,7 +77,7 @@ def test_decode_fragments():
                               mappings=PCAP_Payloads + Ethernet_Payloads + IP_Payloads)
 
     pro = PCAP2Ethernet(Ethernet2IP())
-    de_frag = IPv4Reassembler()
+    de_frag = IPReassembler()
     data = None
     for pcap_r in PCAPRecordIterator(pcap):
         ip = pro.push(pcap_r)

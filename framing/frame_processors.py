@@ -1,15 +1,14 @@
 import typing
-from collections import deque
 from typing import Optional, Tuple, List
 
 from framing.base import T
 from framing.frame_types.ethernet_frames import EthernetII
-from framing.frame_types.ipv4_frames import IPv4, IPv4Reassembler
+from framing.frame_types.ipv4_frames import IPv4
+from framing.frame_types.ipv6_frames import IPReassembler
 from framing.frame_types.pcap_frames import PacketRecord
 from framing.frame_types.tcp_frames import TCP
 from framing.frame_types.udp_frames import UDP
 from framing.frames import Frames
-from framing.raw_data import RawData
 
 S = typing.TypeVar("S")
 
@@ -55,7 +54,7 @@ class Ethernet2IP(Processor[EthernetII, T]):
 class IP2UDP(Processor[IPv4, T]):
     def __init__(self, sub: Optional[Processor[UDP, T]] = None):
         self.sub = NoProcessor() if sub is None else sub
-        self.assembler = IPv4Reassembler()
+        self.assembler = IPReassembler()
 
     def push(self, value: IPv4) -> Optional[T]:
         if IPv4.Protocol[value] == 0x11:

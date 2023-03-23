@@ -1,9 +1,11 @@
-from typing import Tuple
+from types import UnionType
+from typing import Tuple, Dict, Optional, cast
 
 from framing.base import Frame, LayerMapping
+from framing.data_queue import RawDataQueue
 from framing.fields import Structure, ValueOf
-from framing.frame_types.ipv4_frames import IP_Payloads
-from framing.raw_data import IPAddress
+from framing.frame_types.ipv4_frames import IP_Payloads, IPv4, IPv4Flag
+from framing.raw_data import IPAddress, RawData
 
 
 class IPv6(Frame):
@@ -48,6 +50,9 @@ class Fragment(Frame):
     Payload = structure.raw()
 
 
+# Either IPv4 or IPv6
+IPx: UnionType = IPv4 | IPv6
+
 IPv6_Payloads = LayerMapping(base=IP_Payloads).many_by({
     IPv6.Payload: IPv6.Next_header,
     Fragment.Payload: Fragment.Next_Header,
@@ -55,3 +60,44 @@ IPv6_Payloads = LayerMapping(base=IP_Payloads).many_by({
     0x2c: Fragment,
     0x3a: ICMPv6,
 })
+
+
+class IPReassembler:
+    """IP reassembler"""
+    def __init__(self):
+        self.queues: Dict[Tuple[RawData, RawData, RawData], Tuple[RawDataQueue, int]] = {}
+
+    def push_frame(self, ip: IPx) -> Optional[RawData]:
+        """Push IP frame, get back reassembled data, if possible"""
+        if isinstance(ip, IPv4):
+            more = IPv4.Flags[ip] & IPv4Flag.MF
+            offset = IPv4.Fragment_Offset[ip] * 8
+            data = IPv4.Payload.as_raw(ip)  # cannot always decode payload, as only fragment
+            if offset == 0 and not more:
+                return data
+            key = IPv4.Source_IP[ip], IPv4.Destination_IP[ip], IPv4.Identification[ip]
+        else:
+            if IPv6.Next_header[ip] != 0x2c:
+                return IPv6.Payload.as_raw(ip)
+            # data is fragmented
+            frag = IPv6.Payload.as_frame(ip, frame_type=Fragment)
+            assert isinstance(frag, Fragment)
+            more = Fragment.M[frag]
+            offset = Fragment.Fragment_offset[frag]
+            data = Fragment.Payload.as_raw(frag)
+            key = IPv6.Source_address[ip], IPv6.Destination_address[ip], Fragment.Identification[frag]
+        ent = self.queues.get(key)
+        if not ent:
+            ent = self.queues.setdefault(key, (RawDataQueue(), 0))
+        queue, t_len = ent
+        queue.push(data, offset)
+        if not more:
+            # we now know how much data coming
+            t_len = offset + data.byte_length()
+        if t_len and queue.head.fixed.byte_length() == t_len:
+            # we have all data
+            del self.queues[key]
+            queue.close()
+            return queue.head
+        self.queues[key] = queue, t_len
+        return None

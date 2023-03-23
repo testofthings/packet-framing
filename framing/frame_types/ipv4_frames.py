@@ -51,33 +51,3 @@ IP_Payloads = LayerMapping(IPv4.Payload).by(IPv4.Protocol, {
     0x06: TCP,
     0x11: UDP,
 })
-
-
-class IPv4Reassembler:
-    """IPv4 reassembler"""
-    def __init__(self):
-        self.queues: Dict[Tuple[RawData, RawData, RawData], Tuple[RawDataQueue, int]] = {}
-
-    def push_frame(self, ip: IPv4) -> Optional[RawData]:
-        """Push IP frame, get back reassembled data, if possible"""
-        more = IPv4.Flags[ip] & IPv4Flag.MF
-        offset = IPv4.Fragment_Offset[ip] * 8
-        data = IPv4.Payload.as_raw(ip)  # cannot always decode payload, as only fragment
-        if offset == 0 and not more:
-            return data
-        # data is fragmented
-        key = IPv4.Source_IP[ip], IPv4.Destination_IP[ip], IPv4.Identification[ip]
-        ent = self.queues.get(key)
-        if not ent:
-            ent = self.queues.setdefault(key, (RawDataQueue(), 0))
-        queue, t_len = ent
-        queue.push(data, offset)
-        if not more:
-            # we now know how much data coming
-            t_len = offset + data.byte_length()
-        if t_len and queue.head.fixed.byte_length() == t_len:
-            # we have all data
-            del self.queues[key]
-            queue.close()
-            return queue.head
-        return None
