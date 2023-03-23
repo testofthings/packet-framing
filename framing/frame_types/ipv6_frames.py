@@ -1,7 +1,7 @@
 from typing import Tuple
 
 from framing.base import Frame
-from framing.fields import Structure
+from framing.fields import Structure, ValueOf
 from framing.raw_data import IPAddress
 
 
@@ -16,6 +16,8 @@ class IPv6(Frame):
     Hop_limit = structure.integer(bits=8)
     Source_address = structure.raw(bytes=16)
     Destination_address = structure.raw(bytes=16)
+
+    Payload = structure.raw().end_offset_by(ValueOf(Payload_length))
 
     def get_addresses(self) -> Tuple[IPAddress, IPAddress]:
         """Quick access to source and destination address"""
