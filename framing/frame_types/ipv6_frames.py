@@ -1,6 +1,6 @@
 from typing import Tuple
 
-from framing.base import Frame
+from framing.base import Frame, LayerMapping
 from framing.fields import Structure, ValueOf
 from framing.raw_data import IPAddress
 
@@ -23,3 +23,17 @@ class IPv6(Frame):
         """Quick access to source and destination address"""
         return self.backend.get(self.Source_address).as_ip_address(), \
             self.backend.get(self.Destination_address).as_ip_address()
+
+
+class ICMPv6(Frame):
+    structure = Structure['ICMPv6']()
+
+    Type = structure.integer(bits=8)
+    Code = structure.integer(bits=8)
+    Checksum = structure.integer(bits=16)
+    Message_Body = structure.raw()
+
+
+IPv6_Payloads = LayerMapping(IPv6.Payload).by(IPv6.Next_header, {
+    0x3a: ICMPv6,
+})

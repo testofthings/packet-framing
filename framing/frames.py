@@ -13,8 +13,8 @@ class Frames:
         return lambda f: ComposingBackend(f, LayerMapping())
 
     @classmethod
-    def dissect(cls, data: RawData) -> Callable[['Frame'], FrameBackend]:
-        return lambda f: DissectorBackend(f, LayerMapping(), data)
+    def dissect(cls, data: RawData, mappings=LayerMapping()) -> Callable[['Frame'], FrameBackend]:
+        return lambda f: DissectorBackend(f, mappings, data)
 
     @classmethod
     def dissect_file(cls, file: pathlib.Path) -> Callable[['Frame'], FrameBackend]:
