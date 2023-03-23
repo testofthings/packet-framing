@@ -226,8 +226,8 @@ class DissectorBackend(BackendImplementation):
                     v = self.decode_as_frame(field, layer_map, data)
                 else:
                     v = field.decode(data, d_len, self)
-            except EOFError:
-                raise EOFError(f"EOF in '{field.field_name}'")
+            except EOFError as e:
+                raise EOFError(f"{field.field_name} {e}")
             self.field_values[field] = v
         return v
 
