@@ -55,11 +55,15 @@ class RawDataQueue:
         self.offset += offset_d
         return self
 
-    def pull(self, length) -> Self:
+    def pull(self, byte_length: int) -> RawData:
         """Pull data from beginning of the queue"""
-        r = self.head.subBlock(0, length)
-        self.forward(length)
+        r = self.head.subBlock(0, byte_length)
+        self.forward(byte_length)
         return r
+
+    def pull_all(self) -> RawData:
+        """Pull all data from beginning of the queue"""
+        return self.pull(self.head.fixed.byte_length())
 
     def close(self):
         self.head.closed = True

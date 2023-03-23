@@ -2,11 +2,12 @@ import ipaddress
 import pathlib
 
 from framing.backends import BackendImplementation
+from framing.frame_processors import PCAP2Ethernet, Ethernet2IP, IP2UDP
 from framing.frame_types.ethernet_frames import EthernetII, Ethernet_Payloads
-from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads, PacketRecord
+from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads, PacketRecord, PCAPRecordIterator
 from framing.frame_types.tcp_frames import TCP
 from framing.frames import Frames
-from framing.frame_types.ipv4_frames import IPv4, IP_Payloads
+from framing.frame_types.ipv4_frames import IPv4, IP_Payloads, IPv4DefragmentQueue
 from framing.raw_data import Raw
 
 
@@ -67,3 +68,18 @@ def test_decode_payload():
     assert isinstance(pl, TCP)
 
     Frames.close(pcap)
+
+
+def test_decode_fragments():
+    pcap = PCAPFile.open_file(pathlib.Path("samples/ipv4-udp-frag.pcap"),
+                              mappings=PCAP_Payloads + Ethernet_Payloads + IP_Payloads)
+
+    pro = PCAP2Ethernet(Ethernet2IP())
+    de_frag = IPv4DefragmentQueue()
+    for pcap_r in PCAPRecordIterator(pcap):
+        ip = pro.push(pcap_r)
+        if ip:
+            data = de_frag.push_frame(ip)
+            if data:
+                assert data.byte_length() == 16392
+                break

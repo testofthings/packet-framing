@@ -93,6 +93,10 @@ class Field(FieldPointer[F, T]):
         """Return value as frame, use type information when available"""
         return frame.backend.get_as_frame(self, frame_type, default_frame)
 
+    def as_raw(self, frame: F) -> Optional[RawData]:
+        """Get as raw, do not try to attempt to parse payload. Does not work, if payload determines the length"""
+        return frame.backend.get_raw(self)[0]
+
     def to_string(self, frame: F) -> str:
         """A string representation of current value, for unit tests"""
         enc = self.encode(self.get(frame), EncodingState())
@@ -159,6 +163,10 @@ class FrameBackend:
     def iterate(self, sequence_field: Field, item_field: Field[F, T],
                 count=-1, terminator: Optional[Callable[[T], bool]] = None) -> typing.Iterator[T]:
         """Iterate sequence field values without storing them"""
+        raise NotImplementedError()
+
+    def get_raw(self, field: Field) -> typing.Tuple[RawData, int]:
+        """Get field raw data"""
         raise NotImplementedError()
 
     def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type[F]] = None,
