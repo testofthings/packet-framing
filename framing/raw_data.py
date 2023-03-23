@@ -123,6 +123,14 @@ class RawData:
                 return False
         return True
 
+    def __hash__(self):
+        h = self.byte_length()
+        if h < 0:
+            raise Exception("Cannot calculate hash for stream")
+        for i in range(0, h):
+            h += self.octet(i)
+        return h
+
     def __add__(self, other: 'RawData') -> 'RawData':
         return Raw.sequence([self, other])
 

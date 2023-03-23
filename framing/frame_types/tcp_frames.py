@@ -48,6 +48,7 @@ class TCPFlag(enum.IntFlag):
 TCP.Flags.flag_values(TCPFlag)
 
 
+# FIXME: Replace by similar class then IPv4Reassembler!
 class TCPDataQueue(RawDataQueue):
     """TCP data queue, one connection to one direction"""
     def __init__(self, start: TCP):

@@ -1,5 +1,5 @@
 import enum
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict
 
 from framing.base import Frame, LayerMapping
 from framing.codecs import IntegerFormat
@@ -18,7 +18,8 @@ class IPv4(Frame):
     DSCP = structure.integer(IntegerFormat(bits=6))
     ECN = structure.integer(IntegerFormat(bits=2))
     Total_Length = structure.integer(IntegerFormat(bits=16))
-    Identification = structure.integer(IntegerFormat(bits=16))
+    # Identification = structure.integer(IntegerFormat(bits=16))
+    Identification = structure.raw(bits=16)
     Flags = structure.integer(IntegerFormat(bits=3))
     Fragment_Offset = structure.integer(IntegerFormat(bits=13))
     TTL = structure.integer(IntegerFormat(bits=8))
@@ -52,24 +53,31 @@ IP_Payloads = LayerMapping(IPv4.Payload).by(IPv4.Protocol, {
 })
 
 
-class IPv4DefragmentQueue(RawDataQueue):
-    """IPv4 defragmented data queue"""
+class IPv4Reassembler:
+    """IPv4 reassembler"""
     def __init__(self):
-        super().__init__(offset=0)
-        self.target_length = 0
+        self.queues: Dict[Tuple[RawData, RawData, RawData], Tuple[RawDataQueue, int]] = {}
 
     def push_frame(self, ip: IPv4) -> Optional[RawData]:
+        """Push IP frame, get back reassembled data, if possible"""
         more = IPv4.Flags[ip] & IPv4Flag.MF
         offset = IPv4.Fragment_Offset[ip] * 8
         data = IPv4.Payload.as_raw(ip)  # cannot always decode payload, as only fragment
         if offset == 0 and not more:
-            return data  # not fragmented
-        super().push(data, offset)
+            return data
+        # data is fragmented
+        key = IPv4.Source_IP[ip], IPv4.Destination_IP[ip], IPv4.Identification[ip]
+        ent = self.queues.get(key)
+        if not ent:
+            ent = self.queues.setdefault(key, (RawDataQueue(), 0))
+        queue, t_len = ent
+        queue.push(data, offset)
         if not more:
             # we now know how much data coming
-            self.target_length = offset + data.byte_length()
-        if self.target_length and self.head.fixed.byte_length() == self.target_length:
+            t_len = offset + data.byte_length()
+        if t_len and queue.head.fixed.byte_length() == t_len:
             # we have all data
-            self.head.close()
-            return self.head
+            del self.queues[key]
+            queue.close()
+            return queue.head
         return None
