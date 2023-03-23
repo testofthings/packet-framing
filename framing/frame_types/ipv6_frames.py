@@ -2,6 +2,7 @@ from typing import Tuple
 
 from framing.base import Frame, LayerMapping
 from framing.fields import Structure, ValueOf
+from framing.frame_types.ipv4_frames import IP_Payloads
 from framing.raw_data import IPAddress
 
 
@@ -34,6 +35,23 @@ class ICMPv6(Frame):
     Message_Body = structure.raw()
 
 
-IPv6_Payloads = LayerMapping(IPv6.Payload).by(IPv6.Next_header, {
+class Fragment(Frame):
+    structure = Structure['Fragment']()
+
+    Next_Header = structure.integer(bits=8)
+    Reserved = structure.raw(bits=8)
+    Fragment_offset = structure.integer(bits=13)
+    Res = structure.raw(bits=2)
+    M = structure.integer(bits=1)
+    Identification = structure.raw(bytes=4)
+    # NOTE: Payload starts from middle if Fragment_offset > 0, e.g. UDP headers only in first fragment
+    Payload = structure.raw()
+
+
+IPv6_Payloads = LayerMapping(base=IP_Payloads).many_by({
+    IPv6.Payload: IPv6.Next_header,
+    Fragment.Payload: Fragment.Next_Header,
+}, {
+    0x2c: Fragment,
     0x3a: ICMPv6,
 })

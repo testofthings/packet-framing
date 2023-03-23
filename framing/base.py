@@ -313,16 +313,34 @@ class FrameStructure(typing.Generic[F]):
 
 class LayerMapping:
     """Map lower layer selector into upper layer payload"""
-    def __init__(self, payload: Field = None):
+    def __init__(self, payload: Field = None, base: Optional['LayerMapping'] = None):
+        assert not (payload and base), "Cannot provide both payload and base mapping"
         self._mappings: Dict[Field, Dict[FieldPointer, Dict]] = {}
+        self._payload = payload
         if payload:
             self._mappings[payload] = {}
-        self._payload = payload
+        if base is not None:
+            self._payload = base._payload
+            base.merge(self)
 
     def by(self, type_field: FieldPointer[Any, T], mappings: typing.Dict[T, Type[Frame]]) -> Self:
         """Add mappings for defined payload"""
         mp = self._mappings[self._payload]
         mp.setdefault(type_field, {}).update(mappings)
+        return self
+
+    def many_by(self, fields: Dict[Field, FieldPointer[Any, T]], mappings: typing.Dict[T, Type[Frame]]) -> Self:
+        """Add mappings for defined payload for many type fields"""
+        first = True
+        t_map = self._mappings.get(self._payload, {}).values()
+        for pf, tf in fields.items():
+            if first:
+                self._payload = pf
+            mp = self._mappings.setdefault(pf, {})
+            nt_map = mp.setdefault(tf, {})
+            nt_map.update(mappings)
+            for tm in t_map:
+                nt_map.update(tm)
         return self
 
     def is_mapped(self, payload: Field) -> bool:

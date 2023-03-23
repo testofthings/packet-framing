@@ -1,8 +1,9 @@
 import pathlib
 
-from framing.frame_types.ethernet_frames import EthernetII
-from framing.frame_types.ipv6_frames import IPv6, IPv6_Payloads, ICMPv6
+from framing.frame_types.ethernet_frames import EthernetII, Ethernet_Payloads
+from framing.frame_types.ipv6_frames import IPv6, IPv6_Payloads, ICMPv6, Fragment
 from framing.frame_types.pcap_frames import PCAPFile, PacketRecord, PCAP_Payloads
+from framing.frame_types.udp_frames import UDP
 from framing.frames import Frames
 
 
@@ -21,3 +22,14 @@ def test_decode_ip():
     assert isinstance(ic, ICMPv6)
 
     Frames.close(pcap)
+
+
+def test_decode_headers():
+    pcap = PCAPFile.open_file(pathlib.Path("samples/ipv6-udp-frag.pcap"),
+                              mappings=PCAP_Payloads + Ethernet_Payloads + IPv6_Payloads)
+
+    fr = IPv6.Payload.as_frame(PCAPFile.Packet_Records.item(pcap, 0) / PacketRecord.Packet_Data / EthernetII.data)
+    udp = Fragment.Payload.as_frame(fr)
+    assert UDP.Length[udp] == 16392
+
+    # NOTE: UDP is split into 12 fragments!
