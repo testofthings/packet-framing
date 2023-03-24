@@ -1,5 +1,5 @@
 import enum
-from typing import Tuple
+from typing import Tuple, Optional
 
 from framing.base import Frame
 from framing.codecs import IntegerFormat
@@ -47,6 +47,9 @@ class TCPFlag(enum.IntFlag):
 
 TCP.Flags.flag_values(TCPFlag)
 
+# source IP address, source port, destination IP address, destination port
+TCP_Stream_Id = Tuple[RawData, int, RawData, int]
+
 
 # FIXME: Replace by similar class then IPv4Reassembler!
 class TCPDataQueue(RawDataQueue):
@@ -55,13 +58,16 @@ class TCPDataQueue(RawDataQueue):
         super().__init__(offset=TCP.Sequence_number[start], modulus=2 ** 32)
         if TCP.Flags[start] & TCPFlag.SYN:
             self.offset += 1
+        self.end_offset = -1
 
     def push_frame(self, tcp: TCP) -> RawData:
+        """Push tcp frame"""
         data = TCP.Data[tcp]
-        if not data:
-            return data
-        super().push(data, offset=TCP.Sequence_number[tcp])
+        offset = TCP.Sequence_number[tcp]
+        super().push(data, offset=offset)
         flags = TCP.Flags[tcp]
         if flags & TCPFlag.FIN or flags & TCPFlag.RST:
-            self.head.close()
+            self.end_offset = offset + data.byte_length()
+        if -1 < self.end_offset <= self.offset + self.available():
+            self.close()
         return data

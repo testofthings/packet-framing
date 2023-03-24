@@ -1,13 +1,12 @@
 import enum
-from typing import Tuple, Optional, Dict
+from typing import Tuple
 
 from framing.base import Frame, LayerMapping
 from framing.codecs import IntegerFormat
-from framing.data_queue import RawDataQueue
 from framing.fields import Structure, ValueOf
 from framing.frame_types.tcp_frames import TCP
 from framing.frame_types.udp_frames import UDP
-from framing.raw_data import IPAddress, RawData
+from framing.raw_data import IPAddress
 
 
 class IPv4(Frame):

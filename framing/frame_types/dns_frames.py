@@ -132,3 +132,15 @@ class DNSMessage(Frame):
     Answer = Sequence(structure.sub(DNSResource)).count_by(DNSHeader.ANCOUNT.of(Header))
     Authority = Sequence(structure.sub(DNSResource)).count_by(DNSHeader.NSCOUNT.of(Header))
     Additional = Sequence(structure.sub(DNSResource)).count_by(DNSHeader.ARCOUNT.of(Header))
+
+
+class DNSMessageTCP(Frame):
+    structure = Structure['DNSMessageTCP']()
+
+    Length = structure.integer(bits=16)
+    Header = structure.sub(DNSHeader)
+    Question = Sequence(structure.sub(DNSQuestion)).count_by(DNSHeader.QDCOUNT.of(Header))
+    Answer = Sequence(structure.sub(DNSResource)).count_by(DNSHeader.ANCOUNT.of(Header))
+    Authority = Sequence(structure.sub(DNSResource)).count_by(DNSHeader.NSCOUNT.of(Header))
+    Additional = Sequence(structure.sub(DNSResource)).count_by(DNSHeader.ARCOUNT.of(Header)) \
+        .end_offset_by(ValueOf(Length))

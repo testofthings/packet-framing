@@ -2,11 +2,13 @@ import pathlib
 
 import pytest
 
+from framing.frame_processors import PCAP2Ethernet, Ethernet2IP, IP2TCP
 from framing.frame_types.dns_frames import DNSMessage, DNSHeader, DNSQuestion, DNSName, DNSResource, \
-    SOA_RDATA, RDATA
+    SOA_RDATA, RDATA, DNSMessageTCP
 from framing.frame_types.ethernet_frames import Ethernet_Payloads, EthernetII
+from framing.frame_types.ip_utilities import TCPReassembler
 from framing.frame_types.ipv4_frames import IPv4, IP_Payloads
-from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads, PacketRecord
+from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads, PacketRecord, PCAPRecordIterator
 from framing.frame_types.udp_frames import UDP
 from framing.frames import Frames
 from framing.raw_data import Raw
@@ -118,3 +120,23 @@ def test_malformed_dns():
             name = DNSName.string(rd, DNSQuestion.QNAME)
             print(f"name={name}")
 
+
+def test_dns_tcp():
+    # sample capture from: https://packetlife.net/
+    pcap = PCAPFile.open_file(pathlib.Path("samples/dns-zone-transfer-axfr.cap"),
+                              mappings=PCAP_Payloads + Ethernet_Payloads + IP_Payloads)
+
+    pro = PCAP2Ethernet(Ethernet2IP(IP2TCP()))
+    asm = TCPReassembler(full_streams=True)
+    dns = []
+    for pcap_r in PCAPRecordIterator(pcap):
+        tcp_ip = pro.push(pcap_r)
+        if not tcp_ip:
+            continue
+        raw = asm.push(tcp_ip)
+        if raw:
+            dns.append(DNSMessageTCP(Frames.dissect(raw)))
+
+    assert len(dns) == 2
+    assert DNSMessageTCP.Length[dns[0]] == 28
+    assert DNSMessageTCP.Length[dns[1]] == 195

@@ -46,7 +46,7 @@ class RawDataQueue:
 
     def forward(self, length) -> Self:
         """Forward offset from beginning of the queue"""
-        assert length < self.head.fixed.byte_length(), "Forwarding queue too fast"
+        assert length <= self.head.fixed.byte_length(), "Forwarding queue too fast"
         self.head = self.head.tailBytes(length)
         new_offset = (self.offset + length) % self.modulus
         offset_d = new_offset - self.offset
@@ -54,6 +54,10 @@ class RawDataQueue:
             self.fragments[i] = f[0] - offset_d, f[1]
         self.offset += offset_d
         return self
+
+    def available(self) -> int:
+        """Get byte length of available data"""
+        return self.head.fixed.byte_length()
 
     def pull(self, byte_length: int) -> RawData:
         """Pull data from beginning of the queue"""
@@ -63,7 +67,7 @@ class RawDataQueue:
 
     def pull_all(self) -> RawData:
         """Pull all data from beginning of the queue"""
-        return self.pull(self.head.fixed.byte_length())
+        return self.pull(self.available())
 
     def close(self):
         self.head.closed = True
