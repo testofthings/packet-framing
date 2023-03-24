@@ -31,6 +31,16 @@ class BackendImplementation(FrameBackend):
         mapping.merge(self.mappings)
         return self
 
+    def decode_as_frame(self, mapping: Dict[FieldPointer, Dict[Any, Type[Frame]]], data: RawData) -> Frame:
+        for f_ptr, mm in mapping.items():
+            value = f_ptr.get(self.frame)
+            f_type = mm.get(value)
+            if f_type is not None:
+                v = f_type(self.factory(data))
+                return v
+        # just raw frame
+        return RawFrame(self.factory(data))
+
     def dump(self, bit_offset=0, indent='', width=80, copy_sub_frames=False) -> str:
         r = []
 
@@ -223,7 +233,7 @@ class DissectorBackend(BackendImplementation):
             try:
                 if layer_map:
                     # override field to decode as payload frame
-                    v = self.decode_as_frame(field, layer_map, data)
+                    v = self.decode_as_frame(layer_map, data)
                 else:
                     v = field.decode(data, d_len, self)
             except EOFError as e:
@@ -244,17 +254,6 @@ class DissectorBackend(BackendImplementation):
         else:
             data = self.data.subBlockBits(bit_offset, bit_length)
         return data, bit_length
-
-    def decode_as_frame(self, field: Field, mapping: Dict[FieldPointer, Dict[Any, Type[Frame]]], data: RawData) -> Frame:
-        """Decore raw field as a frame with given mappings"""
-        for f_ptr, mm in mapping.items():
-            value = f_ptr.get(self.frame)
-            f_type = mm.get(value)
-            if f_type is not None:
-                v = f_type(self.factory(data))
-                return v
-        # just raw frame
-        return RawFrame(self.factory(data))
 
     def set(self, field: Field[F, T], value: T) -> Self:
         assert field.structure == self.structure, self._bad_field_access(field)

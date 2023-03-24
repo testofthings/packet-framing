@@ -58,7 +58,7 @@ class IP2UDP(Processor[IPv4, T]):
 
     def push(self, value: IPv4) -> Optional[T]:
         if IPv4.Protocol[value] == 0x11:
-            raw = self.assembler.push_frame(value)
+            raw = self.assembler.push(value)
             if raw:
                 return UDP(Frames.dissect(raw))
         return None

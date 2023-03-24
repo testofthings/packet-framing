@@ -174,6 +174,10 @@ class FrameBackend:
         """Get field value as frame, use implicit or explicit type"""
         raise NotImplementedError()
 
+    def decode_as_frame(self, mapping: Dict[FieldPointer, Dict[Any, Type['Frame']]], data: RawData) -> 'Frame':
+        """Decore raw field as a frame with given mappings"""
+        raise NotImplementedError()
+
     def factory(self, decode: RawData = None) -> Callable[['Frame'], 'FrameBackend']:
         """Create a fresh backend for given frame"""
         raise NotImplementedError()
@@ -330,6 +334,12 @@ class LayerMapping:
         if base is not None:
             self._payload = base._payload
             base.merge(self)
+
+    def resolve_payload(self, frame: Frame, field: Field, data: Optional[RawData]) -> Frame:
+        layer_map = self.get_mappings(field)
+        assert layer_map, f"No known payload mapping for {field}"
+        be = frame.backend
+        return be.decode_as_frame(layer_map, data)
 
     def by(self, type_field: FieldPointer[Any, T], mappings: typing.Dict[T, Type[Frame]]) -> Self:
         """Add mappings for defined payload"""

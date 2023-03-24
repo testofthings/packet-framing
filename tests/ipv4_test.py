@@ -85,7 +85,11 @@ def test_decode_fragments():
             data = de_frag.push_frame(ip)
             if data:
                 break
+    assert isinstance(data, UDP)
     assert data.byte_length() == 16392
+    assert UDP.Source_port[data] == 34910
+    assert UDP.Destination_port[data] == 6666
+    assert UDP.Length[data] == 16392
 
     pro = PCAP2Ethernet(Ethernet2IP(IP2UDP()))
     data = None

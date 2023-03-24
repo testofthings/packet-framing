@@ -5,6 +5,7 @@ from framing.base import Frame, LayerMapping
 from framing.data_queue import RawDataQueue
 from framing.fields import Structure, ValueOf
 from framing.frame_types.ipv4_frames import IP_Payloads, IPv4, IPv4Flag
+from framing.frames import Frames
 from framing.raw_data import IPAddress, RawData
 
 
@@ -67,7 +68,16 @@ class IPReassembler:
     def __init__(self):
         self.queues: Dict[Tuple[RawData, RawData, RawData], Tuple[RawDataQueue, int]] = {}
 
-    def push_frame(self, ip: IPx) -> Optional[RawData]:
+    def push_frame(self, ip: IPx) -> Optional[Frame]:
+        """Push IP frame, get back frame, if possible"""
+        r = self.push(ip)
+        if r is None:
+            return None
+        field = IPv6.Payload if isinstance(ip,IPv6) else IPv4.Payload
+        out = IPv6_Payloads.resolve_payload(ip, field, data=r)
+        return out
+
+    def push(self, ip: IPx) -> Optional[RawData]:
         """Push IP frame, get back reassembled data, if possible"""
         if isinstance(ip, IPv4):
             more = IPv4.Flags[ip] & IPv4Flag.MF
