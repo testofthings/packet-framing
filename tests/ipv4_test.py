@@ -90,6 +90,7 @@ def test_decode_fragments():
     assert UDP.Source_port[data] == 34910
     assert UDP.Destination_port[data] == 6666
     assert UDP.Length[data] == 16392
+    assert UDP.Data[data].byte_length() == 16384
 
     pro = PCAP2Ethernet(Ethernet2IP(IP2UDP()))
     data = None
