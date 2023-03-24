@@ -255,10 +255,8 @@ class DissectorBackend(BackendImplementation):
             data = self.data.subBlockBits(bit_offset, bit_length)
         return data, bit_length
 
-    def set(self, field: Field[F, T], value: T) -> Self:
-        assert field.structure == self.structure, self._bad_field_access(field)
-        self.field_values[field] = value
-        return self
+    # Editing not allowed for dissected stuff
+    # def set(self, field: Field[F, T], value: T) -> Self:
 
     def get_item(self, sequence_field: Field, item_field: Field[F, FT], index: int):
         v = self.field_values.get(sequence_field)
