@@ -121,7 +121,7 @@ class PCAPScanner:
                         TCP: lambda f: self.scan_tcp(eth, ip, f),
                         UDP: lambda f: self.scan_udp(eth, ip, f),
                     }
-                    IPv4.Payload.process_frame(ip, procs)
+                    Frames.process(IPv4.Payload[ip], procs)
 
         finally:
             raw_data.close()
@@ -286,7 +286,7 @@ class PCAPScanner:
                 RDATA.A: lambda r: self.learn_dns_name(name, r.as_ip_address()),
                 RDATA.AAAA: lambda r: self.learn_dns_name(name, r.as_ip_address()),
             }
-            DNSResource.RDATA.process_frame(rd, proc_rd)
+            Frames.process(DNSResource.RDATA[rd], proc_rd)
 
     def learn_dns_name(self, name: str, ip: IPAddress):
         self.dns_names[ip] = name
