@@ -7,6 +7,7 @@ setup(
     author_email="rauli.kaksonen@gmail.com",
     description='Frame parsing for good people',
     long_description='Under construction. Not for production use.',
+    url='https://gitlab.com/CinCan/framing',
     packages=['framing'],
     install_requires=[],
     classifiers=[
