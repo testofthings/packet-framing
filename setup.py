@@ -1,12 +1,12 @@
 from setuptools import setup
 
 setup(
-    name='framing',
-    version='0.0',
+    name='packet-framing',
+    version='0.1',
     author="Rauli Kaksonen",
     author_email="rauli.kaksonen@gmail.com",
     description='Frame parsing for good people',
-    long_description='Under construction',
+    long_description='Under construction. Not for production use.',
     packages=['framing'],
     install_requires=[],
     classifiers=[
