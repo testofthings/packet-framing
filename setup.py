@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='packet-framing',
@@ -8,7 +8,7 @@ setup(
     description='IP-related packet and frame parsing',
     long_description='Under construction. Research code, not for production use.',
     url='https://gitlab.com/CinCan/framing',
-    packages=['framing'],
+    packages=find_packages(),
     install_requires=[],
     classifiers=[
         "Programming Language :: Python :: 3",
