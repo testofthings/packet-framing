@@ -87,7 +87,9 @@ class PCAPScanner:
 
     def scan_pcap_file(self, file: pathlib.Path):
         file_name = file.as_posix()
+        # Use Raw.stream to test/profile stream handling
         raw_data = Raw.file(file)
+        # raw_data = Raw.stream(file.open("rb"), request_size=1 << 20)
         try:
             pcap = PCAPFile(Frames.dissect(raw_data))
             # PCAP_Payloads.add_to(pcap)  # handle link type manually for performance

@@ -453,11 +453,11 @@ class AppendableRawData(RawData):
 
 class StreamData(RawData):
     """Stream data, input stream should be in blocking mode"""
-    def __init__(self, stream: BinaryIO, name: str):
+    def __init__(self, stream: BinaryIO, name: str, request_size=65536):
         self.stream = stream
         self.stream_name = name
         self.buffer = AppendableRawData(Raw.empty)
-        self.request_size = 256
+        self.request_size = request_size
 
     def _read_until(self, to_byte_length: int):
         """Read until given data length or EOF (-1 to read until EOF)"""
@@ -568,5 +568,5 @@ class Raw:
         return FileData(f, file_path)
 
     @classmethod
-    def stream(cls, stream: BinaryIO, name="stream") -> StreamData:
-        return StreamData(stream, name)
+    def stream(cls, stream: BinaryIO, name="stream", request_size=65536) -> StreamData:
+        return StreamData(stream, name, request_size)
