@@ -230,22 +230,29 @@ class RawDataSequence(RawData):
                 if off % 8 == 0 and off + 8 <= c_len:
                     return c.octet(off // 8)
                 # octet must be collected bit-by-bit (slow!)
-                v = 0
-                for i in range(0, 8):
-                    if off >= c_len:
-                        # next component buffer
-                        off = 0
-                        ci += 1
-                        if ci >= len(self.components):
-                            return -1  # run out of data
-                        c = self.components[ci]
-                        c_len = c.bit_length()
-                    v <<= 1
-                    v |= c.bit(off)
-                    off += 1
+                v = self._collect_octet(off, ci)
                 return v
             off -= c_len
         return -1
+
+    def _collect_octet(self, bit_offset: int, index: int) -> int:
+        v = 0
+        c = self.components[index]
+        c_len = c.bit_length()
+        for i in range(0, 8):
+            if bit_offset >= c_len:
+                # next component buffer
+                bit_offset = 0
+                index += 1
+                if index >= len(self.components):
+                    return -1  # run out of data
+                c = self.components[index]
+                c_len = c.bit_length()
+            v <<= 1
+            v |= c.bit(bit_offset)
+            bit_offset += 1
+        return v
+
 
     def bit(self, bit_offset: int) -> int:
         off = bit_offset

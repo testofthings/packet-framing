@@ -227,18 +227,22 @@ class DissectorBackend(BackendImplementation):
     def get(self, field: Field[F, T]) -> T:
         v = self.field_values.get(field)
         if v is None:
-            assert field.structure == self.structure, self._bad_field_access(field)
-            data, d_len = self.get_raw(field)
-            layer_map = self.mappings.get_mappings(field)
-            try:
-                if layer_map:
-                    # override field to decode as payload frame
-                    v = self.decode_as_frame(layer_map, data)
-                else:
-                    v = field.decode(data, d_len, self)
-            except EOFError as e:
-                raise EOFError(f"{field.field_name} {e}")
+            v = self.get_not_cached(field)
             self.field_values[field] = v
+        return v
+
+    def get_not_cached(self, field: Field[F, T]) -> T:
+        assert field.structure == self.structure, self._bad_field_access(field)
+        data, d_len = self.get_raw(field)
+        layer_map = self.mappings.get_mappings(field)
+        try:
+            if layer_map:
+                # override field to decode as payload frame
+                v = self.decode_as_frame(layer_map, data)
+            else:
+                v = field.decode(data, d_len, self)
+        except EOFError as e:
+            raise EOFError(f"{field.field_name} {e}")
         return v
 
     def get_raw(self, field: Field) -> Tuple[RawData, int]:
