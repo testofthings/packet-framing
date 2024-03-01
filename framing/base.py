@@ -56,10 +56,11 @@ class FieldPointer(typing.Generic[F, T]):
 
 class Field(FieldPointer[F, T]):
     """Base class for fields"""
-    def __init__(self, type_name: str, default_value: T):
+    def __init__(self, type_name: str, default_value: T, fixed_bit_offset=-1):
         self.field_name = "field?"
         self.type_name = type_name
         self.default_value = default_value
+        self.fixed_bit_offset = fixed_bit_offset
         self.fixed_bit_length = -1
         self.direct_decode = False
         self.offset = FieldOffset(self)

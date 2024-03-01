@@ -2,7 +2,8 @@ import enum
 from typing import Iterator
 
 from framing.base import *
-from framing.base import Field
+from framing.base import Field, FrameBackend
+from framing.raw_data import RawData
 
 
 class Multiplier(Calculator):
@@ -213,11 +214,10 @@ class ConfigurableField(Field[F, T]):
 
 class RawField(ConfigurableField[F, RawData]):
     """Raw data field"""
-    def __init__(self, default_value: RawData):
-        super().__init__("raw", default_value)
-
-    def fixed_length(self, bit_length: int):
-        self.fixed_bit_length = bit_length
+    def __init__(self, default_value: RawData, fixed_bit_length=-1, fixed_bit_offset=-1):
+        super().__init__("raw", default_value, fixed_bit_offset)
+        self.fixed_bit_length = fixed_bit_length
+        self.direct_decode = self.fixed_bit_offset >= 0 and self.fixed_bit_length >= 0
 
     def get(self, frame: F) -> RawData:
         v = frame.backend.get(self)
@@ -258,6 +258,10 @@ class RawField(ConfigurableField[F, RawData]):
                 return data.subBlockBits(0, bit_length)
             return data  # read it all
         return data.subBlockBits(0, self.fixed_bit_length)
+
+    def decode_direct(self, frame_data: RawData, backend: FrameBackend) -> RawData:
+        v = frame_data.subBlockBits(self.fixed_bit_offset, self.fixed_bit_length)
+        return v
 
 
 class IntField(ConfigurableField[F, int], Calculator, CalculatorSource):
@@ -611,12 +615,13 @@ class Structure(FrameStructure[F]):
             name: str = None) -> RawField[F]:
         fn = self._get_a_name(name)
         default = default if default else Raw.zeroes(bit_length=bits, byte_length=bytes)
-        f: RawField[F] = RawField(default)
-        f.structure = self
+        fix_len = -1
         if bits is not None:
-            f.fixed_length(bits)
+            fix_len = bits
         if bytes is not None:
-            f.fixed_length(bytes * 8)
+            fix_len = bytes * 8
+        f: RawField[F] = RawField(default, fix_len, self.fields_fixed_bit_offset)
+        f.structure = self
         self.fields[fn] = f
         self._update_fixed_length(f)
         return f
