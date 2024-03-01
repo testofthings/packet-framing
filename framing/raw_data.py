@@ -207,13 +207,7 @@ class ByteData(RawData):
 
 class RawDataSequence(RawData):
     def __init__(self, components: List[RawData]):
-        cs = []
-        for c in components:
-            if isinstance(c, RawDataSequence):
-                cs.extend(c.components)
-            elif c.bit_length() > 0:
-                cs.append(c)
-        self.components = cs
+        self.components = components
         self.length = sum([c.bit_length() for c in components])
 
     def bit_length(self) -> int:
@@ -562,7 +556,12 @@ class Raw:
 
     @classmethod
     def sequence(cls, components: Iterable[RawData]) -> RawData:
-        cs = list(components)
+        cs = []
+        for c in components:
+            if isinstance(c, RawDataSequence):
+                cs.extend(c.components)
+            elif c.bit_length() > 0:
+                cs.append(c)
         if not cs:
             return cls.empty
         if len(cs) == 1:
