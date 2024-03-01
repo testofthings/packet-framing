@@ -1,5 +1,5 @@
 from types import UnionType
-from typing import Tuple, Dict, Optional
+from typing import Tuple, Dict, Optional, Union
 
 from framing.base import Frame, LayerMapping
 from framing.data_queue import RawDataQueue
@@ -51,7 +51,7 @@ class Fragment(Frame):
 
 
 # Either IPv4 or IPv6
-IPx: UnionType = IPv4 | IPv6
+IPx = Union[IPv4 | IPv6]
 
 
 IPv6_Payloads = LayerMapping(base=IP_Payloads).many_by({
