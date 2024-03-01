@@ -61,6 +61,7 @@ class Field(FieldPointer[F, T]):
         self.type_name = type_name
         self.default_value = default_value
         self.fixed_bit_length = -1
+        self.direct_decode = False
         self.offset = FieldOffset(self)
         self.structure: Optional['Sturcture'] = None  # set by structure herself
         self.end_offset_resolver: Optional[Calculator] = None
@@ -134,6 +135,10 @@ class Field(FieldPointer[F, T]):
 
     def decode(self, data: RawData, bit_length: int, backend: 'FrameBackend') -> T:
         """Decode value. Bit length is provided if it is resolved earlier and available"""
+        raise NotImplementedError()
+
+    def decode_direct(self, frame_data: RawData, backend: 'FrameBackend') -> T:
+        """Decode value directly from frame data. Called when direct decode is true"""
         raise NotImplementedError()
 
 
@@ -240,6 +245,7 @@ class FrameStructure(typing.Generic[F]):
         self.structure_name = "Unnamed"
         self.is_selection = False
         self.fields: typing.Dict[str, Field] = {}
+        self.fields_fixed_bit_offset = 0
         self.fields_length = FieldOffset()
         self.commit_procedures: List[typing.Tuple[Optional[Field], Callable[[F], None]]] = []
         self.built = False

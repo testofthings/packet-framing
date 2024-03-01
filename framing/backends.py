@@ -233,8 +233,11 @@ class DissectorBackend(BackendImplementation):
 
     def get_not_cached(self, field: Field[F, T]) -> T:
         assert field.structure == self.structure, self._bad_field_access(field)
-        data, d_len = self.get_raw(field)
         layer_map = self.mappings.get_mappings(field)
+        if not layer_map and field.direct_decode:
+            v = field.decode_direct(self.data, self)  # quick (hopefully)
+            return v
+        data, d_len = self.get_raw(field)
         try:
             if layer_map:
                 # override field to decode as payload frame

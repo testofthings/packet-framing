@@ -55,6 +55,10 @@ class IntegerCodec(ValueCodec[int]):
     def default_value(self) -> int:
         return 0
 
+    def decode_direct(self, bit_offset: int, data: RawData) -> int:
+        """Decode directly from frame data. Caller must know when supported"""
+        return self.decode(data.tailBits(bit_offset))
+
 
 class FixedByteIntegerCodec(IntegerCodec):
     def __init__(self, byte_length: int, little_end=False):

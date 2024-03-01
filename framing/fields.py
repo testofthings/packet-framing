@@ -2,6 +2,7 @@ import enum
 from typing import Iterator
 
 from framing.base import *
+from framing.base import Field
 
 
 class Multiplier(Calculator):
@@ -261,10 +262,14 @@ class RawField(ConfigurableField[F, RawData]):
 
 class IntField(ConfigurableField[F, int], Calculator, CalculatorSource):
     """Integer field"""
-    def __init__(self, codec: IntegerCodec, default_value: int):
+    def __init__(self, codec: IntegerCodec, default_value: int, fixed_bit_offset: int):
         super().__init__("int", default_value)
         self.codec = codec
         self.fixed_bit_length = codec.get_fixed_bit_length()
+        self.fixed_bit_offset = fixed_bit_offset
+        if fixed_bit_offset >= 0 and self.fixed_bit_length >= 0:
+            # fixed integer in fixed offset - fast value decode from frame data
+            self.direct_decode = True
 
     def flag_values(self, definition: Type[enum.IntFlag]) -> Self:
         return self
@@ -282,7 +287,12 @@ class IntField(ConfigurableField[F, int], Calculator, CalculatorSource):
         return super().decode_bit_length(data, bit_offset, None, backend)
 
     def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> int:
-        return self.codec.decode(data)
+        v = self.codec.decode(data)
+        return v
+
+    def decode_direct(self, frame_data: RawData, backend: FrameBackend) -> int:
+        v = self.codec.decode_direct(self.fixed_bit_offset, frame_data)
+        return v
 
     def calculator(self) -> Calculator:
         return self
@@ -583,10 +593,18 @@ class Sequence(ConfigurableField[F, List[FT]]):
 class Structure(FrameStructure[F]):
     """Frame structure definition"""
 
+    def _update_fixed_length(self, field: Field):
+        """Update fixed length or reset it to -1"""
+        if self.fields_fixed_bit_offset < 0 or field.fixed_bit_length < 0:
+            self.fields_fixed_bit_offset = -1
+        else:
+            self.fields_fixed_bit_offset += field.fixed_bit_length
+
     def field(self, field: Field, name: str = None) -> Field:
         fn = self._get_a_name(name)
         field.structure = self
         self.fields[fn] = field
+        self._update_fixed_length(field)
         return field
 
     def raw(self, bits: int = None, bytes: int = None, default: RawData = Raw.empty,
@@ -600,6 +618,7 @@ class Structure(FrameStructure[F]):
         if bytes is not None:
             f.fixed_length(bytes * 8)
         self.fields[fn] = f
+        self._update_fixed_length(f)
         return f
 
     def integer(self, int_format=IntegerFormat(), bytes=-1, bits=-1,
@@ -610,9 +629,10 @@ class Structure(FrameStructure[F]):
         if bits > 0:
             int_format = int_format.bits(bits)
         codec = int_format.create_codec()
-        f = IntField(codec, default)
+        f = IntField(codec, default, fixed_bit_offset=self.fields_fixed_bit_offset)
         f.structure = self
         self.fields[fn] = f
+        self._update_fixed_length(f)
         return f
 
     def sub(self, sub_frame: Type[FT], name: str = None) -> SubStructureField[F, FT]:
@@ -620,6 +640,7 @@ class Structure(FrameStructure[F]):
         f = SubStructureField(sub_frame)
         f.structure = self
         self.fields[fn] = f
+        self._update_fixed_length(f)
         return f
 
     def at_commit(self, update: Callable[[F], None]):
@@ -633,6 +654,9 @@ class Selection(Structure[F]):
         self.is_selection = True
         self.choice_map: Dict[Any, ConfigurableField] = {}
         self.reverse_map: Dict[Structure, Any] = {}
+
+    def _update_fixed_length(self, field: Field):
+        self.fields_fixed_bit_offset = 0  # all choices start from offset 0
 
     def choice(self, key, value: ConfigurableField[F, T]) -> ConfigurableField[F, T]:
         if key in self.choice_map or value in self.reverse_map:
