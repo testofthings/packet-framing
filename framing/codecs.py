@@ -80,14 +80,20 @@ class FixedByteIntegerCodec(IntegerCodec):
 
     def decode(self, data: RawData) -> int:
         v = 0
-        d = 0
+        octet = 0
         for i in self.reverse:
             v <<= 8
-            d = data.octet(i)
-            v |= d
-        if d < 0:
+            octet = data.octet(i)
+            v |= octet
+        if octet < 0:
             raise EOFError()  # only check the last part to minimize impact
         return v
+
+    def decode_direct(self, bit_offset: int, data: RawData) -> int:
+        b_off = bit_offset % 8
+        if b_off == 0:
+            return self.decode(data.tailBytes(bit_offset // 8))
+        raise NotImplementedError()
 
     def get_bit_length(self, value: int) -> int:
         return self.length * 8
@@ -115,6 +121,24 @@ class FixedBitIntegerCodec(IntegerCodec):
         else:
             b = data + Raw.zeroes(bit_length=8 - self.length % 8)
         return self.byte_codec.decode(b)
+
+    def decode_direct(self, bit_offset: int, data: RawData) -> int:
+        octet_off = bit_offset // 8
+        l_mask = 0xff >> (8 - bit_offset % 8)
+        octet = data.octet(octet_off)
+        v = octet & l_mask if l_mask else octet
+        for i in range(0, self.length // 8):
+            v <<= 8
+            octet = data.octet(octet_off + 1 + i)
+            v |= octet
+        if octet < 0:
+            raise EOFError()  # only check the last part to minimize impact
+        r_shift = 8 - ((bit_offset + self.length) % 8)
+        v = v >> r_shift if r_shift < 8 else v
+        if not self.byte_codec.little_end:
+            # big endian
+            raise NotImplementedError()
+        return v
 
     def get_bit_length(self, value: int) -> int:
         return self.length
