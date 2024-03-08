@@ -296,7 +296,11 @@ class RawDataSequence(RawData):
             if off < c_len:
                 nc = [c.tailBits(off)]
                 nc.extend(self.components[i + 1:])
-                return Raw.sequence(nc)
+                # do not call Raw.sequence(), these components already optimized
+                if len(nc) == 1:
+                    return nc[0]
+                return RawDataSequence(nc)
+                # return Raw.sequence(nc)
             off -= c_len
         return Raw.empty
 
