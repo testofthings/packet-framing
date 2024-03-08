@@ -325,36 +325,36 @@ class DissectorBackend(BackendImplementation):
             return v.__iter__()  # already value in memory (we do not store it here)
 
         backend = self
-        data = self.data
 
         class ItemIterator(Iterator[FT]):
-            def __init__(self, offset: int, count: int):
-                self.offset = offset
+            def __init__(self, window: RawData, count: int):
+                self.window = window  # sliding to avoid starting from first sub-block each time
                 self.count = count
                 self.items = 0
                 self.previous = None
 
             def __next__(self) -> Optional[FT]:
                 if 0 <= count <= self.items:
-                    raise StopIteration()
+                    raise StopIteration()  # hit max. count
 
                 if self.previous is not None:
-                    v_len = item_field.decode_bit_length(data, self.offset, self.previous, backend)
-                    self.offset += v_len
+                    # move buffer to next item
+                    v_len = item_field.decode_bit_length(self.window, 0, self.previous, backend)
+                    self.window = self.window.tailBits(v_len)
 
-                n_data = data.tailBits(self.offset)
-                if n_data.octet(0) < 0:
+                if self.window.octet(0) < 0:
                     self.count = self.items
                     raise StopIteration()
-                v = item_field.decode(n_data, -1, backend)
+                v = item_field.decode(self.window, -1, backend)
                 self.items += 1
                 self.previous = v
                 if terminator is not None and terminator(v):
-                    self.count = self.items
+                    self.count = self.items  # hit terminator
                 return v
 
         off = self.get_bit_offset(sequence_field.offset)
-        return ItemIterator(off, count)
+        window = self.data.tailBits(off)
+        return ItemIterator(window, count)
 
     def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type[F]] = None,
                      default_frame=False) -> Optional[Frame]:
