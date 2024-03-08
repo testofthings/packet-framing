@@ -302,7 +302,14 @@ class IntField(ConfigurableField[F, int], Calculator, CalculatorSource):
         return self
 
     def pull(self, backend: FrameBackend) -> float:
-        return backend.get(self)
+        # NOTE: Looks like marginal/non-existent improvement
+        # if self.direct_decode and backend.is_decoder:
+        #     # take the shortcut, we are decoding, thus raw data should be available
+        #     raw = backend.input_data()
+        #     r = self.codec.decode_direct(self.fixed_bit_offset, raw)
+        # else:
+        r = backend.get(self)
+        return r
 
     def push(self, backend: FrameBackend, value: float) -> float:
         backend.set(self, int(value))
