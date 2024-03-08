@@ -82,14 +82,17 @@ class FixedByteIntegerCodec(IntegerCodec):
         return self.decode_direct(0, data)
 
     def decode_direct(self, bit_offset: int, data: RawData) -> int:
-        if bit_offset % 8 != 0:
-            raise NotImplementedError()
-        offset = bit_offset // 8
+        if bit_offset % 8 == 0:
+            d = data
+            offset = bit_offset // 8
+        else:
+            d = data.tailBits(bit_offset)
+            offset = 0
         v = 0
         octet = 0
         for i in self.reverse:
             v <<= 8
-            octet = data.octet(offset + i)
+            octet = d.octet(offset + i)
             v |= octet
         if octet < 0:
             raise EOFError()  # only check the last part to minimize impact

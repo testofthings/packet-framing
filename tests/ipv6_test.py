@@ -14,6 +14,7 @@ def test_decode_ip():
     ip = IPv6(Frames.dissect(raw_ip, mappings=IPv6_Payloads))
 
     assert IPv6.Version[ip] == 6
+    assert IPv6.Traffic_class[ip] == 0
     assert str(IPv6.Source_address[ip].as_ip_address()) == "fe80::9400:1ff:fe98:e866"
     assert str(IPv6.Destination_address[ip].as_ip_address()) == "ff02::1:ff00:1"
     assert IPv6.Payload[ip].byte_length() == 32
