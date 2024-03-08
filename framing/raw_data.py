@@ -262,7 +262,6 @@ class RawDataSequence(RawData):
         if bit_offset == 0 and bit_length == self.bit_length():
             return self
         off = 0
-        end_offset = min(bit_offset + bit_length, self.bit_length())
         nc = []
         got = 0
         for c in self.components:
