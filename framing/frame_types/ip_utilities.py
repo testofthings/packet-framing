@@ -16,6 +16,7 @@ class IPUtility:
         return IPv6.Source_address[ip], IPv6.Destination_address[ip]
 
 
+# FIXME: IP reassembly is not implemented
 class TCPReassembler:
     """TCP reassembler"""
     def __init__(self, full_streams=False):

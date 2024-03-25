@@ -4,7 +4,7 @@ from typing import Optional, Tuple, List
 from framing.base import T
 from framing.frame_types.ethernet_frames import EthernetII
 from framing.frame_types.ipv4_frames import IPv4
-from framing.frame_types.ipv6_frames import IPReassembler
+from framing.frame_types.ipv6_frames import IPReassembler, IPv6, IPx
 from framing.frame_types.pcap_frames import PacketRecord
 from framing.frame_types.tcp_frames import TCP
 from framing.frame_types.udp_frames import UDP
@@ -37,7 +37,8 @@ class PCAP2Ethernet(Processor[PacketRecord, T]):
         self.sub = NoProcessor() if sub is None else sub
 
     def push(self, value: PacketRecord) -> Optional[T]:
-        return self.sub.push(PacketRecord.Packet_Data.as_frame(value, frame_type=EthernetII))
+        fr = PacketRecord.Packet_Data.as_frame(value, frame_type=EthernetII)
+        return self.sub.push(fr)
 
 
 class Ethernet2IP(Processor[EthernetII, T]):
@@ -46,29 +47,41 @@ class Ethernet2IP(Processor[EthernetII, T]):
 
     def push(self, value: EthernetII) -> Optional[T]:
         p = EthernetII.data.as_frame(value, default_frame=False)
-        if isinstance(p, IPv4):
+        if isinstance(p, IPx):
             return self.sub.push(p)
         return None
 
 
-class IP2UDP(Processor[IPv4, T]):
+class IP2UDP(Processor[IPx, T]):
     def __init__(self, sub: Optional[Processor[UDP, T]] = None):
         self.sub = NoProcessor() if sub is None else sub
         self.assembler = IPReassembler()
 
     def push(self, value: IPv4) -> Optional[T]:
-        if IPv4.Protocol[value] == 0x11:
-            raw = self.assembler.push(value)
-            if raw:
-                return UDP(Frames.dissect(raw))
+        if isinstance(value, IPv4):
+            if IPv4.Protocol[value] == 0x11:
+                raw = self.assembler.push(value)
+                if raw:
+                    return UDP(Frames.dissect(raw))
+        elif isinstance(value, IPv6):
+            if IPv6.Next_header[value] == 0x11:
+                raw = self.assembler.push(value)
+                if raw:
+                    return UDP(Frames.dissect(raw))
         return None
 
 
-class IP2TCP(Processor[IPv4, T]):
-    def __init__(self, sub: Optional[Processor[Tuple[TCP, IPv4], T]] = None):
+class IP2TCP(Processor[IPx, T]):
+    def __init__(self, sub: Optional[Processor[Tuple[TCP, IPx], T]] = None):
         self.sub = NoProcessor() if sub is None else sub
 
     def push(self, value: IPv4) -> Optional[T]:
-        if IPv4.Protocol[value] == 0x6:
-            return self.sub.push(IPv4.Payload.as_frame(value, frame_type=TCP)), value
+        if isinstance(value, IPv4):
+            if IPv4.Protocol[value] == 0x6:
+                fr = IPv4.Payload.as_frame(value, frame_type=TCP)
+                return self.sub.push(fr), value
+        elif isinstance(value, IPv6):
+            if IPv6.Next_header[value] == 0x6:
+                fr = IPv6.Payload.as_frame(value, frame_type=TCP)
+                return self.sub.push(fr), value
         return None

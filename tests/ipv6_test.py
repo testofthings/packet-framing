@@ -1,9 +1,11 @@
 import pathlib
 
+from framing.frame_processors import IP2TCP, Ethernet2IP, PCAP2Ethernet
 from framing.frame_types.ethernet_frames import EthernetII, Ethernet_Payloads
+from framing.frame_types.ip_utilities import TCPReassembler
 from framing.frame_types.ipv6_frames import IPv6, IPv6_Payloads, ICMPv6, Fragment
-from framing.frame_types.pcap_frames import PCAPFile, PacketRecord, PCAP_Payloads
-from framing.frame_types.tcp_frames import TCP
+from framing.frame_types.pcap_frames import PCAPFile, PCAPRecordIterator, PacketRecord, PCAP_Payloads
+from framing.frame_types.tcp_frames import TCP, TCPDataQueue, TCPFlag
 from framing.frame_types.udp_frames import UDP
 from framing.frames import Frames
 from framing.raw_data import Raw
@@ -38,12 +40,12 @@ def test_decode_headers():
     # NOTE: UDP is split into 12 fragments!
 
 
-def test_decode_ip_tcp():
-        pcap = PCAPFile.open_file(pathlib.Path("samples/tls13-over-ipv6.pcap"),
-                                  mappings=PCAP_Payloads + Ethernet_Payloads + IPv6_Payloads)
-        fr0 = PCAPFile.Packet_Records.item(pcap, 0) / PacketRecord.Packet_Data / EthernetII.data
-        assert IPv6.Source_address[fr0] == Raw.hex("2a 00 1d 50 00 03 00 00 ac 3a 30 a5 20 41 35 44")
-        assert IPv6.Destination_address[fr0] == Raw.hex("2a 04 fa 87 ff fe 00 00 00 00 00 00 c0 00 49 02")
-        assert IPv6.Payload_length[fr0] == 40
-        pl0 = IPv6.Payload.as_frame(fr0)
-        assert TCP.Checksum[pl0] == Raw.hex("692a")
+def test_decode_ip6_tcp():
+    pcap = PCAPFile.open_file(pathlib.Path("samples/tls13-over-ipv6.pcap"),
+                                mappings=PCAP_Payloads + Ethernet_Payloads + IPv6_Payloads)
+    fr0 = PCAPFile.Packet_Records.item(pcap, 0) / PacketRecord.Packet_Data / EthernetII.data
+    assert IPv6.Source_address[fr0] == Raw.hex("2a 00 1d 50 00 03 00 00 ac 3a 30 a5 20 41 35 44")
+    assert IPv6.Destination_address[fr0] == Raw.hex("2a 04 fa 87 ff fe 00 00 00 00 00 00 c0 00 49 02")
+    assert IPv6.Payload_length[fr0] == 40
+    pl0 = IPv6.Payload.as_frame(fr0)
+    assert TCP.Checksum[pl0] == Raw.hex("692a")

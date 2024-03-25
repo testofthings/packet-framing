@@ -572,6 +572,10 @@ class Raw:
         return RawDataSequence(cs)
 
     @classmethod
+    def concat(cls, *components: RawData) -> RawData:
+        return cls.sequence(components)
+
+    @classmethod
     def file(cls, file_path: pathlib.Path) -> FileData:
         f = file_path.open("rb")
         return FileData(f, file_path)

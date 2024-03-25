@@ -1,5 +1,5 @@
 import enum
-from typing import Tuple, Optional
+from typing import Dict, Tuple, Optional
 
 from framing.base import Frame
 from framing.codecs import IntegerFormat
@@ -51,7 +51,6 @@ TCP.Flags.flag_values(TCPFlag)
 TCP_Stream_Id = Tuple[RawData, int, RawData, int]
 
 
-# FIXME: Replace by similar class then IPv4Reassembler!
 class TCPDataQueue(RawDataQueue):
     """TCP data queue, one connection to one direction"""
     def __init__(self, start: TCP):
