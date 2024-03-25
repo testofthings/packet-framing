@@ -20,7 +20,7 @@ class IPv6(Frame):
     Source_address = structure.raw(bytes=16)
     Destination_address = structure.raw(bytes=16)
 
-    Payload = structure.raw().end_offset_by(ValueOf(Payload_length))
+    Payload = structure.raw().length_by(ValueOf(Payload_length))
 
     def get_addresses(self) -> Tuple[IPAddress, IPAddress]:
         """Quick access to source and destination address"""
