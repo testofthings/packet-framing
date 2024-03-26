@@ -18,7 +18,7 @@ class IPUtility:
 
 # FIXME: IP reassembly is not implemented
 class TCPReassembler:
-    """TCP reassembler"""
+    """TCP reassembler, push TCP frames, get raw data back"""
     def __init__(self, full_streams=False):
         self.queues: Dict[TCP_Stream_Id, TCPDataQueue] = {}
         self.full_stream = full_streams

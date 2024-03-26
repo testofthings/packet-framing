@@ -64,7 +64,7 @@ IPv6_Payloads = LayerMapping(base=IP_Payloads).many_by({
 
 
 class IPReassembler:
-    """IP reassembler"""
+    """IPx reassembler"""
     def __init__(self):
         self.queues: Dict[Tuple[RawData, RawData, RawData], Tuple[RawDataQueue, int]] = {}
 
