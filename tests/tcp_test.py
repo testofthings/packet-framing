@@ -78,10 +78,8 @@ def test_decode_ip6_tcp_payload():
         tcp_ip = pro.push(pcap_r)
         if not tcp_ip:
             continue
-        raw = asm.push(tcp_ip)
+        k, raw = asm.push(tcp_ip)
         if raw:
-            tcp, ip = tcp_ip
-            k = ip.get_addresses(), tcp.get_ports()
             old = streams.get(k, Raw.empty)
             streams[k] = Raw.concat(old, raw)
 

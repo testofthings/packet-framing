@@ -16,14 +16,13 @@ class IPUtility:
         return IPv6.Source_address[ip], IPv6.Destination_address[ip]
 
 
-# FIXME: IP reassembly is not implemented
 class TCPReassembler:
     """TCP reassembler, push TCP frames, get raw data back"""
     def __init__(self, full_streams=False):
         self.queues: Dict[TCP_Stream_Id, TCPDataQueue] = {}
         self.full_stream = full_streams
 
-    def push(self, packets: Tuple[TCP, IPx]) -> Optional[RawData]:
+    def push(self, packets: Tuple[TCP, IPx]) -> Tuple[TCP_Stream_Id, Optional[RawData]]:
         """Push TCP frame, get back raw data, if possible"""
         tcp, ip = packets
         flags = TCP.Flags[tcp]
@@ -37,13 +36,13 @@ class TCPReassembler:
         else:
             queue = self.queues.get(key)
             if not queue:
-                return None  # no start seen
+                return key, None  # no start seen
 
         queue.push_frame(tcp)
         if queue.is_closed():
             del self.queues[key]
-            return queue.pull_all()
+            return key, queue.pull_all()
         if self.full_stream:
-            return None
+            return key, None
         data = queue.pull_all()
-        return data
+        return key, data

@@ -133,7 +133,7 @@ def test_dns_tcp():
         tcp_ip = pro.push(pcap_r)
         if not tcp_ip:
             continue
-        raw = asm.push(tcp_ip)
+        _, raw = asm.push(tcp_ip)
         if raw:
             dns.append(DNSMessageTCP(Frames.dissect(raw)))
 
