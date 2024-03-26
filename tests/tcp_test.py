@@ -1,7 +1,7 @@
 import ipaddress
 import pathlib
 
-from framing.frame_processors import IP2TCP, PCAP2Ethernet, Ethernet2IP
+from framing.frame_processors import IP2TCP, PCAP2Ethernet, Ethernet2IP, ProcessorIterator
 from framing.frame_types.ethernet_frames import Ethernet_Payloads, EthernetII
 from framing.frame_types.ip_utilities import IP2TCPStream, TCPReassembler
 from framing.frame_types.ipv4_frames import IPv4, IP_Payloads
@@ -72,13 +72,11 @@ def test_decode_ip6_tcp_payload():
                               mappings=PCAP_Payloads + Ethernet_Payloads + IPv6_Payloads)
 
     pro = PCAP2Ethernet(Ethernet2IP(IP2TCPStream()))
+    iter = ProcessorIterator(PCAPRecordIterator(pcap), pro)
     streams = {}
-    for pcap_r in PCAPRecordIterator(pcap):
-        k_raw = pro.push(pcap_r)
-        if k_raw:
-            k, raw = k_raw
-            old = streams.get(k, Raw.empty)
-            streams[k] = Raw.concat(old, raw)
+    for k, raw in iter:
+        old = streams.get(k, Raw.empty)
+        streams[k] = Raw.concat(old, raw)
 
     assert len(streams) == 2
     client_s, server_s = list(streams.values())

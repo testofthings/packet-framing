@@ -1,11 +1,11 @@
-from typing import Dict, Tuple, Optional
+from typing import Dict, Iterator, Self, Tuple, Optional
 
 from framing.data_queue import RawDataQueue
 from framing.frame_processors import Processor
 from framing.frame_types.ipv4_frames import IPv4
 from framing.frame_types.ipv6_frames import IPReassembler, IPx, IPv6
 from framing.frame_types.tcp_frames import TCP_Null_Stream_Id, TCP_Stream_Id, TCP, TCPFlag, TCPDataQueue
-from framing.raw_data import RawData
+from framing.raw_data import Raw, RawData
 
 
 # Utility functions
@@ -74,3 +74,24 @@ class IP2TCPStream(Processor[IPx, Tuple[TCP_Stream_Id, RawData]]):
         if data is None:
             return None
         return key, data
+
+
+class TCPDataTable:
+    """Store TCP data by stream id"""
+    def __init__(self) -> None:
+        self.data: Dict[TCP_Stream_Id, RawData] = {}
+
+    def push(self, data: Optional[Tuple[TCP_Stream_Id, RawData]]) -> Optional[Tuple[TCP_Stream_Id, RawData]]:
+        """Push pair of stream key and data"""
+        if data is None:
+            return None
+        key, d = data
+        old = self.data.get(key, Raw.empty)
+        self.data[key] = Raw.concat(old, d)
+        return data
+
+    def push_all(self, streams: Iterator[Tuple[TCP_Stream_Id, RawData]]) -> Self:
+        """Push all stream data"""
+        for data in streams:
+            self.push(data)
+        return self

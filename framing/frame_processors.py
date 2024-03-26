@@ -1,5 +1,5 @@
 import typing
-from typing import Optional, Tuple, List
+from typing import Generic, Iterator, Optional, Tuple, List
 
 from framing.base import T
 from framing.frame_types.ethernet_frames import EthernetII
@@ -91,3 +91,20 @@ class IP2TCP(Processor[IPx, T]):
         if not tcp:
             return None
         return self.sub.push(tcp), value
+
+
+class ProcessorIterator(Generic[S, T], Iterator[T]):
+    """Iterator which processes data from source iterator"""
+    def __init__(self, source: Iterator[S], processor: Processor[S, T]):
+        self.source = source
+        self.processor = processor
+
+    def __next__(self) -> T:
+        while True:
+            s = self.source.__next__()
+            t = self.processor.push(s)
+            if t:
+                return t
+
+    def __iter__(self) -> typing.Iterator[T]:
+        return self
