@@ -412,6 +412,11 @@ class AppendableRawData(RawData):
         self.fixed = Raw.sequence([self.fixed, data])
         return self
 
+    def forward(self, byte_length: int) -> 'AppedableRawData':
+        r = AppendableRawData(self.fixed.tailBytes(byte_length))
+        r.closed = self.closed
+        return r
+
     def bit_length(self) -> int:
         return self.fixed.bit_length() if self.closed else -1
 
@@ -437,12 +442,10 @@ class AppendableRawData(RawData):
         return self.fixed.subBlock(byte_offset, byte_length)
 
     def tailBits(self, bit_offset: int) -> 'RawData':
-        f = self.fixed.tailBits(bit_offset)
-        return f if self.closed else AppendableRawData(f)
+        return self.fixed.tailBits(bit_offset)
 
     def tailBytes(self, byte_offset: int) -> 'RawData':
-        f = self.fixed.tailBytes(byte_offset)
-        return f if self.closed else AppendableRawData(f)
+        return self.fixed.tailBytes(byte_offset)
 
     def close(self) -> 'RawData':
         self.closed = True

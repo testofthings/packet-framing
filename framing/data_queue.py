@@ -47,7 +47,7 @@ class RawDataQueue:
     def forward(self, length) -> Self:
         """Forward offset from beginning of the queue"""
         assert length <= self.head.fixed.byte_length(), "Forwarding queue too fast"
-        self.head = self.head.tailBytes(length)
+        self.head = self.head.forward(length)
         new_offset = (self.offset + length) % self.modulus
         offset_d = new_offset - self.offset
         for i, f in enumerate(self.fragments):
