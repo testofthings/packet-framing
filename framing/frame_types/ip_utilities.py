@@ -23,8 +23,8 @@ class TCPReassembler:
         self.queues: Dict[TCP_Stream_Id, TCPDataQueue] = {}
         self.full_stream = full_streams
 
-    def push(self, packets: Tuple[TCP, IPx]) -> Tuple[TCP_Stream_Id, Optional[RawData]]:
-        """Push TCP frame, get back raw data, if possible"""
+    def push_queue(self, packets: Optional[Tuple[TCP, IPx]]) -> Tuple[TCP_Stream_Id, Optional[RawDataQueue]]:
+        """Push TCP frame, get back raw data queue"""
         if packets is None:
             return TCP_Null_Stream_Id, None
         tcp, ip = packets
@@ -41,9 +41,17 @@ class TCPReassembler:
             if not queue:
                 return key, None  # no start seen
 
-        queue.push_frame(tcp)
         if queue.is_closed():
-            del self.queues[key]
+            del self.queues[key]  # remove closed
+        queue.push_frame(tcp)
+        return key, queue
+
+    def push(self, packets: Optional[Tuple[TCP, IPx]]) -> Tuple[TCP_Stream_Id, Optional[RawData]]:
+        """Push TCP frame, get back raw data, if more available"""
+        key, queue = self.push_queue(packets)
+        if not queue:
+            return key, None  # no queue
+        if queue.is_closed():
             return key, queue.pull_all()
         if self.full_stream:
             return key, None
