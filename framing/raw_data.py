@@ -457,6 +457,9 @@ class AppendableRawData(RawData):
     def __eq__(self, other):
         return self.fixed == other
 
+    def __bool__(self):
+        return self.fixed.bit_length() > 0
+
 
 class StreamData(RawData):
     """Stream data, input stream should be in blocking mode"""
