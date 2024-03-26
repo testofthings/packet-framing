@@ -3,7 +3,7 @@ import pathlib
 
 from framing.frame_processors import IP2TCP, PCAP2Ethernet, Ethernet2IP
 from framing.frame_types.ethernet_frames import Ethernet_Payloads, EthernetII
-from framing.frame_types.ip_utilities import TCPReassembler
+from framing.frame_types.ip_utilities import IP2TCPStream, TCPReassembler
 from framing.frame_types.ipv4_frames import IPv4, IP_Payloads
 from framing.frame_types.ipv6_frames import IPv6_Payloads
 from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads, PacketRecord, PCAPRecordIterator
@@ -71,15 +71,12 @@ def test_decode_ip6_tcp_payload():
     pcap = PCAPFile.open_file(pathlib.Path("samples/tls13-over-ipv6.pcap"),
                               mappings=PCAP_Payloads + Ethernet_Payloads + IPv6_Payloads)
 
-    pro = PCAP2Ethernet(Ethernet2IP(IP2TCP()))
-    asm = TCPReassembler()
+    pro = PCAP2Ethernet(Ethernet2IP(IP2TCPStream()))
     streams = {}
     for pcap_r in PCAPRecordIterator(pcap):
-        tcp_ip = pro.push(pcap_r)
-        if not tcp_ip:
-            continue
-        k, raw = asm.push(tcp_ip)
-        if raw:
+        k_raw = pro.push(pcap_r)
+        if k_raw:
+            k, raw = k_raw
             old = streams.get(k, Raw.empty)
             streams[k] = Raw.concat(old, raw)
 

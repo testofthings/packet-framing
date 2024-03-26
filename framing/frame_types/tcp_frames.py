@@ -5,7 +5,7 @@ from framing.base import Frame
 from framing.codecs import IntegerFormat
 from framing.data_queue import RawDataQueue
 from framing.fields import Structure, ValueOf
-from framing.raw_data import RawData
+from framing.raw_data import Raw, RawData
 
 
 # https://www.ietf.org/rfc/rfc793.txt
@@ -47,9 +47,10 @@ class TCPFlag(enum.IntFlag):
 
 TCP.Flags.flag_values(TCPFlag)
 
-# source IP address, source port, destination IP address, destination port
+# TCP stream id: source IP address, source port, destination IP address, destination port
 TCP_Stream_Id = Tuple[RawData, int, RawData, int]
-
+# Null TCP stream id
+TCP_Null_Stream_Id = Tuple[Raw.empty, 0, Raw.empty, 0]
 
 class TCPDataQueue(RawDataQueue):
     """TCP data queue, one connection to one direction"""
