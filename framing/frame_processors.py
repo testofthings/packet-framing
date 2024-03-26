@@ -60,28 +60,34 @@ class IP2UDP(Processor[IPx, T]):
     def push(self, value: IPv4) -> Optional[T]:
         if isinstance(value, IPv4):
             if IPv4.Protocol[value] == 0x11:
-                raw = self.assembler.push(value)
-                if raw:
-                    return UDP(Frames.dissect(raw))
+                udp = self.assembler.push_frame(value)
         elif isinstance(value, IPv6):
             if IPv6.Next_header[value] == 0x11:
-                raw = self.assembler.push(value)
-                if raw:
-                    return UDP(Frames.dissect(raw))
-        return None
+                udp = self.assembler.push_frame(value)
+        else:
+            return None
+        if not udp:
+            return
+        return self.sub.push(udp), value
 
 
 class IP2TCP(Processor[IPx, T]):
+    """Extract TCP frames from IPx frames with IP reassembly"""
     def __init__(self, sub: Optional[Processor[Tuple[TCP, IPx], T]] = None):
         self.sub = NoProcessor() if sub is None else sub
+        self.reassemble = IPReassembler()
 
-    def push(self, value: IPv4) -> Optional[T]:
+    def push(self, value: IPx) -> Optional[T]:
         if isinstance(value, IPv4):
-            if IPv4.Protocol[value] == 0x6:
-                fr = IPv4.Payload.as_frame(value, frame_type=TCP)
-                return self.sub.push(fr), value
+            if IPv4.Protocol[value] != 0x6:
+                return None
+            tcp = self.reassemble.push_frame(value)
         elif isinstance(value, IPv6):
-            if IPv6.Next_header[value] == 0x6:
-                fr = IPv6.Payload.as_frame(value, frame_type=TCP)
-                return self.sub.push(fr), value
-        return None
+            if IPv6.Next_header[value] != 0x6:
+                return None
+            tcp = self.reassemble.push_frame(value)
+        else:
+            return None
+        if not tcp:
+            return None
+        return self.sub.push(tcp), value

@@ -2,7 +2,7 @@ from typing import Dict, Tuple, Optional
 
 from framing.data_queue import RawDataQueue
 from framing.frame_types.ipv4_frames import IPv4
-from framing.frame_types.ipv6_frames import IPx, IPv6
+from framing.frame_types.ipv6_frames import IPReassembler, IPx, IPv6
 from framing.frame_types.tcp_frames import TCP_Stream_Id, TCP, TCPFlag, TCPDataQueue
 from framing.raw_data import RawData
 

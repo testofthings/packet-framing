@@ -95,8 +95,9 @@ def test_decode_fragments():
     pro = PCAP2Ethernet(Ethernet2IP(IP2UDP()))
     data = None
     for pcap_r in PCAPRecordIterator(pcap):
-        data = pro.push(pcap_r)
-        if data:
+        udp_ip = pro.push(pcap_r)
+        if udp_ip:
             break
+    data, ip = udp_ip
     assert UDP.Data[data].byte_length() == 16384
 
