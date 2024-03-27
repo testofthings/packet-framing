@@ -72,6 +72,13 @@ class Field(FieldPointer[F, T]):
     def get(self, frame: F) -> T:
         return frame.backend.get(self)
 
+    def get_choice(self, frame: F) -> T:
+        """Return the selected choice, when this is a selection field, otherwise the value itself"""
+        v = self.get(frame)
+        if v.backend.choice:
+            return v.backend.choice.get(v)
+        return v
+
     def get_default_value(self, frame: F) -> T:
         return self.default_value
 
