@@ -1,6 +1,27 @@
 from framing.base import Frame, LayerMapping
-from framing.fields import Structure, ValueOf
+from framing.fields import Selection, Structure, ValueOf
 from framing.frame_processors import Processor
+
+
+class ClientHello(Frame):
+    structure = Structure['ClientHello']()
+
+    version = structure.integer(bytes=2)
+    random = structure.raw(bytes=32)
+    session_id_length = structure.integer(bytes=1)
+    session_id = structure.raw().length_by(session_id_length)
+    cipher_suites_length = structure.integer(bytes=2)
+    cipher_suites = structure.raw().length_by(cipher_suites_length)
+    compression_methods_length = structure.integer(bytes=1)
+    compression_methods = structure.raw().length_by(compression_methods_length)
+    extensions_length = structure.integer(bytes=2)
+    extensions = structure.raw().length_by(extensions_length)
+
+
+class TLSHandshakeMessage(Frame):
+    structure = Selection['TLSHandshakeMessage']()
+
+    client_hello = structure.choice(1, structure.sub(ClientHello))
 
 
 class TLSRecord(Frame):
@@ -17,7 +38,8 @@ class TLSHandshake(Frame):
 
     HandshakeType = structure.integer(bits=8)
     length = structure.integer(bits=24)
-    message = structure.raw().length_by(ValueOf(length))
+    message = structure.sub(TLSHandshakeMessage).length_by(ValueOf(length)).choice_by(HandshakeType)
+
 
 class TLSChangeCipherSpec(Frame):
     structure = Structure['TLSChangeCipherSpec']()

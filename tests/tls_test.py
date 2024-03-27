@@ -5,7 +5,7 @@ from framing.frame_types.ethernet_frames import Ethernet_Payloads
 from framing.frame_types.ip_utilities import IP2TCPStream, TCPDataTable, TCPReassembler
 from framing.frame_types.ipv6_frames import IPv6_Payloads
 from framing.frame_types.pcap_frames import PCAP_Payloads, PCAPFile, PCAPRecordIterator
-from framing.frame_types.tls_frames import TLSApplicationData, TLSChangeCipherSpec, TLSHandshake, TLSRecord, TLSRecord_Payloads
+from framing.frame_types.tls_frames import ClientHello, TLSApplicationData, TLSChangeCipherSpec, TLSHandshake, TLSHandshakeMessage, TLSRecord, TLSRecord_Payloads
 from framing.frames import Frames
 
 
@@ -52,3 +52,6 @@ def test_tls_record():
     assert server_msg_types[:3] == [TLSHandshake, TLSChangeCipherSpec, TLSApplicationData]
     assert all([t == TLSApplicationData for t in server_msg_types[3:]])
 
+    client_hello = TLSHandshake.message.get_choice(client_msgs[0])
+    assert isinstance(client_hello, ClientHello)
+    assert ClientHello.extensions_length[client_hello] == 403
