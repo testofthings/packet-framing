@@ -64,7 +64,7 @@ class Field(FieldPointer[F, T]):
         self.fixed_bit_length = -1
         self.direct_decode = False
         self.offset = FieldOffset(self)
-        self.structure: Optional['Sturcture'] = None  # set by structure herself
+        self.structure: Optional['Structure'] = None  # set by structure herself
         self.end_offset_resolver: Optional[Calculator] = None
         self.length_resolver: Optional[Calculator] = None
         self.consumed_by: Optional[Field[F, Any]] = None
