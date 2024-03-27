@@ -105,6 +105,7 @@ class PayloadFieldExtractor(TypedFieldExtractor):
     def __repr__(self):
         return f"{self.frame_type.structure.structure_name}.{self.payload_field}"
 
+
 def main():
     # Create the argument parser
     parser = argparse.ArgumentParser(description='PCAP printing tool')
@@ -113,7 +114,10 @@ def main():
     args = parser.parse_args()
 
     # construct the filtering
-    filter_d = yaml.safe_load(args.filter or "")
+    filter_s = args.filter or ""
+    # add space after colon to faciliate more compact command-line notation
+    filter_s = filter_s.replace(':{', ': {')
+    filter_d = yaml.safe_load(filter_s)
     extractor = RootExtractor()
     extractor.build(filter_d or {})
 
