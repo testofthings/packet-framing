@@ -284,12 +284,14 @@ class FrameStructure(typing.Generic[F]):
         # find field names
         self.structure_name = type(frame).__name__
         i_names: typing.Dict[Field, str] = {}
-        for member in inspect.getmembers(frame):
+        all_members = inspect.getmembers(frame)
+        for member in all_members:
             name, v = member
             if isinstance(v, Field):
                 i_names[v] = name
         # ...keep order of fields
         old_names = self.fields.copy()
+        assert old_names, f"No fields defined for Selection '{self.structure_name}'"
         self.fields.clear()
         for n, v in old_names.items():
             while v.consumed_by:
