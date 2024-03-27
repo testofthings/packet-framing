@@ -32,7 +32,7 @@ class Frames:
         if not queue.head:
             return None  # no data
         try:
-            f = frame_type(cls.dissect(queue.head, mappings=mappings))
+            f = frame_type(cls.dissect(queue.head.fixed, mappings=mappings))
             length = f.byte_length()
             queue.pull(byte_length=length)
             return f
