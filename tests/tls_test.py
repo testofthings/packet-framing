@@ -14,16 +14,18 @@ def test_tls_record():
 
     pro = PCAP2Ethernet(Ethernet2IP(IP2TCP()))
     asm = TCPReassembler(full_streams=True)
-    recs = []
+    recs = {}
     for pcap_r in PCAPRecordIterator(pcap):
         tcp_ip = pro.push(pcap_r)
-        _, queue = asm.push_queue(tcp_ip)
+        k, queue = asm.push_queue(tcp_ip)
         if not queue:
             continue
         rec = Frames.dissect_pull(TLSRecord, queue)
-        if not rec:
-            continue
-        recs.append(rec)
+        while rec:
+            recs.setdefault(k, []).append(rec)
+            rec = Frames.dissect_pull(TLSRecord, queue)
 
-    assert len(recs) == 16
+    client, server = recs.values()
+    assert len(client) == 7
+    assert len(server) == 10
 
