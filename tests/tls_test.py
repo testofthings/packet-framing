@@ -4,7 +4,7 @@ from framing.frame_types.ethernet_frames import Ethernet_Payloads
 from framing.frame_types.ip_utilities import IP2TCPStream, TCPDataTable, TCPReassembler
 from framing.frame_types.ipv6_frames import IPv6_Payloads
 from framing.frame_types.pcap_frames import PCAP_Payloads, PCAPFile, PCAPRecordIterator
-from framing.frame_types.tls_frames import TLSRecord
+from framing.frame_types.tls_frames import TLSHandshake, TLSRecord, TLSRecord_Payloads
 from framing.frames import Frames
 
 
@@ -28,4 +28,8 @@ def test_tls_record():
     client, server = recs.values()
     assert len(client) == 7
     assert len(server) == 10
+
+    hs = TLSRecord_Payloads.decode_payload(client[0], TLSRecord.fragment)
+    assert isinstance(hs, TLSHandshake)
+
 

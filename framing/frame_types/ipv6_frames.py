@@ -74,7 +74,7 @@ class IPReassembler:
         if r is None:
             return None
         field = IPv6.Payload if isinstance(ip,IPv6) else IPv4.Payload
-        out = IPv6_Payloads.resolve_payload(ip, field, data=r)
+        out = IPv6_Payloads.decode_payload(ip, field, data=r)
         return out
 
     def push(self, ip: IPx) -> Optional[RawData]:

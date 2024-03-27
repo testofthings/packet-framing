@@ -4,6 +4,7 @@ from typing import Callable, cast, Type, Dict, Any, TypeVar, Optional
 from framing.backends import ComposingBackend, FrameBackend, DissectorBackend, BackendImplementation
 from framing.base import Frame, LayerMapping, F
 from framing.data_queue import RawDataQueue
+from framing.fields import Structure, SubStructureField
 from framing.raw_data import RawData, Raw
 
 F = TypeVar("F", bound=Frame)

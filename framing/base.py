@@ -342,10 +342,13 @@ class LayerMapping:
             self._payload = base._payload
             base.merge(self)
 
-    def resolve_payload(self, frame: Frame, field: Field, data: Optional[RawData]) -> Frame:
+    def decode_payload(self, frame: Frame, field: Field, data: Optional[RawData] = None) -> Frame:
+        """Resolve payload type and decode the frame using this mapping"""
         layer_map = self.get_mappings(field)
         assert layer_map, f"No known payload mapping for {field}"
         be = frame.backend
+        if data is None:
+            data = be.get_raw(field)[0]
         return be.decode_as_frame(layer_map, data)
 
     def by(self, type_field: FieldPointer[Any, T], mappings: typing.Dict[T, Type[Frame]]) -> Self:
