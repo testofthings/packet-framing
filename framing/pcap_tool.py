@@ -5,68 +5,105 @@ import yaml
 
 from framing.backends import RawFrame
 from framing.base import Field, Frame
+from framing.fields import RawField
 from framing.frame_types.ethernet_frames import EthernetII
-from framing.frame_types.pcap_frames import PCAPFile, PCAPRecordIterator, PacketRecord
+from framing.frame_types.ipv4_frames import IPv4
+from framing.frame_types.ipv6_frames import IPv6
+from framing.frame_types.pcap_frames import FileHeader, PCAP_Payloads, PCAPFile, PCAPRecordIterator, PacketRecord
 from framing.frames import Frames
 from framing.raw_data import Raw, RawData
 
 
 class FrameOutput:
     """Extractor output, frame and way to get payload data"""
-    def __init__(self, frame: Frame, payload: Field = None):
-        self.frame = frame
-        self.payload = payload
+    def __init__(self, stack: List[Frame], data: RawData):
+        self.stack = stack
+        self.data = data
 
 
 class FrameExtractor:
     """Extract frames from raw data using a specification"""
-    def __init__(self, spec: Dict[Any, Any]):
-        self.process: Callable[[RawData], Iterable[Frame]] = self._no_processing
-        self.next: Optional[FrameExtractor] = None
-        self._build(spec)
+    def __init__(self):
+        self.next: Dict[Any, FrameExtractor] = {}
 
-    def _build(self, spec: Dict[Any, Any]):
+    def extract(self, input: FrameOutput) -> Iterable[Frame]:
+        """Extract frames from raw data"""
+        return [RawFrame(Frames.dissect(input.data))]
+
+    def build(self, spec: Dict[Any, Any]):
         """Build this extractor recursively"""
         for k, v in spec.items():
+            next = None
             if k == 'pcap':
-                self.process = self._extract_pcap_records
+                next = self.next[k] = PCAPRecordExtractor()
             if k == 'eth':
-                self.process = self._extract_ethernet_frames
-            if isinstance(v, Dict) and v:
-                self.next = FrameExtractor(v)
+                next = self.next[1] = PayloadFieldExtractor(EthernetII, EthernetII.type, EthernetII.data)
+            # FIXME: Reassembly for payloads
+            if k == 'ip4':
+                next = self.next[0x0800] = PayloadFieldExtractor(IPv4, IPv4.Protocol, IPv4.Payload)
+            if k == 'ip6':
+                next = self.next[0x86dd] = PayloadFieldExtractor(IPv6, IPv6.Next_header, IPv6.Payload)
+            if next and v and isinstance(v, Dict):
+                next.build(v)
 
-    def _no_processing(self, data: RawData) -> Iterable[FrameOutput]:
-        return [FrameOutput(RawFrame(Frames.dissect(data)))]
 
-    def _extract_pcap_records(self, data: RawData) -> Iterable[FrameOutput]:
-        """Extract PCAP records"""
-        file = PCAPFile(Frames.dissect(data))
+class RootExtractor(FrameExtractor):
+    def extract(self, input: FrameOutput) -> Iterable[Frame]:
+        if not self.next:
+            return super().extract(input)
+        next = self.next.values().__iter__().__next__()
+        return next.extract(input)
+
+
+class PCAPRecordExtractor(FrameExtractor):
+    """Extract PCAP records"""
+    def extract(self, input: FrameOutput) -> Iterable[Frame]:
+        file = PCAPFile(Frames.dissect(input.data))
         hdr = PCAPFile.File_Header[file]
-        yield FrameOutput(hdr)
+        if not self.next:
+            yield hdr
+        next = self.next.get(FileHeader.LinkType[hdr])
+        if not next and self.next:
+            return []  # link type mismatch, no data to return
         for i, rec in enumerate(PCAPRecordIterator(file)):
-            yield FrameOutput(rec, PacketRecord.Packet_Data)
-
-    def _extract_ethernet_frames(self, data: RawData) -> Iterable[FrameOutput]:
-        """Extract Ethernet frames"""
-        frame = EthernetII(Frames.dissect(data))
-        return [FrameOutput(frame, EthernetII.data)]
-
-    def extract(self, data: RawData, stack: List[Frame] = None) -> Iterable[FrameOutput]:
-        if stack is None:
-            stack = []
-        while data:
-            frame_it = self.process(data)
-            for out in frame_it:
-                if self.next:
-                    if out.payload:
-                        sub_data = out.payload[out.frame]
-                        for sub in self.next.extract(sub_data, stack + [out.frame]):
-                            yield sub
-                else:
+            if not self.next:
+                yield rec
+            else:
+                pay_data = PacketRecord.Packet_Data[rec]
+                output = FrameOutput(input.stack + [rec], pay_data)
+                out_d = next.extract(output)
+                for out in out_d:
                     yield out
-                frame_len = out.frame.byte_length()
-                data = data.tailBytes(frame_len)
 
+
+class TypedFieldExtractor(FrameExtractor):
+    pass
+
+class PayloadFieldExtractor(TypedFieldExtractor):
+    """Extract frame from payload field"""
+    def __init__(self, frame_type: Type[Frame], type_field: Field, payload_field: RawField):
+        super().__init__()
+        # force frame type initialization
+        frame_type(Frames.compose())
+        self.frame_type = frame_type
+        self.type_field = type_field
+        self.payload_field = payload_field
+
+    def extract(self, input: FrameOutput) -> Iterable[Frame]:
+        frame = self.frame_type(Frames.dissect(input.data))
+        if not self.next:
+             yield frame
+        type_v = self.type_field[frame]
+        next = self.next.get(type_v)
+        if next is None:
+            return []
+        pay_raw = self.payload_field[frame]
+        output = FrameOutput(input.stack + [frame], pay_raw)
+        out_d = next.extract(output)
+        yield from out_d
+
+    def __repr__(self):
+        return f"{self.frame_type.structure.structure_name}.{self.payload_field}"
 
 def main():
     # Create the argument parser
@@ -77,15 +114,18 @@ def main():
 
     # construct the filtering
     filter_d = yaml.safe_load(args.filter or "")
-    extractor = FrameExtractor(filter_d or {})
+    extractor = RootExtractor()
+    extractor.build(filter_d or {})
 
     # print extracted frames from files
     for file in args.read or []:
-        with pathlib.Path(file) as f:
-            data = Raw.file(f)
-            for fr in extractor.extract(data):
-                print(f"{fr.frame}")
-
+        f = pathlib.Path(file)
+        data = Raw.file(f)
+        try:
+            for fr in extractor.extract(FrameOutput([], data)):
+                print(f"{fr}")
+        finally:
+            data.close()
 
 if __name__ == '__main__':
     main()
