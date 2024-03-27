@@ -14,10 +14,10 @@ from framing.frames import Frames
 from framing.raw_data import Raw, RawData
 
 
-class FrameOutput:
+class FrameStack:
     """Extractor output, frame and way to get payload data"""
-    def __init__(self, stack: List[Frame], data: RawData):
-        self.stack = stack
+    def __init__(self, lower: List[Frame], data: RawData):
+        self.lower = lower
         self.data = data
 
 
@@ -26,7 +26,7 @@ class FrameExtractor:
     def __init__(self):
         self.next: Dict[Any, FrameExtractor] = {}
 
-    def extract(self, input: FrameOutput) -> Iterable[Frame]:
+    def extract(self, input: FrameStack) -> Iterable[Frame]:
         """Extract frames from raw data"""
         return [RawFrame(Frames.dissect(input.data))]
 
@@ -48,7 +48,7 @@ class FrameExtractor:
 
 
 class RootExtractor(FrameExtractor):
-    def extract(self, input: FrameOutput) -> Iterable[Frame]:
+    def extract(self, input: FrameStack) -> Iterable[Frame]:
         if not self.next:
             return super().extract(input)
         next = self.next.values().__iter__().__next__()
@@ -57,7 +57,7 @@ class RootExtractor(FrameExtractor):
 
 class PCAPRecordExtractor(FrameExtractor):
     """Extract PCAP records"""
-    def extract(self, input: FrameOutput) -> Iterable[Frame]:
+    def extract(self, input: FrameStack) -> Iterable[Frame]:
         file = PCAPFile(Frames.dissect(input.data))
         hdr = PCAPFile.File_Header[file]
         if not self.next:
@@ -70,7 +70,7 @@ class PCAPRecordExtractor(FrameExtractor):
                 yield rec
             else:
                 pay_data = PacketRecord.Packet_Data[rec]
-                output = FrameOutput(input.stack + [rec], pay_data)
+                output = FrameStack(input.lower + [rec], pay_data)
                 out_d = next.extract(output)
                 for out in out_d:
                     yield out
@@ -89,7 +89,7 @@ class PayloadFieldExtractor(TypedFieldExtractor):
         self.type_field = type_field
         self.payload_field = payload_field
 
-    def extract(self, input: FrameOutput) -> Iterable[Frame]:
+    def extract(self, input: FrameStack) -> Iterable[Frame]:
         frame = self.frame_type(Frames.dissect(input.data))
         if not self.next:
              yield frame
@@ -98,7 +98,7 @@ class PayloadFieldExtractor(TypedFieldExtractor):
         if next is None:
             return []
         pay_raw = self.payload_field[frame]
-        output = FrameOutput(input.stack + [frame], pay_raw)
+        output = FrameStack(input.lower + [frame], pay_raw)
         out_d = next.extract(output)
         yield from out_d
 
@@ -126,7 +126,7 @@ def main():
         f = pathlib.Path(file)
         data = Raw.file(f)
         try:
-            for fr in extractor.extract(FrameOutput([], data)):
+            for fr in extractor.extract(FrameStack([], data)):
                 print(f"{fr}")
         finally:
             data.close()
