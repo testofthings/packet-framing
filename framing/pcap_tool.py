@@ -81,7 +81,7 @@ class FrameStack:
             return
         # this is intermediate layer, pass to higher layers
         for s in self.layer.receive(state):
-            next = self.next.get(s.payload_type)
+            next = self.next.get(s.payload_type) or self.next.get(None)  # None key is fallback
             if next is not None:
                 yield from next.receive(s)
 
@@ -97,6 +97,8 @@ class FrameStack:
                 next = self.next[0x86dd] = FrameStack(IPStackLayer(IPv6))
             if k == 'tcp':
                 next = self.next[6] = FrameStack(TCPStackLayer())
+            if k == 'raw':
+                next = self.next[None] = FrameStack(FrameStackLayer())  # any data
             if next and v and isinstance(v, Dict):
                 next.build(v)
 
@@ -235,11 +237,11 @@ class TCPStackLayer(FrameStackLayer):
             return []  # no data available
         if queue.is_closed():
             data = queue.pull_all()
-            return state.add(tcp, key, data)
+            return [state.add(tcp, key, data)]
         if self.full_stream:
             return []
         data = queue.pull_all()
-        return state.add(tcp, key, data)
+        return [state.add(tcp, key, data)]
 
 
 
