@@ -7,6 +7,7 @@ from framing.backends import RawFrame
 from framing.base import Field, Frame
 from framing.data_queue import RawDataQueue
 from framing.fields import RawField
+from framing.frame_types.dns_frames import DNSMessageTCP
 from framing.frame_types.ethernet_frames import EthernetII
 from framing.frame_types.ip_utilities import IPUtility
 from framing.frame_types.ipv4_frames import IPv4, IPv4Flag
@@ -19,26 +20,33 @@ from framing.raw_data import Raw, RawData
 
 class StackState:
     """Extractor output, frame and way to get payload data"""
-    def __init__(self, data: RawData, payload_type: Any = None, lower: List[Frame] = None):
+    def __init__(self, data: RawData, payload_type: Any = None, frame: Optional[Frame] = None, lower: Optional['StackState'] = None):
         self.data = data
         self.payload_type = payload_type
-        self.lower = [] if lower is None else lower
+        self.frame = frame
+        self.lower = lower
 
     def add(self, frame: Frame, payload_type: Any = None, data: RawData = Raw.empty):
         """Add frame to the stack"""
-        lower = self.lower.copy()
-        lower.append(frame)
-        return StackState(data, payload_type, lower)
+        self.frame = frame  # update this frame
+        return StackState(data, payload_type, lower=self)
 
     def get_frame(self) -> Frame:
-        """Get the top frame"""
-        return self.lower[-1]
+        """Get the top frame, look for it"""
+        return self.frame or (self.lower.get_frame() if self.lower else None)
 
-    def get_layer_names(self, omit_last = 0) -> str:
+    def get_layer_names(self) -> str:
         """Get the string of layers names"""
-        if len(self.lower) <= omit_last:
-            return ""
-        return ".".join([f"{f.structure.structure_name}" for f in self.lower[:-omit_last]])
+        lower = []
+        s = self
+        while s:
+            if s.frame:
+                fs = s.frame.structure.structure_name
+                if s.payload_type is not None:
+                    fs = f"{s.payload_type}={fs}"
+                lower.insert(0, fs)
+            s = s.lower
+        return " / ".join(lower)
 
     def __repr__(self) -> str:
         s = self.get_layer_names()
@@ -97,6 +105,8 @@ class FrameStack:
                 next = self.next[0x86dd] = FrameStack(IPStackLayer(IPv6))
             if k == 'tcp':
                 next = self.next[6] = FrameStack(TCPStackLayer())
+            if k == 'dns':
+                next = self.next[53] = FrameStack(FrameStackLayer(DNSMessageTCP))
             if k == 'raw':
                 next = self.next[None] = FrameStack(FrameStackLayer())  # any data
             if next and v and isinstance(v, Dict):
@@ -265,8 +275,13 @@ def main():
         f = pathlib.Path(file)
         data = Raw.file(f)
         try:
-            for s in stack.receive(StackState(data)):
-                print(f"{s.get_layer_names(omit_last=1)}.{s.get_frame()}")
+            for state in stack.receive(StackState(data)):
+                s = f"{state.get_frame()}"
+                # drop first line of frame dump, it contains extra frame name
+                first_line_len = s.find('\n')
+                if first_line_len > 0 and first_line_len < len(s):
+                    s = s[first_line_len + 1:]
+                print(f"{state.get_layer_names()}\n{s}")
         finally:
             data.close()
 
