@@ -149,7 +149,7 @@ class IPStackLayer(FrameStackLayer):
         for s in self.receive(StackState(data)):
             yield s.payload_type, s.data
 
-    def receive(self, state: StackState) -> Iterable[Frame]:
+    def receive(self, state: StackState) -> Iterable[StackState]:
         ip = self.frame_type(Frames.dissect(state.data))
         if isinstance(ip, IPv4):
             more = IPv4.Flags[ip] & IPv4Flag.MF
@@ -161,7 +161,7 @@ class IPStackLayer(FrameStackLayer):
                 return [state.add(ip, pay_type, data)]
             key = IPv4.Source_IP[ip], IPv4.Destination_IP[ip], IPv4.Identification[ip]
         else:
-            pay_type = Fragment.Next_Header[ip]
+            pay_type = IPv6.Next_header[ip]
             if pay_type != 0x2c:
                 # not fragmented
                 data = IPv6.Payload.as_raw(ip)
