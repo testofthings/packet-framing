@@ -8,9 +8,11 @@ from framing.base import Field, Frame
 from framing.data_queue import RawDataQueue
 from framing.fields import RawField
 from framing.frame_types.ethernet_frames import EthernetII
+from framing.frame_types.ip_utilities import IPUtility
 from framing.frame_types.ipv4_frames import IPv4, IPv4Flag
 from framing.frame_types.ipv6_frames import Fragment, IPv6, IPx
 from framing.frame_types.pcap_frames import FileHeader, PCAP_Payloads, PCAPFile, PCAPRecordIterator, PacketRecord
+from framing.frame_types.tcp_frames import TCP, TCP_Null_Stream_Id, TCP_Stream_Id, TCPDataQueue, TCPFlag
 from framing.frames import Frames
 from framing.raw_data import Raw, RawData
 
@@ -93,6 +95,8 @@ class FrameStack:
                 next = self.next[0x0800] = FrameStack(IPStackLayer(IPv4))
             if k == 'ip6':
                 next = self.next[0x86dd] = FrameStack(IPStackLayer(IPv6))
+            if k == 'tcp':
+                next = self.next[6] = FrameStack(TCPStackLayer())
             if next and v and isinstance(v, Dict):
                 next.build(v)
 
@@ -190,6 +194,53 @@ class IPStackLayer(FrameStackLayer):
         # must wait for more fragments
         self.queues[key] = queue, t_len
         return []
+
+
+class TCPStackLayer(FrameStackLayer):
+    def __init__(self, full_streams=False):
+        super().__init__(TCP)
+        self.queues: Dict[TCP_Stream_Id, TCPDataQueue] = {}
+        self.full_stream = full_streams
+
+    def receive_queue(self, packets: Optional[Tuple[TCP, IPx]]) -> Tuple[TCP_Stream_Id, Optional[RawDataQueue]]:
+        """Push TCP frame, get back raw data queue"""
+        if packets is None:
+            return TCP_Null_Stream_Id, None
+        tcp, ip = packets
+        flags = TCP.Flags[tcp]
+        start = flags & TCPFlag.SYN
+
+        sd = IPUtility.get_source_destination(ip)
+        key = sd[0], TCP.Source_port[tcp], sd[1], TCP.Destination_port[tcp]
+        if start:
+            queue = TCPDataQueue(tcp)
+            self.queues[key] = queue
+        else:
+            queue = self.queues.get(key)
+            if not queue:
+                return key, None  # no start seen
+
+        if queue.is_closed():
+            del self.queues[key]  # remove closed
+        queue.push_frame(tcp)
+        return key, queue
+
+    def receive(self, state: StackState) -> Iterable[StackState]:
+        """Push TCP frame, get back raw data queue"""
+        tcp = TCP(Frames.dissect(state.data))
+        ip = state.get_frame()
+        assert isinstance(ip, IPx), f"Expected IPx as TCP transport, got {type(ip)}"
+        key, queue = self.receive_queue((tcp, ip))
+        if not queue:
+            return []  # no data available
+        if queue.is_closed():
+            data = queue.pull_all()
+            return state.add(tcp, key, data)
+        if self.full_stream:
+            return []
+        data = queue.pull_all()
+        return state.add(tcp, key, data)
+
 
 
 def main():
