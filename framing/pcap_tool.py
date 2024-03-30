@@ -79,17 +79,21 @@ class FrameStackLayer:
         return f"{self.frame_type.structure.structure_name}"
 
 
+class StackLayerBuilder:
+    """Stack layer builder"""
+    def __init__(self, mappings: Dict[Any, Callable[[], FrameStackLayer]] = {}):
+        self.mappings = mappings
+
+    def build(self, transport: Type[Frame]) -> Dict[Any, FrameStackLayer]:
+        """Get the layer key to layer mapping"""
+        return {k: v() for k, v in self.mappings.items()}
+
+
 class FrameStack:
     """Frame stack comprising layers"""
     def __init__(self, layer: FrameStackLayer = FrameStackLayer()):
         self.layer = layer
         self.next: Dict[Any, FrameStack] = {}  # higher layers keyed by payload types
-
-    Builder_Map: Dict[str, Callable[[], FrameStackLayer]] = {
-        'eth': lambda: PayloadFieldStackLayer(EthernetII, EthernetII.type, EthernetII.data),
-        'ip4': lambda: IPStackLayer(IPv4),
-        'ip6': lambda: IPStackLayer(IPv6),
-    }
 
     def receive(self, state: StackState) -> Iterable[StackState]:
         """Receive data through the stack"""
@@ -106,6 +110,8 @@ class FrameStack:
 
     def build(self, spec: Dict[Any, Any]):
         """Build this extractor recursively"""
+        transport = self.layer.frame_type
+
         p_regexp = re.compile(r"^_(\d+)$")  # '_'+number for decimal protocol type
         x_regexp = re.compile(r"^_x([0-9a-fA-F]+)$") # '_x' for hexadecimal protocol type
         for k, v in spec.items():
@@ -113,28 +119,41 @@ class FrameStack:
             if not isinstance(v, Dict):
                 continue  # no configuration
 
-            p_num = p_regexp.match(k) # integer key?
-            key = int(p_num.group(1)) if p_num else None
-            if key is None:
-                p_num = x_regexp.match(k)  # hex key?
-                key = int(p_num.group(1), 16) if p_num else None
-            if key is None:
-                continue  # not key like for sub-protocol
+            layer_builder = Stack_builder_map.get(k)
+            if layer_builder is None:
+                # key is not protocol, maybe port number, payload type, etc.
+                p_num = p_regexp.match(k) # integer key?
+                key = int(p_num.group(1)) if p_num else None
+                if key is None:
+                    p_num = x_regexp.match(k)  # hex key?
+                    key = int(p_num.group(1), 16) if p_num else None
+                if key is None:
+                    continue  # not key like for sub-protocol
 
-            # ok, which protocol
-            proto_name = v.get('protocol') or v.get('p')
-            if not proto_name:
-                raise ValueError('Missing protocol, use "protocol=" or "p="')
-            layer_type = self.Builder_Map.get(proto_name)
-            if layer_type is None:
-                continue  # FIXME: Unknown protocol, throw an error
-
-            layer = layer_type().configure(v)
-            s_layer = FrameStack(layer)
-            s_layer.build(v)
-            self.next[key] = s_layer
-
-
+                # payload protocol specified explictly
+                proto_name = v.get('protocol') or v.get('p')
+                if not proto_name:
+                    raise ValueError('Missing protocol, use "protocol=" or "p="')
+                layer_builder = Stack_builder_map.get(proto_name)
+                if layer_builder is None:
+                    raise ValueError(f'Unknown protocol "{proto_name}"')
+                mappings = layer_builder.build(transport)
+                if len(mappings) != 1:
+                    raise ValueError(f'"{proto_name}" is a protocol builder, cannot be mapped to single key')
+                layer_type = list(mappings.values())[0]
+                layer = layer_type.configure(v)
+                layer = layer.configure(v)
+                s_layer = FrameStack(layer)
+                s_layer.build(v)
+                self.next[key] = s_layer
+            else:
+                # key is protocol builder, may map to several protocols
+                mappings = layer_builder.build(transport)
+                for key, layer_type in mappings.items():
+                    layer = layer_type.configure(v)
+                    s_layer = FrameStack(layer)
+                    s_layer.build(v)
+                    self.next[key] = s_layer
 
         # for k, v in spec.items():
         #     next = None
@@ -294,6 +313,14 @@ class TCPStackLayer(FrameStackLayer):
         data = queue.pull_all()
         return [state.add(tcp, key, data)]
 
+
+# Stack layer builders by layer keys (port numbers, etc.)
+Stack_builder_map: Dict[str, Callable[[], StackLayerBuilder]] = {
+    'eth': StackLayerBuilder({1: lambda: PayloadFieldStackLayer(EthernetII, EthernetII.type, EthernetII.data) }),
+    'ip4': StackLayerBuilder({0x0800: lambda: IPStackLayer(IPv4)}),
+    'ip6': StackLayerBuilder({0x86dd: lambda: IPStackLayer(IPv6)}),
+    'ip': StackLayerBuilder({0x0800: lambda: IPStackLayer(IPv4), 0x86dd: lambda: IPStackLayer(IPv6)}),
+}
 
 
 def main():
