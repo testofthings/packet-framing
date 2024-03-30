@@ -118,6 +118,10 @@ class FrameStack:
             # specify sub-protocol?
             if not isinstance(v, Dict):
                 continue  # no configuration
+            if k == "raw":
+                # show raw data
+                self.next[None] = FrameStack(FrameStackLayer())
+                continue
 
             layer_builder = Stack_builder_map.get(k)
             if layer_builder is None:
