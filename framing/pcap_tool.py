@@ -322,6 +322,7 @@ Stack_builder_map: Dict[str, Callable[[], StackLayerBuilder]] = {
     'ip4': StackLayerBuilder({0x0800: lambda: IPStackLayer(IPv4)}),
     'ip6': StackLayerBuilder({0x86dd: lambda: IPStackLayer(IPv6)}),
     'ip': StackLayerBuilder({0x0800: lambda: IPStackLayer(IPv4), 0x86dd: lambda: IPStackLayer(IPv6)}),
+    'tcp': StackLayerBuilder({6: lambda: TCPStackLayer()}),
 }
 
 
