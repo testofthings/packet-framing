@@ -121,7 +121,7 @@ class FrameStack:
 
             layer_builder = Stack_builder_map.get(k)
             if layer_builder is None:
-                # key is not protocol, maybe port number, payload type, etc.
+                # not a protocol, maybe port number, payload type, etc. protocol key
                 p_num = p_regexp.match(k) # integer key?
                 key = int(p_num.group(1)) if p_num else None
                 if key is None:
@@ -138,8 +138,10 @@ class FrameStack:
                 if layer_builder is None:
                     raise ValueError(f'Unknown protocol "{proto_name}"')
                 mappings = layer_builder.build(transport)
+                if not mappings:
+                    raise ValueError(f'Must specify layer key for "{proto_name}"')
                 if len(mappings) != 1:
-                    raise ValueError(f'"{proto_name}" is a protocol builder, cannot be mapped to single key')
+                    raise ValueError(f'"{proto_name}" is many protocols, it cannot be mapped to single layer key')
                 layer_type = list(mappings.values())[0]
                 layer = layer_type.configure(v)
                 layer = layer.configure(v)
