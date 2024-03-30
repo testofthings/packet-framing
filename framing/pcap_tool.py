@@ -1,5 +1,6 @@
 import argparse
 import pathlib
+import re
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type
 import yaml
 
@@ -70,6 +71,10 @@ class FrameStackLayer:
         frame = RawFrame(Frames.dissect(state.data))
         return [state.add(frame)]
 
+    def configure(self, spec: Dict[Any, Any]) -> 'FrameStackLayer':
+        """Configure this layer"""
+        return self
+
     def __repr__(self) -> str:
         return f"{self.frame_type.structure.structure_name}"
 
@@ -79,6 +84,12 @@ class FrameStack:
     def __init__(self, layer: FrameStackLayer = FrameStackLayer()):
         self.layer = layer
         self.next: Dict[Any, FrameStack] = {}  # higher layers keyed by payload types
+
+    Builder_Map: Dict[str, Callable[[], FrameStackLayer]] = {
+        'eth': lambda: PayloadFieldStackLayer(EthernetII, EthernetII.type, EthernetII.data),
+        'ip4': lambda: IPStackLayer(IPv4),
+        'ip6': lambda: IPStackLayer(IPv6),
+    }
 
     def receive(self, state: StackState) -> Iterable[StackState]:
         """Receive data through the stack"""
@@ -95,22 +106,52 @@ class FrameStack:
 
     def build(self, spec: Dict[Any, Any]):
         """Build this extractor recursively"""
+        p_regexp = re.compile(r"^_(\d+)$")  # '_'+number for decimal protocol type
+        x_regexp = re.compile(r"^_x([0-9a-fA-F]+)$") # '_x' for hexadecimal protocol type
         for k, v in spec.items():
-            next = None
-            if k == 'eth':
-                next = self.next[1] = FrameStack(PayloadFieldStackLayer(EthernetII, EthernetII.type, EthernetII.data))
-            if k == 'ip4':
-                next = self.next[0x0800] = FrameStack(IPStackLayer(IPv4))
-            if k == 'ip6':
-                next = self.next[0x86dd] = FrameStack(IPStackLayer(IPv6))
-            if k == 'tcp':
-                next = self.next[6] = FrameStack(TCPStackLayer())
-            if k == 'dns':
-                next = self.next[53] = FrameStack(FrameStackLayer(DNSMessageTCP))
-            if k == 'raw':
-                next = self.next[None] = FrameStack(FrameStackLayer())  # any data
-            if next and v and isinstance(v, Dict):
-                next.build(v)
+            # specify sub-protocol?
+            if not isinstance(v, Dict):
+                continue  # no configuration
+
+            p_num = p_regexp.match(k) # integer key?
+            key = int(p_num.group(1)) if p_num else None
+            if key is None:
+                p_num = x_regexp.match(k)  # hex key?
+                key = int(p_num.group(1), 16) if p_num else None
+            if key is None:
+                continue  # not key like for sub-protocol
+
+            # ok, which protocol
+            proto_name = v.get('protocol') or v.get('p')
+            if not proto_name:
+                raise ValueError('Missing protocol, use "protocol=" or "p="')
+            layer_type = self.Builder_Map.get(proto_name)
+            if layer_type is None:
+                continue  # FIXME: Unknown protocol, throw an error
+
+            layer = layer_type().configure(v)
+            s_layer = FrameStack(layer)
+            s_layer.build(v)
+            self.next[key] = s_layer
+
+
+
+        # for k, v in spec.items():
+        #     next = None
+        #     if k == 'eth':
+        #         next = self.next[1] = FrameStack(PayloadFieldStackLayer(EthernetII, EthernetII.type, EthernetII.data))
+        #     if k == 'ip4':
+        #         next = self.next[0x0800] = FrameStack(IPStackLayer(IPv4))
+        #     if k == 'ip6':
+        #         next = self.next[0x86dd] = FrameStack(IPStackLayer(IPv6))
+        #     if k == 'tcp':
+        #         next = self.next[6] = FrameStack(TCPStackLayer())
+        #     if k == 'dns':
+        #         next = self.next[53] = FrameStack(FrameStackLayer(DNSMessageTCP))
+        #     if k == 'raw':
+        #         next = self.next[None] = FrameStack(FrameStackLayer())  # any data
+        #     if next and v and isinstance(v, Dict):
+        #         next.build(v)
 
     def __repr__(self) -> str:
         s = f"{self.layer}"
