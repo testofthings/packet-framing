@@ -1,4 +1,5 @@
 from framing.base import Frame, LayerMapping
+from framing.data_queue import RawDataQueue
 from framing.fields import Selection, Structure, ValueOf
 from framing.frame_processors import Processor
 

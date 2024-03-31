@@ -378,6 +378,20 @@ class DNSStackLayer(FrameStackLayer):
         return DNSMessage
 
 
+class TLSRecordLayer(FrameStackLayer):
+    def __init__(self):
+        super().__init__(TLSRecord)
+        self.queue = RawDataQueue()
+
+    def receive(self, state: StackState) -> Iterable[StackState]:
+        record = TLSRecord(Frames.dissect(state.data))
+        self.queue.push(TLSRecord.fragment[record])
+        if not self.queue:
+            return []
+        data = self.queue.pull_all()
+        return [state.add(record, TLSRecord.ContentType[record], data)]
+
+
 # Stack layer builders by layer keys (port numbers, etc.)
 Stack_builder_map: Dict[str, Callable[[], StackLayerBuilder]] = {
     'eth': StackLayerBuilder({1: lambda: PayloadFieldStackLayer(EthernetII, EthernetII.type, EthernetII.data) }),
@@ -385,7 +399,7 @@ Stack_builder_map: Dict[str, Callable[[], StackLayerBuilder]] = {
     'udp': StackLayerBuilder({17: lambda: UDPStackLayer()}),
     'tcp': StackLayerBuilder({6: lambda: TCPStackLayer()}),
     'dns': StackLayerBuilder({53: lambda: DNSStackLayer()}),
-    'tls-record': StackLayerBuilder({443: lambda: PayloadFieldStackLayer(TLSRecord, TLSRecord.ContentType, TLSRecord.fragment)}),
+    'tls-record': StackLayerBuilder({443: lambda: TLSRecordLayer()}),
     'tls-handshake': StackLayerBuilder({22: lambda: PayloadFieldStackLayer(TLSHandshake, TLSHandshake.HandshakeType, TLSHandshake.message)}),
 }
 
