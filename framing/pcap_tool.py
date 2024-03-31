@@ -235,10 +235,17 @@ class PayloadFieldStackLayer(FrameStackLayer):
 
 class IPStackLayer(FrameStackLayer):
     """IPx stack layer"""
-    def __init__(self, frame_type: IPx):
-        super().__init__(frame_type)
-        assert frame_type in {IPv4, IPv6}, f"Expected IPx, got {frame_type}"
+    def __init__(self):
+        super().__init__(IPv4)
         self.queues: Dict[Tuple[RawData, RawData, RawData], Tuple[RawDataQueue, int]] = {}
+
+    def get_frame_type(self, state: StackState) -> Frame:
+        version = state.data.octet(0) >> 4
+        if version == 4:
+            return IPv4
+        if version == 6:
+            return IPv6
+        raise ValueError(f"Unknown IP version {version}")
 
     def receive_raw(self, data: RawData) -> Iterable[Tuple[int, RawData]]:
         """Receive raw IP data and yield payload type and raw data"""
@@ -246,7 +253,8 @@ class IPStackLayer(FrameStackLayer):
             yield s.payload_type, s.data
 
     def receive(self, state: StackState) -> Iterable[StackState]:
-        ip = self.frame_type(Frames.dissect(state.data))
+        frame_type = self.get_frame_type(state)
+        ip = frame_type(Frames.dissect(state.data))
         if isinstance(ip, IPv4):
             more = IPv4.Flags[ip] & IPv4Flag.MF
             offset = IPv4.Fragment_Offset[ip] * 8
@@ -372,9 +380,7 @@ class DNSStackLayer(FrameStackLayer):
 # Stack layer builders by layer keys (port numbers, etc.)
 Stack_builder_map: Dict[str, Callable[[], StackLayerBuilder]] = {
     'eth': StackLayerBuilder({1: lambda: PayloadFieldStackLayer(EthernetII, EthernetII.type, EthernetII.data) }),
-    'ip4': StackLayerBuilder({0x0800: lambda: IPStackLayer(IPv4)}),
-    'ip6': StackLayerBuilder({0x86dd: lambda: IPStackLayer(IPv6)}),
-    'ip': StackLayerBuilder({0x0800: lambda: IPStackLayer(IPv4), 0x86dd: lambda: IPStackLayer(IPv6)}),
+    'ip': StackLayerBuilder({0x0800: lambda: IPStackLayer(), 0x86dd: lambda: IPStackLayer()}),
     'udp': StackLayerBuilder({17: lambda: UDPStackLayer()}),
     'tcp': StackLayerBuilder({6: lambda: TCPStackLayer()}),
     'dns': StackLayerBuilder({53: lambda: DNSStackLayer()}),
