@@ -15,6 +15,7 @@ from framing.frame_types.ipv4_frames import IPv4, IPv4Flag
 from framing.frame_types.ipv6_frames import Fragment, IPv6, IPx
 from framing.frame_types.pcap_frames import FileHeader, PCAP_Payloads, PCAPFile, PCAPRecordIterator, PacketRecord
 from framing.frame_types.tcp_frames import TCP, TCP_Null_Stream_Id, TCP_Stream_Id, TCPDataQueue, TCPFlag, flip_tcp_stream_id
+from framing.frame_types.tls_frames import TLSHandshake, TLSRecord
 from framing.frame_types.udp_frames import UDP
 from framing.frames import Frames
 from framing.raw_data import Raw, RawData
@@ -384,6 +385,8 @@ Stack_builder_map: Dict[str, Callable[[], StackLayerBuilder]] = {
     'udp': StackLayerBuilder({17: lambda: UDPStackLayer()}),
     'tcp': StackLayerBuilder({6: lambda: TCPStackLayer()}),
     'dns': StackLayerBuilder({53: lambda: DNSStackLayer()}),
+    'tls-record': StackLayerBuilder({443: lambda: PayloadFieldStackLayer(TLSRecord, TLSRecord.ContentType, TLSRecord.fragment)}),
+    'tls-handshake': StackLayerBuilder({22: lambda: PayloadFieldStackLayer(TLSHandshake, TLSHandshake.HandshakeType, TLSHandshake.message)}),
 }
 
 
