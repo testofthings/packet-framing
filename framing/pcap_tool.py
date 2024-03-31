@@ -1,20 +1,20 @@
 import argparse
 import pathlib
 import re
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Type
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, Type
 import yaml
 
 from framing.backends import RawFrame
 from framing.base import Field, Frame
 from framing.data_queue import RawDataQueue
 from framing.fields import RawField
-from framing.frame_types.dns_frames import DNSMessageTCP
+from framing.frame_types.dns_frames import DNSMessage, DNSMessageTCP
 from framing.frame_types.ethernet_frames import EthernetII
 from framing.frame_types.ip_utilities import IPUtility
 from framing.frame_types.ipv4_frames import IPv4, IPv4Flag
 from framing.frame_types.ipv6_frames import Fragment, IPv6, IPx
 from framing.frame_types.pcap_frames import FileHeader, PCAP_Payloads, PCAPFile, PCAPRecordIterator, PacketRecord
-from framing.frame_types.tcp_frames import TCP, TCP_Null_Stream_Id, TCP_Stream_Id, TCPDataQueue, TCPFlag
+from framing.frame_types.tcp_frames import TCP, TCP_Null_Stream_Id, TCP_Stream_Id, TCPDataQueue, TCPFlag, flip_tcp_stream_id
 from framing.frames import Frames
 from framing.raw_data import Raw, RawData
 
@@ -72,6 +72,10 @@ class FrameStackLayer:
         # force frame type initialization
         frame_type(Frames.compose())
 
+    def get_frame_type(self, state: StackState) -> Frame:
+        """Get frame type, may depend on transport layer"""
+        return self.frame_type
+
     def receive(self, state: StackState) -> Iterable[StackState]:
         """Input through the stack"""
         frame = RawFrame(Frames.dissect(state.data))
@@ -105,11 +109,14 @@ class FrameStack:
         """Receive data through the stack"""
         if not self.next:
             # this is the top layer, no further processing
-            out_frame = self.layer.frame_type(Frames.dissect(state.data))
+            frame_type = self.layer.get_frame_type(state)
+            out_frame = frame_type(Frames.dissect(state.data))
             yield state.add(out_frame)
             return
         # this is intermediate layer, pass to higher layers
         for s in self.layer.receive(state):
+            if not s.data:
+                continue  # do not pass empty data
             next = self.next.get(s.payload_type) or self.next.get(None)  # None key is fallback
             if next is not None:
                 yield from next.receive(s)
@@ -284,6 +291,7 @@ class TCPStackLayer(FrameStackLayer):
     def __init__(self, full_streams=False):
         super().__init__(TCP)
         self.queues: Dict[TCP_Stream_Id, TCPDataQueue] = {}
+        self.to_server: Set[TCP_Stream_Id] = set()  # streams towards server
         self.full_stream = full_streams
 
     def receive_queue(self, packets: Optional[Tuple[TCP, IPx]]) -> Tuple[TCP_Stream_Id, Optional[RawDataQueue]]:
@@ -299,6 +307,9 @@ class TCPStackLayer(FrameStackLayer):
         if start:
             queue = TCPDataQueue(tcp)
             self.queues[key] = queue
+            r_key = flip_tcp_stream_id(key)
+            if r_key not in self.to_server:
+                self.to_server.add(key)  # assume first packet is towards server
         else:
             queue = self.queues.get(key)
             if not queue:
@@ -315,15 +326,27 @@ class TCPStackLayer(FrameStackLayer):
         ip = state.get_frame()
         assert isinstance(ip, IPx), f"Expected IPx as TCP transport, got {type(ip)}"
         key, queue = self.receive_queue((tcp, ip))
+        # use server port to identify payload type
+        server_port = key[3] if key in self.to_server else key[1]
         if not queue:
             return []  # no data available
         if queue.is_closed():
             data = queue.pull_all()
-            return [state.add(tcp, key, data)]
+            return [state.add(tcp, server_port, data)]
         if self.full_stream:
             return []
         data = queue.pull_all()
-        return [state.add(tcp, key, data)]
+        return [state.add(tcp, server_port, data)]
+
+
+class DNSStackLayer(FrameStackLayer):
+    def __init__(self):
+        super().__init__(DNSMessage)
+
+    def get_frame_type(self, state: StackState) -> Frame:
+        if state.lower and isinstance(state.lower.frame, TCP):
+            return DNSMessageTCP
+        return DNSMessage
 
 
 # Stack layer builders by layer keys (port numbers, etc.)
@@ -333,6 +356,7 @@ Stack_builder_map: Dict[str, Callable[[], StackLayerBuilder]] = {
     'ip6': StackLayerBuilder({0x86dd: lambda: IPStackLayer(IPv6)}),
     'ip': StackLayerBuilder({0x0800: lambda: IPStackLayer(IPv4), 0x86dd: lambda: IPStackLayer(IPv6)}),
     'tcp': StackLayerBuilder({6: lambda: TCPStackLayer()}),
+    'dns': StackLayerBuilder({53: lambda: DNSStackLayer()}),
 }
 
 

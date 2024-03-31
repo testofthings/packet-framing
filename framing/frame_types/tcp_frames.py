@@ -1,5 +1,5 @@
 import enum
-from typing import Dict, Tuple, Optional
+from typing import Dict, Set, Tuple, Optional
 
 from framing.base import Frame
 from framing.codecs import IntegerFormat
@@ -51,6 +51,11 @@ TCP.Flags.flag_values(TCPFlag)
 TCP_Stream_Id = Tuple[RawData, int, RawData, int]
 # Null TCP stream id
 TCP_Null_Stream_Id = Tuple[Raw.empty, 0, Raw.empty, 0]
+
+def flip_tcp_stream_id(stream_id: TCP_Stream_Id) -> TCP_Stream_Id:
+    """Flip TCP stream id"""
+    return stream_id[2], stream_id[3], stream_id[0], stream_id[1]
+
 
 class TCPDataQueue(RawDataQueue):
     """TCP data queue, one connection to one direction"""
