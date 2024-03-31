@@ -15,6 +15,7 @@ from framing.frame_types.ipv4_frames import IPv4, IPv4Flag
 from framing.frame_types.ipv6_frames import Fragment, IPv6, IPx
 from framing.frame_types.pcap_frames import FileHeader, PCAP_Payloads, PCAPFile, PCAPRecordIterator, PacketRecord
 from framing.frame_types.tcp_frames import TCP, TCP_Null_Stream_Id, TCP_Stream_Id, TCPDataQueue, TCPFlag, flip_tcp_stream_id
+from framing.frame_types.udp_frames import UDP
 from framing.frames import Frames
 from framing.raw_data import Raw, RawData
 
@@ -286,6 +287,26 @@ class IPStackLayer(FrameStackLayer):
         self.queues[key] = queue, t_len
         return []
 
+class UDPStackLayer(FrameStackLayer):
+    def __init__(self):
+        super().__init__(UDP)
+        self.to_server: Set[Tuple[RawData, int]] = set()  # packets towards server
+
+    def receive(self, state: StackState) -> Iterable[StackState]:
+        udp = UDP(Frames.dissect(state.data))
+        ip = state.get_frame()
+        assert isinstance(ip, IPx), f"Expected IPx as UDP transport, got {type(ip)}"
+        s_host, d_host = IPUtility.get_source_destination(ip)
+        to_key = d_host, UDP.Destination_port[udp]
+        if to_key in self.to_server:
+            return [state.add(udp, to_key[1], UDP.Data[udp])]  # client to server
+        from_key = s_host, UDP.Source_port[udp]
+        if from_key in self.to_server:
+            return [state.add(udp, from_key[1], UDP.Data[udp])]  # server to client
+        # assume first packet is towards server
+        self.to_server.add(to_key)
+        return [state.add(udp, to_key[1], UDP.Data[udp])]
+
 
 class TCPStackLayer(FrameStackLayer):
     def __init__(self, full_streams=False):
@@ -321,7 +342,6 @@ class TCPStackLayer(FrameStackLayer):
         return key, queue
 
     def receive(self, state: StackState) -> Iterable[StackState]:
-        """Push TCP frame, get back raw data queue"""
         tcp = TCP(Frames.dissect(state.data))
         ip = state.get_frame()
         assert isinstance(ip, IPx), f"Expected IPx as TCP transport, got {type(ip)}"
@@ -355,6 +375,7 @@ Stack_builder_map: Dict[str, Callable[[], StackLayerBuilder]] = {
     'ip4': StackLayerBuilder({0x0800: lambda: IPStackLayer(IPv4)}),
     'ip6': StackLayerBuilder({0x86dd: lambda: IPStackLayer(IPv6)}),
     'ip': StackLayerBuilder({0x0800: lambda: IPStackLayer(IPv4), 0x86dd: lambda: IPStackLayer(IPv6)}),
+    'udp': StackLayerBuilder({17: lambda: UDPStackLayer()}),
     'tcp': StackLayerBuilder({6: lambda: TCPStackLayer()}),
     'dns': StackLayerBuilder({53: lambda: DNSStackLayer()}),
 }
