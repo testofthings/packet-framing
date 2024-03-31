@@ -38,16 +38,22 @@ class StackState:
 
     def get_layer_names(self) -> str:
         """Get the string of layers names"""
-        lower = []
+        ls = []
         s = self
         while s:
+            lower = s.lower
             if s.frame:
                 fs = s.frame.structure.structure_name
-                if s.payload_type is not None:
-                    fs = f"{s.payload_type}={fs}"
-                lower.insert(0, fs)
-            s = s.lower
-        return " / ".join(lower)
+                p = s.payload_type
+                if isinstance(p, Tuple) and len(p) == 4:
+                    # Assuming source address+port and destination address+port
+                    ks = f"{p[0].as_ip_address()}.{p[1]}, {p[2].as_ip_address()}.{p[3]}"
+                    fs = f"{ks}={fs}"
+                elif p is not None:
+                    fs = f"{p}={fs}"
+                ls.insert(0, fs)
+            s = lower
+        return " / ".join(ls)
 
     def __repr__(self) -> str:
         s = self.get_layer_names()
