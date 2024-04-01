@@ -139,6 +139,14 @@ class RawFrame(Frame):
     structure = Structure['RawFrame']()
     data = structure.raw()
 
+    def build_with_lengths(bits: int = None, bytes: int = None, min_bits: int = None, min_bytes: int = None,
+                           default: RawData = Raw.empty) -> Type[Frame]:
+        """Build raw frame with length limits"""
+        class RawFrameWithLength(Frame):
+            structure = Structure['RawFrameWithLength']()
+            data = structure.raw(bits=bits, bytes=bytes, min_bits=min_bits, min_bytes=min_bytes)
+        return RawFrameWithLength
+
 
 class ComposingBackend(BackendImplementation):
     """Backend to compose a frame"""
