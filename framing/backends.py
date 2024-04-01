@@ -263,6 +263,17 @@ class DissectorBackend(BackendImplementation):
         if bit_length < 0 and field.offset.min_tail_length:
             # length not known, limited by space required by later field(s)
             bit_length = max(0, self.data.bit_length() - bit_length - field.offset.min_tail_length)
+            bit_length = field._validate_length(bit_length)
+
+        if field.min_bit_length < field.max_bit_length:
+            # variable length, check find out how much to read
+            avail = self.data.bits_available()
+            if avail >= field.max_bit_length:
+                # maximum amount of data available
+                return self.data.subBlockBits(0, field.max_bit_length), field.max_bit_length
+            # less than maximum surely available, must read to find out
+            data_len = self.data.bit_length()
+            bit_length = field._validate_length(data_len)
 
         if bit_length < 0:
             data = self.data.tailBits(bit_offset)

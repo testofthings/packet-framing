@@ -1,5 +1,5 @@
 import pytest
-from framing.backends import BackendImplementation
+from framing.backends import BackendImplementation, RawFrame
 from framing.base import Frame
 from framing.codecs import IntegerCodec, IntegerFormat
 from framing.fields import Structure, LVField, Sequence
@@ -97,6 +97,16 @@ def test_min_length():
     e_frame = EFrame(Frames.dissect(Raw.hex("00010203040506070809")))
     d = EFrame.s_field[e_frame]
     assert d == Raw.hex("0001020304050607")
+
+    e_frame = EFrame(Frames.dissect(Raw.hex("00010203040506070809")))
+    d = EFrame.s_field.as_frame(e_frame, frame_type=RawFrame.build_with_lengths(min_bytes=4, bytes=7))
+    assert isinstance(d, Frame)
+    assert d.byte_length() == 7
+
+    e_frame = EFrame(Frames.dissect(Raw.hex("00010203040506070809")))
+    d = EFrame.s_field.as_frame(e_frame, frame_type=RawFrame)
+    assert isinstance(d, Frame)
+    assert d.byte_length() == 8
 
     e_frame = EFrame(Frames.dissect(Raw.hex("000102")))
     # pytest that exception thrown
