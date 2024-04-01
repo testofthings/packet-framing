@@ -23,16 +23,18 @@ from framing.raw_data import Raw, RawData
 
 class StackState:
     """Extractor output, frame and way to get payload data"""
-    def __init__(self, data: RawData, payload_type: Any = None, frame: Optional[Frame] = None, lower: Optional['StackState'] = None):
+    def __init__(self, data: RawData, payload_type: Any = None, frame: Optional[Frame] = None, lower: Optional['StackState'] = None,
+                 stream_id: Optional[Any] = None):
         self.data = data
         self.payload_type = payload_type
         self.frame = frame
         self.lower = lower
+        self.stream_id = stream_id  # for streaming layers
 
-    def add(self, frame: Frame, payload_type: Any = None, data: RawData = Raw.empty):
+    def add(self, frame: Frame, payload_type: Any = None, data: RawData = Raw.empty, stream_id: Optional[Any] = None):
         """Add frame to the stack"""
         self.frame = frame  # update this frame
-        return StackState(data, payload_type, lower=self)
+        return StackState(data, payload_type, lower=self, stream_id=stream_id)
 
     def get_frame(self) -> Frame:
         """Get the top frame, look for it"""
@@ -79,9 +81,13 @@ class FrameStackLayer:
         return self.frame_type
 
     def receive(self, state: StackState) -> Iterable[StackState]:
-        """Input through the stack"""
+        """Receive data through the stack"""
         frame = RawFrame(Frames.dissect(state.data))
         return [state.add(frame)]
+
+    def commit_read(self, stream_id: Any, byte_length: int):
+        """Commit read of bytes from underlying stream"""
+        pass
 
     def configure(self, spec: Dict[Any, Any]) -> 'FrameStackLayer':
         """Configure this layer"""
@@ -116,12 +122,26 @@ class FrameStack:
             yield state.add(out_frame)
             return
         # this is intermediate layer, pass to higher layers
-        for s in self.layer.receive(state):
+        layer_receive = self.layer.receive(state)
+        for s in layer_receive:
             if not s.data:
                 continue  # do not pass empty data
             next = self.next.get(s.payload_type) or self.next.get(None)  # None key is fallback
-            if next is not None:
-                yield from next.receive(s)
+            if next is None:
+                continue  # skip this payload type
+            next_receive = next.receive(s)
+            if s.stream_id:
+                # stream data, commit read data
+                next_receive = list(next.receive(s))  # read the full packet
+                try:
+                    next_frame_len = s.frame.byte_length()  # this raises exception, if EOF
+                    self.layer.commit_read(s.stream_id, next_frame_len)
+                    yield from next_receive
+                except EOFError as e:
+                    pass  # leave data to stream
+            else:
+                yield from next_receive
+
 
     def build(self, spec: Dict[Any, Any]):
         """Build this extractor recursively"""
@@ -135,7 +155,9 @@ class FrameStack:
                 continue  # no configuration
             if k == "raw":
                 # show raw data
-                self.next[None] = FrameStack(FrameStackLayer())
+                layer = RawStackLayer()
+                layer.configure(v)
+                self.next[None] = FrameStack(layer)
                 continue
 
             layer_builder = Stack_builder_map.get(k)
@@ -176,28 +198,22 @@ class FrameStack:
                     s_layer.build(v)
                     self.next[key] = s_layer
 
-        # for k, v in spec.items():
-        #     next = None
-        #     if k == 'eth':
-        #         next = self.next[1] = FrameStack(PayloadFieldStackLayer(EthernetII, EthernetII.type, EthernetII.data))
-        #     if k == 'ip4':
-        #         next = self.next[0x0800] = FrameStack(IPStackLayer(IPv4))
-        #     if k == 'ip6':
-        #         next = self.next[0x86dd] = FrameStack(IPStackLayer(IPv6))
-        #     if k == 'tcp':
-        #         next = self.next[6] = FrameStack(TCPStackLayer())
-        #     if k == 'dns':
-        #         next = self.next[53] = FrameStack(FrameStackLayer(DNSMessageTCP))
-        #     if k == 'raw':
-        #         next = self.next[None] = FrameStack(FrameStackLayer())  # any data
-        #     if next and v and isinstance(v, Dict):
-        #         next.build(v)
-
     def __repr__(self) -> str:
         s = f"{self.layer}"
         for k, v in self.next.items():
             s += f"\n  {k}: {v.layer}"
         return s
+
+
+class RawStackLayer(FrameStackLayer):
+    def __init__(self):
+        super().__init__(RawFrame)
+
+    def configure(self, spec: Dict[Any, Any]) -> FrameStackLayer:
+        length = int(spec.get("len", -1))
+        if length > 0:
+            self.frame_type = RawFrame.build_with_lengths(min_bytes=1, bytes=length)
+        return super().configure(spec)
 
 
 class PCAPStackLayer(FrameStackLayer):
@@ -318,11 +334,10 @@ class UDPStackLayer(FrameStackLayer):
 
 
 class TCPStackLayer(FrameStackLayer):
-    def __init__(self, full_streams=False):
+    def __init__(self):
         super().__init__(TCP)
         self.queues: Dict[TCP_Stream_Id, TCPDataQueue] = {}
         self.to_server: Set[TCP_Stream_Id] = set()  # streams towards server
-        self.full_stream = full_streams
 
     def receive_queue(self, packets: Optional[Tuple[TCP, IPx]]) -> Tuple[TCP_Stream_Id, Optional[RawDataQueue]]:
         """Push TCP frame, get back raw data queue"""
@@ -359,14 +374,14 @@ class TCPStackLayer(FrameStackLayer):
         server_port = key[3] if key in self.to_server else key[1]
         if not queue:
             return []  # no data available
-        if queue.is_closed():
-            data = queue.pull_all()
-            return [state.add(tcp, server_port, data)]
-        if self.full_stream:
-            return []
-        data = queue.pull_all()
-        return [state.add(tcp, server_port, data)]
+        data = queue.head.fixed
+        # With stream ID, stream can produce more data
+        return [state.add(tcp, server_port, data, stream_id=key)]
 
+    def commit_read(self, stream_id: Any, byte_length: int):
+        queue = self.queues.get(stream_id)
+        assert queue, f"Unexpected TCP stream id {stream_id}"
+        queue.forward(byte_length)
 
 class DNSStackLayer(FrameStackLayer):
     def __init__(self):
