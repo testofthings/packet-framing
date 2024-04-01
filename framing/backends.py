@@ -301,6 +301,7 @@ class DissectorBackend(BackendImplementation):
                         if prefix.field.offset.min_tail_length:
                             # data limited by space required by later field(s)
                             p_len = max(0, p_len - prefix.field.offset.min_tail_length)
+                        p_len = prefix.field._validate_length(p_len)
                     off += p_len
                 self.end_offset_cache[prefix.field] = off  # cache for next call
         else:

@@ -62,6 +62,8 @@ class Field(FieldPointer[F, T]):
         self.default_value = default_value
         self.fixed_bit_offset = fixed_bit_offset
         self.fixed_bit_length = -1
+        self.max_bit_length = -1
+        self.min_bit_length = -1
         self.direct_decode = False
         self.offset = FieldOffset(self)
         self.structure: Optional['Structure'] = None  # set by structure herself
@@ -92,6 +94,14 @@ class Field(FieldPointer[F, T]):
     def __setitem__(self, frame: F, value: T) -> F:
         frame.backend.set(self, value)
         return frame
+
+    def _validate_length(self, bit_length: int) -> int:
+        """Validate bit length against minimum and maximum lengths, raise error if too short"""
+        if self.min_bit_length >= 0 and bit_length < self.min_bit_length:
+            raise EOFError(f"Field '{self.field_name}' too short: {bit_length} < {self.min_bit_length} bits")
+        if self.max_bit_length > 0:
+            bit_length = min(bit_length, self.max_bit_length)
+        return bit_length
 
     def get_bit_length(self, frame: F) -> int:
         """Get bit length for a value"""

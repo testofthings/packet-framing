@@ -1,3 +1,4 @@
+import pytest
 from framing.backends import BackendImplementation
 from framing.base import Frame
 from framing.codecs import IntegerCodec, IntegerFormat
@@ -25,9 +26,15 @@ class CFrame(Frame):
 
 
 class DFrame(Frame):
-    structure = Structure['CFrame']()
+    structure = Structure['DFrame']()
 
     asciiz = structure.raw().terminator(Raw.octets(0))
+
+
+class EFrame(Frame):
+    structure = Structure['EFrame']()
+
+    s_field = structure.raw(min_bytes=4, bytes=8)
 
 
 def test_lv_compose():
@@ -78,3 +85,24 @@ def test_terminator():
 
     d_frame = DFrame(Frames.dissect(Raw.hex("61626300 6465")))
     assert DFrame.asciiz[d_frame] == Raw.hex("61626300")
+
+def test_min_length():
+    e_frame = EFrame(Frames.compose())
+    c = e_frame.encode()
+    assert c == Raw.hex("00000000")
+
+    e_frame = EFrame(Frames.dissect(Raw.hex("00010203040506070809")))
+    c = e_frame.byte_length() == 8  # max length
+
+    e_frame = EFrame(Frames.dissect(Raw.hex("00010203040506070809")))
+    d = EFrame.s_field[e_frame]
+    assert d == Raw.hex("0001020304050607")
+
+    e_frame = EFrame(Frames.dissect(Raw.hex("000102")))
+    # pytest that exception thrown
+    with pytest.raises(EOFError):
+        c = e_frame.byte_length() == 8
+
+    with pytest.raises(EOFError):
+        d = EFrame.s_field[e_frame]
+
