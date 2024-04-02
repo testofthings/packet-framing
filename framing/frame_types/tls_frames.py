@@ -19,10 +19,23 @@ class ClientHello(Frame):
     extensions = structure.raw().length_by(extensions_length)
 
 
+class ServerHello(Frame):
+    structure = Structure['ServerHello']()
+
+    version = structure.integer(bytes=2)
+    random = structure.raw(bytes=32)
+    session_id_length = structure.integer(bytes=1)
+    session_id = structure.raw().length_by(session_id_length)
+    cipher_suite = structure.integer(bytes=2)
+    compression_method = structure.integer(bytes=1)
+    extensions_length = structure.integer(bytes=2)
+    extensions = structure.raw().length_by(extensions_length)
+
 class TLSHandshakeMessage(Frame):
     structure = Selection['TLSHandshakeMessage']()
 
     client_hello = structure.choice(1, structure.sub(ClientHello))
+    server_hello = structure.choice(2, structure.sub(ServerHello))
 
 
 class TLSRecord(Frame):
