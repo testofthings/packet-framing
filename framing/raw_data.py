@@ -9,21 +9,29 @@ IPAddress = Union[ipaddress.IPv6Address, ipaddress.IPv4Address]
 
 class LengthEntity:
     def bit_length(self) -> int:
-        """Length in bits or -1 if a stream"""
+        """Length in bits or EOFError if unclosed stream"""
         raise NotImplementedError()
 
     def byte_length(self) -> int:
-        """Length in full bytes or -1 if a stream"""
+        """Length in full bytes or EOFError if unclosed stream"""
         return self.bit_length() // 8
 
 
-class RawData:
+class RawData(LengthEntity):
     """Raw data buffer"""
-    def bit_length(self) -> int:
-        raise NotImplementedError()
+    def get_bit_length(self) -> int:
+        """Get length in bits or -8 if unknown"""
+        try:
+            return self.bit_length()
+        except EOFError:
+            return -8
 
-    def byte_length(self) -> int:
-        return self.bit_length() // 8
+    def get_byte_length(self) -> int:
+        """Get length in bytes or -1 if unknown"""
+        try:
+            return self.byte_length()
+        except EOFError:
+            return -1
 
     def bits_available(self) -> int:
         """Number of bits available without waiting"""
@@ -107,13 +115,13 @@ class RawData:
         return self.dump()
 
     def __bool__(self):
-        return self.bit_length() > 0
+        return self.get_bit_length() != 0
 
     def __eq__(self, other):
         if not isinstance(other, RawData):
             return False
-        blen = self.bit_length()
-        if blen < 0 or other.bit_length() < 0 or (blen != other.bit_length()):
+        blen = self.get_bit_length()
+        if blen < 0 or other.get_bit_length() < 0 or (blen != other.bit_length()):
             return False  # streams cannot be compared or different length
         for i in range(0, blen // 8):
             if self.octet(i) != other.octet(i):
@@ -418,10 +426,14 @@ class AppendableRawData(RawData):
         return r
 
     def bit_length(self) -> int:
-        return self.fixed.bit_length() if self.closed else -1
+        if not self.closed:
+            raise EOFError("Stream not closed")
+        return self.fixed.bit_length()
 
     def byte_length(self) -> int:
-        return self.fixed.byte_length() if self.closed else -1
+        if not self.closed:
+            raise EOFError("Stream not closed")
+        return self.fixed.byte_length()
 
     def bits_available(self) -> int:
         return self.fixed.bit_length()
@@ -458,7 +470,7 @@ class AppendableRawData(RawData):
         return self.fixed == other
 
     def __bool__(self):
-        return self.fixed.bit_length() > 0
+        return (not self.closed) or self.fixed.bit_length() > 0
 
 
 class StreamData(RawData):
