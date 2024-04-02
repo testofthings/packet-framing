@@ -3,7 +3,7 @@ from typing import Generic, Iterator, Optional, Tuple, List
 
 from framing.base import T
 from framing.frame_types.ethernet_frames import EthernetII
-from framing.frame_types.ip_utilities import TCPReassembler
+from framing.frame_types.ip_utilities import TCPStackLayer
 from framing.frame_types.ipv4_frames import IPv4
 from framing.frame_types.ipv6_frames import IPReassembler, IPStackLayer, IPv6, IPx
 from framing.frame_types.pcap_frames import PacketRecord
@@ -84,9 +84,9 @@ class IP2TCP(Processor[IPx, T]):
 
 class IP2TCPStream(Processor[IPx, Tuple[TCP_Stream_Id, RawData]]):
     """TCP stream processor, push IP frames, get back TCP stream data, if possible"""
-    def __init__(self, full_streams=False):
+    def __init__(self):
         self.layer = IPStackLayer()
-        self.tcp_reassemble = TCPReassembler(full_streams)
+        self.tcp_reassemble = TCPStackLayer()
 
     def push(self, value: IPx) -> Optional[Tuple[TCP_Stream_Id, RawData]]:
         if isinstance(value, IPv4) or isinstance(value, IPv6):

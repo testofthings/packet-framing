@@ -1,9 +1,11 @@
-from typing import Dict, Iterator, Self, Tuple, Optional
+from typing import Any, Dict, Iterable, Iterator, Self, Set, Tuple, Optional
 
 from framing.data_queue import RawDataQueue
 from framing.frame_types.ipv4_frames import IPv4
 from framing.frame_types.ipv6_frames import IPx, IPv6
-from framing.frame_types.tcp_frames import TCP_Null_Stream_Id, TCP_Stream_Id, TCP, TCPFlag, TCPDataQueue
+from framing.frame_types.tcp_frames import TCP_Null_Stream_Id, TCP_Stream_Id, TCP, TCPFlag, TCPDataQueue, flip_tcp_stream_id
+from framing.frames import Frames
+from framing.layer_stack import FrameStackLayer, StackState
 from framing.raw_data import RawData
 
 
@@ -16,11 +18,30 @@ class IPUtility:
         return IPv6.Source_address[ip], IPv6.Destination_address[ip]
 
 
-class TCPReassembler:
-    """TCP reassembler, push TCP frames, get raw data back"""
-    def __init__(self, full_streams=False):
+class TCPStackLayer(FrameStackLayer):
+    def __init__(self):
+        super().__init__(TCP)
+        self.streaming = True
         self.queues: Dict[TCP_Stream_Id, TCPDataQueue] = {}
-        self.full_stream = full_streams
+        self.to_server: Set[TCP_Stream_Id] = set()  # streams towards server
+
+    def receive(self, state: StackState) -> Iterable[StackState]:
+        tcp = TCP(Frames.dissect(state.data))
+        ip = state.get_frame()
+        assert isinstance(ip, IPx), f"Expected IPx as TCP transport, got {type(ip)}"
+        key, queue = self.push_queue((tcp, ip))
+        # use server port to identify payload type
+        server_port = key[3] if key in self.to_server else key[1]
+        if not queue:
+            return []  # no data available
+        data = queue.head.fixed
+        # With stream ID, stream can produce more data
+        return [state.add(tcp, server_port, data, stream_id=key)]
+
+    def commit_read(self, stream_id: Any, byte_length: int):
+        queue = self.queues.get(stream_id)
+        assert queue, f"Unexpected TCP stream id {stream_id}"
+        queue.forward(byte_length)
 
     def push_queue(self, packets: Optional[Tuple[TCP, IPx]]) -> Tuple[TCP_Stream_Id, Optional[RawDataQueue]]:
         """Push TCP frame, get back raw data queue"""
@@ -35,6 +56,9 @@ class TCPReassembler:
         if start:
             queue = TCPDataQueue(tcp)
             self.queues[key] = queue
+            r_key = flip_tcp_stream_id(key)
+            if r_key not in self.to_server:
+                self.to_server.add(key)  # assume first packet is towards server
         else:
             queue = self.queues.get(key)
             if not queue:
@@ -50,10 +74,5 @@ class TCPReassembler:
         key, queue = self.push_queue(packets)
         if not queue:
             return key, None  # no queue
-        if queue.is_closed():
-            return key, queue.pull_all()
-        if self.full_stream:
-            return key, None
         data = queue.pull_all()
         return key, data
-

@@ -2,7 +2,7 @@ import pathlib
 from framing.data_queue import RawDataQueue
 from framing.frame_processors import IP2TCP, Ethernet2IP, IP2TCPStream, PCAP2Ethernet, ProcessorIterator
 from framing.frame_types.ethernet_frames import Ethernet_Payloads
-from framing.frame_types.ip_utilities import TCPReassembler
+from framing.frame_types.ip_utilities import TCPStackLayer
 from framing.frame_types.ipv6_frames import IPv6_Payloads
 from framing.frame_types.pcap_frames import PCAP_Payloads, PCAPFile, PCAPRecordIterator
 from framing.frame_types.tls_frames import ClientHello, TLSApplicationData, TLSChangeCipherSpec, TLSHandshake, TLSHandshakeMessage, TLSRecord, TLSRecord_Payloads
@@ -14,7 +14,7 @@ def test_tls_record():
                               mappings=PCAP_Payloads + Ethernet_Payloads + IPv6_Payloads)
 
     pro = PCAP2Ethernet(Ethernet2IP(IP2TCP()))
-    asm = TCPReassembler(full_streams=True)
+    asm = TCPStackLayer()
     recs = {}
     for pcap_r in PCAPRecordIterator(pcap):
         tcp_ip = pro.push(pcap_r)

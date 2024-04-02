@@ -2,7 +2,6 @@ import pathlib
 
 from framing.frame_processors import IP2TCP, Ethernet2IP, PCAP2Ethernet
 from framing.frame_types.ethernet_frames import EthernetII, Ethernet_Payloads
-from framing.frame_types.ip_utilities import TCPReassembler
 from framing.frame_types.ipv6_frames import IPv6, IPv6_Payloads, ICMPv6, Fragment
 from framing.frame_types.pcap_frames import PCAPFile, PCAPRecordIterator, PacketRecord, PCAP_Payloads
 from framing.frame_types.tcp_frames import TCP, TCPDataQueue, TCPFlag
