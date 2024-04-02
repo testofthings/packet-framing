@@ -2,7 +2,7 @@ import pathlib
 from framing.data_queue import RawDataQueue
 from framing.frame_processors import IP2TCP, Ethernet2IP, PCAP2Ethernet, ProcessorIterator
 from framing.frame_types.ethernet_frames import Ethernet_Payloads
-from framing.frame_types.ip_utilities import IP2TCPStream, TCPDataTable, TCPReassembler
+from framing.frame_types.ip_utilities import IP2TCPStream, TCPReassembler
 from framing.frame_types.ipv6_frames import IPv6_Payloads
 from framing.frame_types.pcap_frames import PCAP_Payloads, PCAPFile, PCAPRecordIterator
 from framing.frame_types.tls_frames import ClientHello, TLSApplicationData, TLSChangeCipherSpec, TLSHandshake, TLSHandshakeMessage, TLSRecord, TLSRecord_Payloads
