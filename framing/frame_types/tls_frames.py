@@ -1,7 +1,10 @@
+from typing import Iterable
 from framing.base import Frame, LayerMapping
 from framing.data_queue import RawDataQueue
 from framing.fields import Selection, Structure, ValueOf
 from framing.frame_processors import Processor
+from framing.frames import Frames
+from framing.layer_stack import FrameStackLayer, StackState
 
 
 class ClientHello(Frame):
@@ -81,3 +84,17 @@ TLSRecord_Payloads = LayerMapping(TLSRecord.fragment).by(TLSRecord.ContentType, 
     21: TLSAlert,
     23: TLSApplicationData,
 })
+
+
+class TLSRecordLayer(FrameStackLayer):
+    def __init__(self):
+        super().__init__(TLSRecord)
+        self.queue = RawDataQueue()
+
+    def receive(self, state: StackState) -> Iterable[StackState]:
+        record = TLSRecord(Frames.dissect(state.data))
+        self.queue.push(TLSRecord.fragment[record])
+        if not self.queue:
+            return []
+        data = self.queue.pull_all()
+        return [state.add(record, TLSRecord.ContentType[record], data)]

@@ -1,9 +1,12 @@
 from typing import Any, Dict, Iterable, Iterator, Self, Set, Tuple, Optional
 
+from framing.base import Frame
 from framing.data_queue import RawDataQueue
+from framing.frame_types.dns_frames import DNSMessage, DNSMessageTCP
 from framing.frame_types.ipv4_frames import IPv4
 from framing.frame_types.ipv6_frames import IPx, IPv6
 from framing.frame_types.tcp_frames import TCP_Null_Stream_Id, TCP_Stream_Id, TCP, TCPFlag, TCPDataQueue, flip_tcp_stream_id
+from framing.frame_types.udp_frames import UDP
 from framing.frames import Frames
 from framing.layer_stack import FrameStackLayer, StackState
 from framing.raw_data import RawData
@@ -76,3 +79,35 @@ class TCPStackLayer(FrameStackLayer):
             return key, None  # no queue
         data = queue.pull_all()
         return key, data
+
+
+class UDPStackLayer(FrameStackLayer):
+    """UDP stack layer"""
+    def __init__(self):
+        super().__init__(UDP)
+        self.to_server: Set[Tuple[RawData, int]] = set()  # packets towards server
+
+    def receive(self, state: StackState) -> Iterable[StackState]:
+        udp = UDP(Frames.dissect(state.data))
+        ip = state.get_frame()
+        assert isinstance(ip, IPx), f"Expected IPx as UDP transport, got {type(ip)}"
+        s_host, d_host = IPUtility.get_source_destination(ip)
+        to_key = d_host, UDP.Destination_port[udp]
+        if to_key in self.to_server:
+            return [state.add(udp, to_key[1], UDP.Data[udp])]  # client to server
+        from_key = s_host, UDP.Source_port[udp]
+        if from_key in self.to_server:
+            return [state.add(udp, from_key[1], UDP.Data[udp])]  # server to client
+        # assume first packet is towards server
+        self.to_server.add(to_key)
+        return [state.add(udp, to_key[1], UDP.Data[udp])]
+
+
+class DNSStackLayer(FrameStackLayer):
+    def __init__(self):
+        super().__init__(DNSMessage)
+
+    def get_frame_type(self, state: StackState) -> Frame:
+        if state.lower and isinstance(state.lower.frame, TCP):
+            return DNSMessageTCP
+        return DNSMessage
