@@ -3,12 +3,14 @@ from typing import Generic, Iterator, Optional, Tuple, List
 
 from framing.base import T
 from framing.frame_types.ethernet_frames import EthernetII
+from framing.frame_types.ip_utilities import TCPReassembler
 from framing.frame_types.ipv4_frames import IPv4
-from framing.frame_types.ipv6_frames import IPReassembler, IPv6, IPx
+from framing.frame_types.ipv6_frames import IPReassembler, IPStackLayer, IPv6, IPx
 from framing.frame_types.pcap_frames import PacketRecord
-from framing.frame_types.tcp_frames import TCP
+from framing.frame_types.tcp_frames import TCP, TCP_Stream_Id
 from framing.frame_types.udp_frames import UDP
 from framing.frames import Frames
+from framing.raw_data import RawData
 
 S = typing.TypeVar("S")
 
@@ -55,42 +57,46 @@ class Ethernet2IP(Processor[EthernetII, T]):
 class IP2UDP(Processor[IPx, T]):
     def __init__(self, sub: Optional[Processor[UDP, T]] = None):
         self.sub = NoProcessor() if sub is None else sub
-        self.assembler = IPReassembler()
+        self.layer = IPStackLayer()
 
     def push(self, value: IPv4) -> Optional[T]:
-        if isinstance(value, IPv4):
-            if IPv4.Protocol[value] == 0x11:
-                udp = self.assembler.push_frame(value)
-        elif isinstance(value, IPv6):
-            if IPv6.Next_header[value] == 0x11:
-                udp = self.assembler.push_frame(value)
-        else:
-            return None
-        if not udp:
-            return
-        return self.sub.push(udp), value
-
+        if isinstance(value, IPv4) or isinstance(value, IPv6):
+            type_data = self.layer.push(value)
+            if type_data is not None and type_data[0] == 0x11:
+                frame = UDP(Frames.dissect(type_data[1]))
+                return self.sub.push(frame), value
+        return None
 
 class IP2TCP(Processor[IPx, T]):
     """Extract TCP frames from IPx frames with IP reassembly"""
     def __init__(self, sub: Optional[Processor[Tuple[TCP, IPx], T]] = None):
         self.sub = NoProcessor() if sub is None else sub
-        self.reassemble = IPReassembler()
+        self.layer = IPStackLayer()
 
     def push(self, value: IPx) -> Optional[T]:
-        if isinstance(value, IPv4):
-            if IPv4.Protocol[value] != 0x6:
-                return None
-            tcp = self.reassemble.push_frame(value)
-        elif isinstance(value, IPv6):
-            if IPv6.Next_header[value] != 0x6:
-                return None
-            tcp = self.reassemble.push_frame(value)
-        else:
-            return None
-        if not tcp:
-            return None
-        return self.sub.push(tcp), value
+        if isinstance(value, IPv4) or isinstance(value, IPv6):
+            type_data = self.layer.push(value)
+            if type_data is not None and type_data[0] == 0x6:
+                frame = TCP(Frames.dissect(type_data[1]))
+                return self.sub.push(frame), value
+        return None
+
+
+class IP2TCPStream(Processor[IPx, Tuple[TCP_Stream_Id, RawData]]):
+    """TCP stream processor, push IP frames, get back TCP stream data, if possible"""
+    def __init__(self, full_streams=False):
+        self.layer = IPStackLayer()
+        self.tcp_reassemble = TCPReassembler(full_streams)
+
+    def push(self, value: IPx) -> Optional[Tuple[TCP_Stream_Id, RawData]]:
+        if isinstance(value, IPv4) or isinstance(value, IPv6):
+            type_data = self.layer.push(value)
+            if type_data is not None and type_data[0] == 0x6:
+                tcp = TCP(Frames.dissect(type_data[1]))
+                key, data = self.tcp_reassemble.push((tcp, value))
+                if data is not None:
+                    return key, data
+        return None
 
 
 class ProcessorIterator(Generic[S, T], Iterator[T]):

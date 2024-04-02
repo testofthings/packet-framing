@@ -1,11 +1,10 @@
 from typing import Dict, Iterator, Self, Tuple, Optional
 
 from framing.data_queue import RawDataQueue
-from framing.frame_processors import Processor
 from framing.frame_types.ipv4_frames import IPv4
-from framing.frame_types.ipv6_frames import IPReassembler, IPx, IPv6
+from framing.frame_types.ipv6_frames import IPx, IPv6
 from framing.frame_types.tcp_frames import TCP_Null_Stream_Id, TCP_Stream_Id, TCP, TCPFlag, TCPDataQueue
-from framing.raw_data import Raw, RawData
+from framing.raw_data import RawData
 
 
 # Utility functions
@@ -58,27 +57,3 @@ class TCPReassembler:
         data = queue.pull_all()
         return key, data
 
-
-class IP2TCPStream(Processor[IPx, Tuple[TCP_Stream_Id, RawData]]):
-    """TCP stream processor, push IP frames, get back TCP stream data, if possible"""
-    def __init__(self, full_streams=False):
-        self.reassemble = IPReassembler()
-        self.tcp_reassemble = TCPReassembler(full_streams)
-
-    def push(self, value: IPx) -> Optional[Tuple[TCP_Stream_Id, RawData]]:
-        if isinstance(value, IPv4):
-            if IPv4.Protocol[value] != 0x6:
-                return None
-            tcp = self.reassemble.push_frame(value)
-        elif isinstance(value, IPv6):
-            if IPv6.Next_header[value] != 0x6:
-                return None
-            tcp = self.reassemble.push_frame(value)
-        else:
-            return None
-        if not tcp:
-            return None
-        key, data = self.tcp_reassemble.push((tcp, value))
-        if data is None:
-            return None
-        return key, data
