@@ -82,24 +82,3 @@ class IP2TCPStream(Processor[IPx, Tuple[TCP_Stream_Id, RawData]]):
         if data is None:
             return None
         return key, data
-
-
-class TCPDataTable:
-    """Store TCP data by stream id"""
-    def __init__(self) -> None:
-        self.data: Dict[TCP_Stream_Id, RawData] = {}
-
-    def push(self, data: Optional[Tuple[TCP_Stream_Id, RawData]]) -> Optional[Tuple[TCP_Stream_Id, RawData]]:
-        """Push pair of stream key and data"""
-        if data is None:
-            return None
-        key, d = data
-        old = self.data.get(key, Raw.empty)
-        self.data[key] = Raw.concat(old, d)
-        return data
-
-    def push_all(self, streams: Iterator[Tuple[TCP_Stream_Id, RawData]]) -> Self:
-        """Push all stream data"""
-        for data in streams:
-            self.push(data)
-        return self
