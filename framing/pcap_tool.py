@@ -130,7 +130,7 @@ class FrameStack:
                 if not s.data:
                     continue  # no data to stream
                 assert s.stream_id, "Expected stream ID for streaming layer"
-                next = self.next.get(s.payload_type) or self.next.get(None)  # None key is fallback
+                next = self.next.get(s.payload_type) or RawStackLayer()
                 if next is None:
                     continue  # skip this payload type
                 next_receive = list(next.receive(s))  # next level payloads
@@ -143,7 +143,7 @@ class FrameStack:
         else:
             # block transport, 1-to-n relation between transport and payload frames
             for s in layer_receive:
-                next = self.next.get(s.payload_type) or self.next.get(None)  # None key is fallback
+                next = self.next.get(s.payload_type) or RawStackLayer()
                 if next is None:
                     continue  # skip this payload type
                 next_receive = next.receive(s)
