@@ -73,6 +73,7 @@ class FrameStackLayer:
     """Frame stack layer"""
     def __init__(self, frame_type: Type[Frame] = RawFrame):
         self.frame_type = frame_type
+        self.streaming = False  # streaming layer? (e.g. TCP)
         # force frame type initialization
         frame_type(Frames.compose())
 
@@ -121,25 +122,31 @@ class FrameStack:
             out_frame = frame_type(Frames.dissect(state.data))
             yield state.add(out_frame)
             return
-        # this is intermediate layer, pass to higher layers
+
         layer_receive = self.layer.receive(state)
-        for s in layer_receive:
-            if not s.data:
-                continue  # do not pass empty data
-            next = self.next.get(s.payload_type) or self.next.get(None)  # None key is fallback
-            if next is None:
-                continue  # skip this payload type
-            next_receive = next.receive(s)
-            if s.stream_id:
-                # stream data, commit read data
-                next_receive = list(next.receive(s))  # read the full packet
+        if self.layer.streaming:
+            # stream data m-to-n relation between transports and payload frames
+            for s in layer_receive:
+                if not s.data:
+                    continue  # no data to stream
+                assert s.stream_id, "Expected stream ID for streaming layer"
+                next = self.next.get(s.payload_type) or self.next.get(None)  # None key is fallback
+                if next is None:
+                    continue  # skip this payload type
+                next_receive = list(next.receive(s))  # next level payloads
                 try:
-                    next_frame_len = s.frame.byte_length()  # this raises exception, if EOF
-                    self.layer.commit_read(s.stream_id, next_frame_len)
+                    payload_len = s.frame.byte_length()  # this raises exception, if partial payload(s)
+                    self.layer.commit_read(s.stream_id, payload_len)
                     yield from next_receive
                 except EOFError as e:
                     pass  # leave data to stream
-            else:
+        else:
+            # block transport, 1-to-n relation between transport and payload frames
+            for s in layer_receive:
+                next = self.next.get(s.payload_type) or self.next.get(None)  # None key is fallback
+                if next is None:
+                    continue  # skip this payload type
+                next_receive = next.receive(s)
                 yield from next_receive
 
 
@@ -336,6 +343,7 @@ class UDPStackLayer(FrameStackLayer):
 class TCPStackLayer(FrameStackLayer):
     def __init__(self):
         super().__init__(TCP)
+        self.streaming = True
         self.queues: Dict[TCP_Stream_Id, TCPDataQueue] = {}
         self.to_server: Set[TCP_Stream_Id] = set()  # streams towards server
 
