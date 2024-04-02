@@ -304,25 +304,31 @@ class DissectorBackend(BackendImplementation):
         prefix = offset.prefix
         if prefix:
             # get offset of the prefix
-            off = self.end_offset_cache.get(prefix.field)
+            field = prefix.field
+            off = self.end_offset_cache.get(field)
             if off is None:
                 # not found from the cache
-                if prefix.field.end_offset_resolver:
+                if field.end_offset_resolver:
                     # Note: field.decode_bit_length would also use the resolver, but it needs the offset
-                    off = int(prefix.field.end_offset_resolver.pull(self))
+                    off = int(field.end_offset_resolver.pull(self))
                 else:
                     # prefix offset + variable length
                     off = self.get_bit_offset(prefix)
-                    p_len = prefix.field.decode_bit_length(self.data, off, None, self)
+                    p_len = field.decode_bit_length(self.data, off, None, self)
+                    if p_len < 0 and field.min_bit_length < field.max_bit_length and not field.offset.min_tail_length:
+                        # maximum length is known
+                        if self.data.bit(off + field.max_bit_length - 1) >= 0:
+                            # maximum data available
+                            p_len = field.max_bit_length
                     if p_len < 0:
                         # no length information, assuming all available
                         p_len = self.data.read_all().bit_length() - off
-                        if prefix.field.offset.min_tail_length:
+                        if field.offset.min_tail_length:
                             # data limited by space required by later field(s)
-                            p_len = max(0, p_len - prefix.field.offset.min_tail_length)
-                        p_len = prefix.field._validate_length(p_len)
+                            p_len = max(0, p_len - field.offset.min_tail_length)
+                        p_len = field._validate_length(p_len)
                     off += p_len
-                self.end_offset_cache[prefix.field] = off  # cache for next call
+                self.end_offset_cache[field] = off  # cache for next call
         else:
             off = 0
         off += offset.fixed_bit_offset
@@ -401,8 +407,7 @@ class DissectorBackend(BackendImplementation):
                 rl = self.choice.get_bit_length(self.frame)
             else:
                 rl = self.get_bit_offset(self.structure.fields_length)
-            data_len = self.data.bit_length()
-            if data_len < rl:
+            if self.data.bit(rl - 1) < 0:
                 # input data is known to be shorter...
                 raise EOFError(f"Only {self.data.byte_length()} bytes available for " + self.structure_name())
             self.known_bit_length = rl
