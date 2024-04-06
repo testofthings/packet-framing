@@ -9,17 +9,34 @@ At the moment, this is not too many, so this most likely is not the software you
 The module [packet-framing](https://pypi.org/project/packet-framing/) is published in _Python Package Index_ (PyPI).
 Installation from there should be as easy or hard as any other Python package.
 
-## Supported protocols and formats
-
-The following protocol formats are supported. 
-
 ## Command-line use
 
 The project comes with experimental PCAP dissection tool used in development and testing of the framework.
 
-NOTE: Tool documentation under construction.
+```
+$ python -m packet-framing traffic.pcap
+```
 
-## Basic concepts
+By default, the tool only shows the PCAP frames, which is not very interesting.
+The packet formats to apply are specified by _YAML_ or _JSON_ using command-line argument `--filter` or `-f`.
+For example, to active the default formats give the following command line:
+
+```
+$ python -m packet-framing -f '{"format": true}' traffic.pcap
+```
+
+The exact packet formats dissected can be configured in detail.
+For example, to only open _IP_ packets (Version 4 or 6) from the PCAP, use the following command-line.
+
+```
+$ python -m packet-framing -f '{"ip": {}}}' traffic.pcap
+```
+
+## Supported protocols and formats
+
+The supported protocols are formats are [listed separately](Formats.md).
+
+## Protocol modeling idea
 
 A protocol packet is modeled as a Python class.
 For example, consider the definition of the _IPv4 datagram_ from file `framing/frame_types/ipv4_frames.py`:
@@ -47,3 +64,5 @@ class IPv4(Frame):
     Payload = structure.raw().end_offset_by(ValueOf(Total_Length))
 
 ```
+
+Well, there is more than this, of course. Use the source.
