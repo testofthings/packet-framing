@@ -84,8 +84,7 @@ class LayerBuilder:
                 if layer_builder is None:
                     raise ValueError(f'Unknown protocol "{proto_name}"')
                 layer = layer_builder.build_layer(transport, v)
-                next = FrameStack(layer)
-                stack.next[key] = next
+                next = stack.next[key] = FrameStack(layer)
                 layer_builder.build(next, v)
             else:
                 # key is protocol builder, find all mappings
@@ -99,8 +98,7 @@ class LayerBuilder:
                     raise ValueError(f'No mapping for "{k}" in "{self.short_name}"')
                 for key in keys:
                     layer = layer_builder.build_layer(transport, v)
-                    next = FrameStack(layer)
-                    stack.next[key] = next
+                    next = stack.next[key] = FrameStack(layer)
                     layer_builder.build(next, v)
 
         use_defaults = spec.get('defaults', True)
@@ -113,8 +111,7 @@ class LayerBuilder:
         transport = stack.layer.frame_type
         for k, v in self.sub.items():
             layer = v.build_layer(transport, {})
-            next = FrameStack(layer)
-            stack.next[k] = next
+            next = stack.next[k] = FrameStack(layer)
             v.build_defaults(next)
         stack.layer.show_unmapped = True
 
