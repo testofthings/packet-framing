@@ -11,25 +11,25 @@ Installation from there should be as easy or hard as any other Python package.
 
 ## Command-line use
 
-The project comes with experimental PCAP dissection tool used in development and testing of the framework.
+The project comes with experimental file analysis tool used in development and testing of the framework.
 
 ```
 $ python -m packet-framing traffic.pcap
 ```
 
-By default, the tool only shows the PCAP frames, which is not very interesting.
-The packet formats to apply are specified by _YAML_ or _JSON_ using command-line argument `--filter` or `-f`.
-For example, to active the default formats give the following command line:
+By default, the tool parses _IP_ traffic in _Ethernet_ frames captured by PCAP.
+The protocol stack to apply in dissection is specified by _YAML_ or _JSON_ using command-line argument `--stack` or `-s`.
+For example, to parse only the PCAP layer, use the following:
 
 ```
-$ python -m packet-framing -f '{"format": true}' traffic.pcap
+$ python -m packet-framing -s '{"pcap": {}}' traffic.pcap
 ```
 
-The exact packet formats dissected can be configured in detail.
-For example, to only open _IP_ packets (Version 4 or 6) from the PCAP, use the following command-line.
+The stack can be configured in detail using the available protocls.
+For example, to dissect the _IP_ packets (Version 4 or 6) over _Ethernet_ frames in the PCAP, use the following command-line.
 
 ```
-$ python -m packet-framing -f '{"ip": {}}}' traffic.pcap
+$ python -m packet-framing -s '{"pcap": {"eth": {"ip": {}}}}' traffic.pcap
 ```
 
 ## Supported protocols and formats
