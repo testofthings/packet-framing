@@ -103,6 +103,22 @@ class LayerBuilder:
                     stack.next[key] = next
                     layer_builder.build(next, v)
 
+        use_defaults = spec.get('defaults', True)
+        if use_defaults and not stack.next:
+            self.build_defaults(stack)
+
+
+    def build_defaults(self, stack: FrameStack):
+        # build default sub layers
+        transport = stack.layer.frame_type
+        for k, v in self.sub.items():
+            layer = v.build_layer(transport, {})
+            next = FrameStack(layer)
+            stack.next[k] = next
+            v.build_defaults(next)
+        stack.layer.show_unmapped = True
+
+
     def __repr__(self) -> str:
         return f"{self.short_name}"
 
@@ -145,7 +161,9 @@ class StackBuilder:
             layer_builder.build(stack, v)
             break
         else:
-            stack = FrameStack(cls.eth.build_layer(None, {}))
+            layer = cls.pcap.build_layer(None, {})
+            stack = FrameStack(layer)
+            cls.pcap.build_defaults(stack)
         return stack
 
 def main():

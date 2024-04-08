@@ -61,6 +61,7 @@ class StackLayer:
     def __init__(self, frame_type: Type[Frame] = RawFrame):
         self.frame_type = frame_type
         self.streaming = False  # streaming layer? (e.g. TCP)
+        self.show_unmapped = False  # show unmapped data?
         # force frame type initialization
         frame_type(Frames.compose())
 
@@ -101,14 +102,16 @@ class FrameStack:
             return
 
         layer_receive = self.layer.receive(state)
+        received = False
         if self.layer.streaming:
             # stream data m-to-n relation between transports and payload frames
             for s in layer_receive:
-                if not s.data:
-                    continue  # no data to stream
+                received = True
                 assert s.stream_id, "Expected stream ID for streaming layer"
                 next = self.next.get(s.payload_type) or RawStackLayer()
-                if next is None:
+                if not s.data or next is None:
+                    if self.layer.show_unmapped:
+                        yield s
                     continue  # skip this payload type
                 next_receive = list(next.receive(s))  # next level payloads
                 try:
@@ -120,11 +123,17 @@ class FrameStack:
         else:
             # block transport, 1-to-n relation between transport and payload frames
             for s in layer_receive:
+                received = True
                 next = self.next.get(s.payload_type) or RawStackLayer()
                 if next is None:
+                    if self.layer.show_unmapped:
+                        yield s
                     continue  # skip this payload type
                 next_receive = next.receive(s)
                 yield from next_receive
+
+        if not received and self.layer.show_unmapped:
+            yield state
 
     def __repr__(self) -> str:
         s = f"{self.layer}"
