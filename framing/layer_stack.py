@@ -102,17 +102,17 @@ class FrameStack:
             return
 
         layer_receive = self.layer.receive(state)
-        received = False
         if self.layer.streaming:
             # stream data m-to-n relation between transports and payload frames
             for s in layer_receive:
-                received = True
+                next = self.next.get(s.payload_type)
+                if next is None and self.layer.show_unmapped:
+                    yield s  # show raw frames
+                    continue
+                if not s.data:
+                    continue  # no data added
                 assert s.stream_id, "Expected stream ID for streaming layer"
-                next = self.next.get(s.payload_type) or RawStackLayer()
-                if not s.data or next is None:
-                    if self.layer.show_unmapped:
-                        yield s
-                    continue  # skip this payload type
+                next = next or RawStackLayer()
                 next_receive = list(next.receive(s))  # next level payloads
                 try:
                     payload_len = s.frame.byte_length()  # this raises exception, if partial payload(s)
@@ -123,17 +123,14 @@ class FrameStack:
         else:
             # block transport, 1-to-n relation between transport and payload frames
             for s in layer_receive:
-                received = True
-                next = self.next.get(s.payload_type) or RawStackLayer()
-                if next is None:
-                    if self.layer.show_unmapped:
-                        yield s
-                    continue  # skip this payload type
+                next = self.next.get(s.payload_type)
+                if next is None and self.layer.show_unmapped:
+                    yield s  # show raw frames
+                    continue
+                next = next or RawStackLayer()
                 next_receive = next.receive(s)
                 yield from next_receive
 
-        if not received and self.layer.show_unmapped:
-            yield state
 
     def __repr__(self) -> str:
         s = f"{self.layer}"
