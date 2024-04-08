@@ -116,6 +116,28 @@ class LayerBuilder:
         stack.layer.show_unmapped = True
 
 
+    def prepare_full_spec(self, spec: Dict[Any, Any]) -> Dict[Any, Any]:
+        """Seek layers and construct full specification"""
+        n_spec = {}
+        for k, sub_builder in self.sub.items():
+            name = sub_builder.short_name
+            v = spec.get(name)
+            if v is not None:
+                n_spec[name] = v # build here
+
+        unmapped = {k: v for k, v in spec.items() if k not in n_spec}
+        if unmapped:
+            # seek from lower layers
+            for k, sub_builder in self.sub.items():
+                name = sub_builder.short_name
+                sub_spec = sub_builder.prepare_full_spec(unmapped)
+                if sub_spec:
+                    n_spec.update(sub_spec)
+        if n_spec:
+            n_spec = {self.short_name: n_spec}
+        return n_spec
+
+
     def __repr__(self) -> str:
         return f"{self.short_name}"
 
@@ -147,9 +169,10 @@ class StackBuilder:
     @classmethod
     def build_stack(cls, spec: Dict[Any, Any]) -> FrameStack:
         """Build stack from specification"""
-        if len(spec) > 1:
-            raise ValueError(f'Stack can have only one root layer')
-        for k, v in spec.items():
+        full_spec = cls.pcap.prepare_full_spec(spec)
+        if len(full_spec) > 1:
+            raise ValueError('Stack can have only one root layer, now: ' + ','.join(full_spec.keys()))
+        for k, v in full_spec.items():
             layer_builder = LayerBuilder.mappings.get(k)
             if layer_builder is None:
                 raise ValueError(f'Unknown protocol "{k}"')
