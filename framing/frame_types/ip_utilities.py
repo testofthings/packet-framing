@@ -8,7 +8,7 @@ from framing.frame_types.ipv6_frames import IPx, IPv6
 from framing.frame_types.tcp_frames import TCP_Null_Stream_Id, TCP_Stream_Id, TCP, TCPFlag, TCPDataQueue, flip_tcp_stream_id
 from framing.frame_types.udp_frames import UDP
 from framing.frames import Frames
-from framing.layer_stack import FrameStackLayer, StackState
+from framing.layer_stack import StackLayer, StackState
 from framing.raw_data import RawData
 
 
@@ -21,7 +21,7 @@ class IPUtility:
         return IPv6.Source_address[ip], IPv6.Destination_address[ip]
 
 
-class TCPStackLayer(FrameStackLayer):
+class TCPStackLayer(StackLayer):
     def __init__(self):
         super().__init__(TCP)
         self.streaming = True
@@ -81,7 +81,7 @@ class TCPStackLayer(FrameStackLayer):
         return key, data
 
 
-class UDPStackLayer(FrameStackLayer):
+class UDPStackLayer(StackLayer):
     """UDP stack layer"""
     def __init__(self):
         super().__init__(UDP)
@@ -103,7 +103,7 @@ class UDPStackLayer(FrameStackLayer):
         return [state.add(udp, to_key[1], UDP.Data[udp])]
 
 
-class DNSStackLayer(FrameStackLayer):
+class DNSStackLayer(StackLayer):
     def __init__(self):
         super().__init__(DNSMessage)
 

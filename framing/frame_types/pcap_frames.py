@@ -6,7 +6,7 @@ from framing.codecs import IntegerFormat
 from framing.fields import Structure, Sequence, ValueOf
 from framing.frame_types.ethernet_frames import EthernetII
 from framing.frames import Frames
-from framing.layer_stack import FrameStackLayer, StackState
+from framing.layer_stack import StackLayer, StackState
 from framing.raw_data import Raw
 
 # https://datatracker.ietf.org/doc/id/draft-gharris-opsawg-pcap-00.html
@@ -63,7 +63,7 @@ class PCAPRecordIterator(Iterator[PacketRecord]):
         return self.source.__next__()
 
 
-class PCAPStackLayer(FrameStackLayer):
+class PCAPStackLayer(StackLayer):
     """PCAP stack layer"""
     def __init__(self):
         super().__init__(PCAPFile)

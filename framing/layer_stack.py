@@ -56,7 +56,7 @@ class StackState:
         return s
 
 
-class FrameStackLayer:
+class StackLayer:
     """Frame stack layer"""
     def __init__(self, frame_type: Type[Frame] = RawFrame):
         self.frame_type = frame_type
@@ -77,7 +77,7 @@ class FrameStackLayer:
         """Commit read of bytes from underlying stream"""
         pass
 
-    def configure(self, spec: Dict[Any, Any]) -> 'FrameStackLayer':
+    def configure(self, spec: Dict[Any, Any]) -> 'StackLayer':
         """Configure this layer"""
         return self
 
@@ -85,19 +85,9 @@ class FrameStackLayer:
         return f"{self.frame_type.structure.structure_name}"
 
 
-class StackLayerBuilder:
-    """Stack layer builder"""
-    def __init__(self, mappings: Dict[Any, Callable[[], FrameStackLayer]] = {}):
-        self.mappings = mappings
-
-    def build(self, transport: Type[Frame]) -> Dict[Any, FrameStackLayer]:
-        """Get the layer key to layer mapping"""
-        return {k: v() for k, v in self.mappings.items()}
-
-
 class FrameStack:
     """Frame stack comprising layers"""
-    def __init__(self, layer: FrameStackLayer = FrameStackLayer()):
+    def __init__(self, layer: StackLayer = StackLayer()):
         self.layer = layer
         self.next: Dict[Any, FrameStack] = {}  # higher layers keyed by payload types
 
@@ -136,62 +126,6 @@ class FrameStack:
                 next_receive = next.receive(s)
                 yield from next_receive
 
-
-    def build(self, spec: Dict[Any, Any], builder_map: Dict[str, StackLayerBuilder]):
-        """Build this extractor recursively"""
-        transport = self.layer.frame_type
-
-        p_regexp = re.compile(r"^_(\d+)$")  # '_'+number for decimal protocol type
-        x_regexp = re.compile(r"^_x([0-9a-fA-F]+)$") # '_x' for hexadecimal protocol type
-        for k, v in spec.items():
-            # specify sub-protocol?
-            if not isinstance(v, Dict):
-                continue  # no configuration
-            if k == "raw":
-                # show raw data
-                layer = RawStackLayer()
-                layer.configure(v)
-                self.next[None] = FrameStack(layer)
-                continue
-
-            layer_builder = builder_map.get(k)
-            if layer_builder is None:
-                # not a protocol, maybe port number, payload type, etc. protocol key
-                p_num = p_regexp.match(k) # integer key?
-                key = int(p_num.group(1)) if p_num else None
-                if key is None:
-                    p_num = x_regexp.match(k)  # hex key?
-                    key = int(p_num.group(1), 16) if p_num else None
-                if key is None:
-                    continue  # not key like for sub-protocol
-
-                # payload protocol specified explictly
-                proto_name = v.get('protocol') or v.get('p')
-                if not proto_name:
-                    raise ValueError('Missing protocol, use "protocol=" or "p="')
-                layer_builder = builder_map.get(proto_name)
-                if layer_builder is None:
-                    raise ValueError(f'Unknown protocol "{proto_name}"')
-                mappings = layer_builder.build(transport)
-                if not mappings:
-                    raise ValueError(f'Must specify layer key for "{proto_name}"')
-                if len(mappings) != 1:
-                    raise ValueError(f'"{proto_name}" is many protocols, it cannot be mapped to single layer key')
-                layer_type = list(mappings.values())[0]
-                layer = layer_type.configure(v)
-                layer = layer.configure(v)
-                s_layer = FrameStack(layer)
-                s_layer.build(v, builder_map)
-                self.next[key] = s_layer
-            else:
-                # key is protocol builder, may map to several protocols
-                mappings = layer_builder.build(transport)
-                for key, layer_type in mappings.items():
-                    layer = layer_type.configure(v)
-                    s_layer = FrameStack(layer)
-                    s_layer.build(v, builder_map)
-                    self.next[key] = s_layer
-
     def __repr__(self) -> str:
         s = f"{self.layer}"
         for k, v in self.next.items():
@@ -199,12 +133,12 @@ class FrameStack:
         return s
 
 
-class RawStackLayer(FrameStackLayer):
+class RawStackLayer(StackLayer):
     """Raw frame stack layer"""
     def __init__(self):
         super().__init__(RawFrame)
 
-    def configure(self, spec: Dict[Any, Any]) -> FrameStackLayer:
+    def configure(self, spec: Dict[Any, Any]) -> StackLayer:
         length = int(spec.get("len", -1))
         if length > 0:
             self.frame_type = RawFrame.build_with_lengths(min_bytes=1, bytes=length)

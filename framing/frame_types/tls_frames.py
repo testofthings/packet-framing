@@ -4,7 +4,7 @@ from framing.data_queue import RawDataQueue
 from framing.fields import Selection, Structure, ValueOf
 from framing.frame_processors import Processor
 from framing.frames import Frames
-from framing.layer_stack import FrameStackLayer, StackState
+from framing.layer_stack import StackLayer, StackState
 
 
 class ClientHello(Frame):
@@ -86,7 +86,7 @@ TLSRecord_Payloads = LayerMapping(TLSRecord.fragment).by(TLSRecord.ContentType, 
 })
 
 
-class TLSRecordLayer(FrameStackLayer):
+class TLSRecordLayer(StackLayer):
     def __init__(self):
         super().__init__(TLSRecord)
         self.queue = RawDataQueue()

@@ -6,7 +6,7 @@ from framing.data_queue import RawDataQueue
 from framing.fields import Structure, ValueOf
 from framing.frame_types.ipv4_frames import IP_Payloads, IPv4, IPv4Flag
 from framing.frames import Frames
-from framing.layer_stack import FrameStackLayer, StackState
+from framing.layer_stack import StackLayer, StackState
 from framing.raw_data import IPAddress, RawData
 
 
@@ -115,7 +115,7 @@ class IPReassembler:
         return None
 
 
-class IPStackLayer(FrameStackLayer):
+class IPStackLayer(StackLayer):
     """IPx stack layer"""
     def __init__(self):
         super().__init__(IPv4)
