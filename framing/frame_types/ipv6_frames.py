@@ -95,7 +95,7 @@ class IPReassembler:
             frag = IPv6.Payload.as_frame(ip, frame_type=Fragment)
             assert isinstance(frag, Fragment)
             more = Fragment.M[frag]
-            offset = Fragment.Fragment_offset[frag]
+            offset = Fragment.Fragment_offset[frag] * 8
             data = Fragment.Payload.as_raw(frag)
             key = IPv6.Source_address[ip], IPv6.Destination_address[ip], Fragment.Identification[frag]
         ent = self.queues.get(key)
@@ -158,8 +158,8 @@ class IPStackLayer(StackLayer):
             # data is fragmented
             frag = IPv6.Payload.as_frame(ip, frame_type=Fragment)
             assert isinstance(frag, Fragment)
+            offset = Fragment.Fragment_offset[frag] * 8
             more = Fragment.M[frag]
-            offset = Fragment.Fragment_offset[frag]
             data = Fragment.Payload.as_raw(frag)
             pay_type = Fragment.Next_Header[frag]
             key = IPv6.Source_address[ip], IPv6.Destination_address[ip], Fragment.Identification[frag]
