@@ -19,17 +19,22 @@ $ python -m packet-framing traffic.pcap
 
 By default, the tool parses _IP_ traffic in _Ethernet_ frames captured by PCAP.
 The protocol stack to apply in dissection is specified by _YAML_ or _JSON_ using command-line argument `--stack` or `-s`.
-For example, to parse only the PCAP layer, use the following:
+For example, to parse only the TCP layer and above, use the following:
 
 ```
-$ python -m packet-framing -s '{"pcap": {}}' traffic.pcap
+$ python -m packet-framing -s '{"tcp": {}}' traffic.pcap
 ```
 
-The stack can be configured in detail using the available protocls.
-For example, to dissect the _IP_ packets (Version 4 or 6) over _Ethernet_ frames in the PCAP, use the following command-line.
+Disable higher layer of the stack in parsing (only `-s` shown):
 
 ```
-$ python -m packet-framing -s '{"pcap": {"eth": {"ip": {}}}}' traffic.pcap
+-s '{"tcp": {"default": false}}' traffic.pcap
+```
+
+Similarly you can only show the PCAP frames:
+
+```
+-s '{"pcap": {"default": false}}' traffic.pcap
 ```
 
 ## Supported protocols and formats
