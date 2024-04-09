@@ -1,6 +1,6 @@
-PYPI_API_KEY = ""
+export PYPI_API_KEY := 
 
-REPO_URL = --repository-url https://test.pypi.org/legacy/
+export REPO_URL = --repository-url https://test.pypi.org/legacy/
 
 # Default target, test, build and release
 # Set REPO_URL to empty string to upload to real PyPi
@@ -8,7 +8,7 @@ release: unit-tests
 	$(MAKE) release-build
 	$(MAKE) release-upload
 
-release-build: upload
+release-build:
 	rm -rf build/ dist/ *.egg-info
 	python setup.py sdist bdist_wheel
 

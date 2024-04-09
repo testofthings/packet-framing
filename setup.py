@@ -9,7 +9,7 @@ setup(
     author="Rauli Kaksonen",
     author_email="rauli.kaksonen@gmail.com",
     description='Protocol packet parsing tool',
-    long_description='Small protocol packet parsing tool for Tcsfw.',
+    long_description='Protocol packet parsing tool for Tcsfw (https://gitlab.com/CinCan/tcsfw) project',
     url='https://gitlab.com/CinCan/framing',
     packages=find_packages(),
     install_requires=requirements,
