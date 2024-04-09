@@ -62,15 +62,24 @@ class Field(FieldPointer[F, T]):
         self.default_value = default_value
         self.fixed_bit_offset = fixed_bit_offset
         self.fixed_bit_length = -1
+        self.max_bit_length = -1
+        self.min_bit_length = -1
         self.direct_decode = False
         self.offset = FieldOffset(self)
-        self.structure: Optional['Sturcture'] = None  # set by structure herself
+        self.structure: Optional['Structure'] = None  # set by structure herself
         self.end_offset_resolver: Optional[Calculator] = None
         self.length_resolver: Optional[Calculator] = None
         self.consumed_by: Optional[Field[F, Any]] = None
 
     def get(self, frame: F) -> T:
         return frame.backend.get(self)
+
+    def get_choice(self, frame: F) -> T:
+        """Return the selected choice, when this is a selection field, otherwise the value itself"""
+        v = self.get(frame)
+        if v.backend.choice:
+            return v.backend.choice.get(v)
+        return v
 
     def get_default_value(self, frame: F) -> T:
         return self.default_value
@@ -85,6 +94,14 @@ class Field(FieldPointer[F, T]):
     def __setitem__(self, frame: F, value: T) -> F:
         frame.backend.set(self, value)
         return frame
+
+    def _validate_length(self, bit_length: int) -> int:
+        """Validate bit length against minimum and maximum lengths, raise error if too short"""
+        if self.min_bit_length >= 0 and bit_length < self.min_bit_length:
+            raise EOFError(f"Field '{self.field_name}' too short: {bit_length} < {self.min_bit_length} bits")
+        if self.max_bit_length > 0:
+            bit_length = min(bit_length, self.max_bit_length)
+        return bit_length
 
     def get_bit_length(self, frame: F) -> int:
         """Get bit length for a value"""
@@ -220,7 +237,7 @@ TF = typing.TypeVar("TF", bound='Frame')
 
 class Frame(LengthEntity):
     """Base class for frames"""
-    def __init__(self, backend_factory: Callable[['Frame'], FrameBackend]) -> object:
+    def __init__(self, backend_factory: Callable[['Frame'], FrameBackend]):
         self.backend = backend_factory(self)
 
     def bit_length(self) -> int:
@@ -284,12 +301,14 @@ class FrameStructure(typing.Generic[F]):
         # find field names
         self.structure_name = type(frame).__name__
         i_names: typing.Dict[Field, str] = {}
-        for member in inspect.getmembers(frame):
+        all_members = inspect.getmembers(frame)
+        for member in all_members:
             name, v = member
             if isinstance(v, Field):
                 i_names[v] = name
         # ...keep order of fields
         old_names = self.fields.copy()
+        assert old_names, f"No fields defined for Selection '{self.structure_name}'"
         self.fields.clear()
         for n, v in old_names.items():
             while v.consumed_by:
@@ -342,10 +361,25 @@ class LayerMapping:
             self._payload = base._payload
             base.merge(self)
 
-    def resolve_payload(self, frame: Frame, field: Field, data: Optional[RawData]) -> Frame:
+    def resolve_payload_type(self, frame: Frame, field: Field) -> Type[Frame]:
+        """Resolve payload type, return raw frame if no mapping found"""
+        layer_map = self.get_mappings(field)
+        assert layer_map, f"No known payload mapping for {field}"
+        for type_f, m in layer_map.items():
+            type_v = type_f.get(frame)
+            p_type = m.get(type_v)
+            if p_type is not None:
+                return p_type
+        from framing.backends import RawFrame
+        return RawFrame
+
+    def decode_payload(self, frame: Frame, field: Field, data: Optional[RawData] = None) -> Frame:
+        """Resolve payload type and decode the frame using this mapping"""
         layer_map = self.get_mappings(field)
         assert layer_map, f"No known payload mapping for {field}"
         be = frame.backend
+        if data is None:
+            data = be.get_raw(field)[0]
         return be.decode_as_frame(layer_map, data)
 
     def by(self, type_field: FieldPointer[Any, T], mappings: typing.Dict[T, Type[Frame]]) -> Self:

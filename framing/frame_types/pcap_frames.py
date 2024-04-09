@@ -1,11 +1,12 @@
 import pathlib
-from typing import Optional, Iterator
+from typing import Iterable, Optional, Iterator
 
 from framing.base import Frame, LayerMapping
 from framing.codecs import IntegerFormat
 from framing.fields import Structure, Sequence, ValueOf
 from framing.frame_types.ethernet_frames import EthernetII
 from framing.frames import Frames
+from framing.layer_stack import StackLayer, StackState
 from framing.raw_data import Raw
 
 # https://datatracker.ietf.org/doc/id/draft-gharris-opsawg-pcap-00.html
@@ -60,3 +61,19 @@ class PCAPRecordIterator(Iterator[PacketRecord]):
 
     def __next__(self) -> PacketRecord:
         return self.source.__next__()
+
+
+class PCAPStackLayer(StackLayer):
+    """PCAP stack layer"""
+    def __init__(self):
+        super().__init__(PCAPFile)
+
+    def receive(self, state: StackState) -> Iterable[StackState]:
+        file = PCAPFile(Frames.dissect(state.data))
+        hdr = PCAPFile.File_Header[file]
+        pay_type = FileHeader.LinkType[hdr]
+        state = state.add(file)
+        for i, rec in enumerate(PCAPRecordIterator(file)):
+            pay_data = PacketRecord.Packet_Data[rec]
+            n_state = state.add(rec, pay_type, pay_data)
+            yield n_state

@@ -127,7 +127,7 @@ class FixedBitIntegerCodec(IntegerCodec):
 
     def decode_direct(self, bit_offset: int, data: RawData) -> int:
         octet_off = bit_offset // 8
-        l_mask = 0xff >> (8 - bit_offset % 8)
+        l_mask = 0xff >> (bit_offset % 8)
         octet = data.octet(octet_off)
         v = octet & l_mask if l_mask else octet
         for i in range(0, self.length // 8):

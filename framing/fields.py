@@ -214,10 +214,14 @@ class ConfigurableField(Field[F, T]):
 
 class RawField(ConfigurableField[F, RawData]):
     """Raw data field"""
-    def __init__(self, default_value: RawData, fixed_bit_length=-1, fixed_bit_offset=-1):
+    def __init__(self, default_value: RawData, min_bit_length=-1, max_bit_length=-1, fixed_bit_offset=-1):
         super().__init__("raw", default_value, fixed_bit_offset)
-        self.fixed_bit_length = fixed_bit_length
-        self.direct_decode = self.fixed_bit_offset >= 0 and self.fixed_bit_length >= 0
+        self.max_bit_length = max_bit_length
+        self.min_bit_length = min_bit_length
+        if max_bit_length == min_bit_length and max_bit_length > 0:
+            # fixed length field
+            self.fixed_bit_length = min_bit_length
+            self.direct_decode = self.fixed_bit_offset >= 0 and self.fixed_bit_length >= 0
 
     def get(self, frame: F) -> RawData:
         v = frame.backend.get(self)
@@ -238,7 +242,7 @@ class RawField(ConfigurableField[F, RawData]):
     def get_bit_length(self, frame: F) -> int:
         """Get bit length for a value"""
         v = frame.backend.get(self)
-        return v.bit_length() if isinstance(v, Frame) else v.bit_length()
+        return v.bit_length()
 
     def encoding_bit_length(self, backend: FrameBackend, value: RawData) -> int:
         return value.bit_length()
@@ -250,14 +254,28 @@ class RawField(ConfigurableField[F, RawData]):
                           backend: 'FrameBackend') -> int:
         if value is not None:
             return value.bit_length()  # Pst... value could be Frame, as well
-        return super().decode_bit_length(data, bit_offset, None, backend)
+        bit_len = super().decode_bit_length(data, bit_offset, None, backend)
+        if bit_len >= 0 and self.min_bit_length < self.max_bit_length:
+            # variable length, check limits
+            bit_len = self._validate_length()
+        return bit_len
 
     def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> RawData:
-        if self.fixed_bit_length < 0:
-            if bit_length >= 0:
-                return data.subBlockBits(0, bit_length)
-            return data  # read it all
-        return data.subBlockBits(0, self.fixed_bit_length)
+        if self.fixed_bit_length >= 0:
+            return data.subBlockBits(0, self.fixed_bit_length)
+        if bit_length >= 0:
+            return data.subBlockBits(0, bit_length)
+        if self.min_bit_length < self.max_bit_length:
+            # variable length, check find out how much to read
+            avail = data.bits_available()
+            if avail >= self.max_bit_length:
+                # maximum amount of data available
+                return data.subBlockBits(0, self.max_bit_length)
+            # less than maximum surely available, must read to find out
+            data_len = data.bit_length()
+            dec_len = self._validate_length(data_len)
+            return data.subBlockBits(0, dec_len)
+        return data  # read it all
 
     def decode_direct(self, frame_data: RawData, backend: FrameBackend) -> RawData:
         v = frame_data.subBlockBits(self.fixed_bit_offset, self.fixed_bit_length)
@@ -618,16 +636,23 @@ class Structure(FrameStructure[F]):
         self._update_fixed_length(field)
         return field
 
-    def raw(self, bits: int = None, bytes: int = None, default: RawData = Raw.empty,
+    def raw(self, bits: int = None, bytes: int = None, min_bits: int = None, min_bytes: int = None, default: RawData = None,
             name: str = None) -> RawField[F]:
         fn = self._get_a_name(name)
-        default = default if default else Raw.zeroes(bit_length=bits, byte_length=bytes)
         fix_len = -1
         if bits is not None:
             fix_len = bits
         if bytes is not None:
             fix_len = bytes * 8
-        f: RawField[F] = RawField(default, fix_len, self.fields_fixed_bit_offset)
+        min_len = fix_len
+        if min_bits is not None:
+            min_len = min_bits
+        if min_bytes is not None:
+            min_len = min_bytes * 8
+        assert min_len <= fix_len, f"Minimun length is {min_len} bits and max length is {fix_len} bits"
+        if default is None:
+            default = Raw.empty if min_len < 0 else Raw.zeroes(bit_length=min_len)
+        f: RawField[F] = RawField(default, min_len, fix_len, self.fields_fixed_bit_offset)
         f.structure = self
         self.fields[fn] = f
         self._update_fixed_length(f)
@@ -673,6 +698,7 @@ class Selection(Structure[F]):
     def choice(self, key, value: ConfigurableField[F, T]) -> ConfigurableField[F, T]:
         if key in self.choice_map or value in self.reverse_map:
             raise Exception(f"Duplicate entry for key {key}")
+        assert isinstance(value, ConfigurableField), "Provide a field for choice(...)"
         self.choice_map[key] = value
         self.reverse_map[value.structure] = key
         return value

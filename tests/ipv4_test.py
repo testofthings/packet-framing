@@ -5,7 +5,7 @@ from framing.backends import BackendImplementation
 from framing.frame_processors import PCAP2Ethernet, Ethernet2IP, IP2UDP
 from framing.frame_types.ethernet_frames import EthernetII, Ethernet_Payloads
 from framing.frame_types.ipv4_frames import IPv4, IP_Payloads
-from framing.frame_types.ipv6_frames import IPReassembler
+from framing.frame_types.ipv6_frames import IPStackLayer
 from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads, PacketRecord, PCAPRecordIterator
 from framing.frame_types.tcp_frames import TCP
 from framing.frame_types.udp_frames import UDP
@@ -77,7 +77,7 @@ def test_decode_fragments():
                               mappings=PCAP_Payloads + Ethernet_Payloads + IP_Payloads)
 
     pro = PCAP2Ethernet(Ethernet2IP())
-    de_frag = IPReassembler()
+    de_frag = IPStackLayer()
     data = None
     for pcap_r in PCAPRecordIterator(pcap):
         ip = pro.push(pcap_r)
@@ -95,8 +95,9 @@ def test_decode_fragments():
     pro = PCAP2Ethernet(Ethernet2IP(IP2UDP()))
     data = None
     for pcap_r in PCAPRecordIterator(pcap):
-        data = pro.push(pcap_r)
-        if data:
+        udp_ip = pro.push(pcap_r)
+        if udp_ip:
             break
+    data, ip = udp_ip
     assert UDP.Data[data].byte_length() == 16384
 

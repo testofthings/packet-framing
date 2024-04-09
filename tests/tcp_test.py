@@ -1,9 +1,10 @@
 import ipaddress
 import pathlib
 
-from framing.frame_processors import IP2TCP, PCAP2Ethernet, Ethernet2IP
+from framing.frame_processors import IP2TCP, IP2TCPStream, PCAP2Ethernet, Ethernet2IP, ProcessorIterator
 from framing.frame_types.ethernet_frames import Ethernet_Payloads, EthernetII
 from framing.frame_types.ipv4_frames import IPv4, IP_Payloads
+from framing.frame_types.ipv6_frames import IPv6_Payloads
 from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads, PacketRecord, PCAPRecordIterator
 from framing.frame_types.tcp_frames import TCP, TCPFlag, TCPDataQueue
 from framing.frames import Frames
@@ -64,3 +65,19 @@ def test_decode_tcp_payload():
     q = conns[((ipaddress.ip_address("17.253.39.208"), ipaddress.ip_address("192.168.4.16")), (443, 64982))]
     assert q.head.byte_length() == 6723
 
+
+def test_decode_ip6_tcp_payload():
+    pcap = PCAPFile.open_file(pathlib.Path("samples/tls13-over-ipv6.pcap"),
+                              mappings=PCAP_Payloads + Ethernet_Payloads + IPv6_Payloads)
+
+    pro = PCAP2Ethernet(Ethernet2IP(IP2TCPStream()))
+    iter = ProcessorIterator(PCAPRecordIterator(pcap), pro)
+    streams = {}
+    for k, raw in iter:
+        old = streams.get(k, Raw.empty)
+        streams[k] = Raw.concat(old, raw)
+
+    assert len(streams) == 2
+    client_s, server_s = list(streams.values())
+    assert client_s.byte_length() == 1206
+    assert server_s.byte_length() == 4759

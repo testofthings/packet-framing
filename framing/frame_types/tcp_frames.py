@@ -1,11 +1,11 @@
 import enum
-from typing import Tuple, Optional
+from typing import Dict, Set, Tuple, Optional
 
 from framing.base import Frame
 from framing.codecs import IntegerFormat
 from framing.data_queue import RawDataQueue
 from framing.fields import Structure, ValueOf
-from framing.raw_data import RawData
+from framing.raw_data import Raw, RawData
 
 
 # https://www.ietf.org/rfc/rfc793.txt
@@ -47,11 +47,16 @@ class TCPFlag(enum.IntFlag):
 
 TCP.Flags.flag_values(TCPFlag)
 
-# source IP address, source port, destination IP address, destination port
+# TCP stream id: source IP address, source port, destination IP address, destination port
 TCP_Stream_Id = Tuple[RawData, int, RawData, int]
+# Null TCP stream id
+TCP_Null_Stream_Id = Tuple[Raw.empty, 0, Raw.empty, 0]
+
+def flip_tcp_stream_id(stream_id: TCP_Stream_Id) -> TCP_Stream_Id:
+    """Flip TCP stream id"""
+    return stream_id[2], stream_id[3], stream_id[0], stream_id[1]
 
 
-# FIXME: Replace by similar class then IPv4Reassembler!
 class TCPDataQueue(RawDataQueue):
     """TCP data queue, one connection to one direction"""
     def __init__(self, start: TCP):

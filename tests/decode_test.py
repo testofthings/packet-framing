@@ -2,6 +2,7 @@ import pathlib
 
 import pytest
 
+from framing.backends import RawFrame
 from framing.frame_types.ethernet_frames import EthernetII
 from framing.frame_types.ipv4_frames import IPv4
 from framing.frame_types.pcap_frames import PCAPFile, PCAP_Payloads, PacketRecord
@@ -53,3 +54,15 @@ def test_partial_decode():
     assert IPv4.Destination_IP[ip] == Raw.hex("")
     with pytest.raises(EOFError):
         ip_len = ip.bit_length()
+
+
+def test_raw_data_frame():
+    raw = Raw.octets(0)
+    frame = RawFrame(Frames.dissect(raw))
+    assert frame.byte_length() == 1
+    assert frame.bit_length() == 8
+
+    raw = Raw.empty
+    frame = RawFrame(Frames.dissect(raw))
+    assert frame.byte_length() == 0
+    assert frame.bit_length() == 0

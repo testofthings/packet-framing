@@ -139,6 +139,14 @@ class RawFrame(Frame):
     structure = Structure['RawFrame']()
     data = structure.raw()
 
+    def build_with_lengths(bits: int = None, bytes: int = None, min_bits: int = None, min_bytes: int = None,
+                           default: RawData = Raw.empty) -> Type[Frame]:
+        """Build raw frame with length limits"""
+        class RawFrameWithLength(Frame):
+            structure = Structure['RawFrameWithLength']()
+            data = structure.raw(bits=bits, bytes=bytes, min_bits=min_bits, min_bytes=min_bytes)
+        return RawFrameWithLength
+
 
 class ComposingBackend(BackendImplementation):
     """Backend to compose a frame"""
@@ -255,6 +263,17 @@ class DissectorBackend(BackendImplementation):
         if bit_length < 0 and field.offset.min_tail_length:
             # length not known, limited by space required by later field(s)
             bit_length = max(0, self.data.bit_length() - bit_length - field.offset.min_tail_length)
+            bit_length = field._validate_length(bit_length)
+
+        if field.min_bit_length < field.max_bit_length:
+            # variable length, check find out how much to read
+            avail = self.data.bits_available()
+            if avail >= field.max_bit_length:
+                # maximum amount of data available
+                return self.data.subBlockBits(0, field.max_bit_length), field.max_bit_length
+            # less than maximum surely available, must read to find out
+            data_len = self.data.bit_length()
+            bit_length = field._validate_length(data_len)
 
         if bit_length < 0:
             data = self.data.tailBits(bit_offset)
@@ -285,24 +304,31 @@ class DissectorBackend(BackendImplementation):
         prefix = offset.prefix
         if prefix:
             # get offset of the prefix
-            off = self.end_offset_cache.get(prefix.field)
+            field = prefix.field
+            off = self.end_offset_cache.get(field)
             if off is None:
                 # not found from the cache
-                if prefix.field.end_offset_resolver:
+                if field.end_offset_resolver:
                     # Note: field.decode_bit_length would also use the resolver, but it needs the offset
-                    off = int(prefix.field.end_offset_resolver.pull(self))
+                    off = int(field.end_offset_resolver.pull(self))
                 else:
                     # prefix offset + variable length
                     off = self.get_bit_offset(prefix)
-                    p_len = prefix.field.decode_bit_length(self.data, off, None, self)
+                    p_len = field.decode_bit_length(self.data, off, None, self)
+                    if p_len < 0 and field.min_bit_length < field.max_bit_length and not field.offset.min_tail_length:
+                        # maximum length is known
+                        if self.data.bit(off + field.max_bit_length - 1) >= 0:
+                            # maximum data available
+                            p_len = field.max_bit_length
                     if p_len < 0:
                         # no length information, assuming all available
                         p_len = self.data.read_all().bit_length() - off
-                        if prefix.field.offset.min_tail_length:
+                        if field.offset.min_tail_length:
                             # data limited by space required by later field(s)
-                            p_len = max(0, p_len - prefix.field.offset.min_tail_length)
+                            p_len = max(0, p_len - field.offset.min_tail_length)
+                        p_len = field._validate_length(p_len)
                     off += p_len
-                self.end_offset_cache[prefix.field] = off  # cache for next call
+                self.end_offset_cache[field] = off  # cache for next call
         else:
             off = 0
         off += offset.fixed_bit_offset
@@ -381,16 +407,9 @@ class DissectorBackend(BackendImplementation):
                 rl = self.choice.get_bit_length(self.frame)
             else:
                 rl = self.get_bit_offset(self.structure.fields_length)
-            data_len = self.data.bit_length()
-            if data_len >= 0:
-                if data_len < rl:
-                    # input data is known to be shorter...
-                    raise EOFError(f"Only {self.data.byte_length()} bytes available for " + self.structure_name())
-            elif rl > 0:
-                # length of data is not known
-                last_d = self.data.octet(rl // 8 - 1) if rl % 8 == 0 else self.data.bit(rl - 1)
-                if last_d < 0:
-                    raise EOFError(f"Not enough data for " + self.structure_name())
+            if self.data.bit(rl - 1) < 0:
+                # input data is known to be shorter...
+                raise EOFError(f"Only {self.data.byte_length()} bytes available for " + self.structure_name())
             self.known_bit_length = rl
         return self.known_bit_length
 

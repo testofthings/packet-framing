@@ -13,8 +13,11 @@ class RawDataQueue:
 
     # FIXME: Offset wrapping is not working, especially with forwarding!!!
 
-    def push(self, data: RawData, offset: int) -> RawData:
+    def push(self, data: RawData, offset: int = None) -> RawData:
         """Push data to end of the queue"""
+        if offset is None:
+            # as default, continuous data
+            offset = self.offset + self.head.bytes_available()
         # avoid off-set wrapping, trust Python has enough bits in int
         off = (offset + self.modulus - self.offset) % self.modulus
         fix_length = self.head.fixed.byte_length()
@@ -47,7 +50,7 @@ class RawDataQueue:
     def forward(self, length) -> Self:
         """Forward offset from beginning of the queue"""
         assert length <= self.head.fixed.byte_length(), "Forwarding queue too fast"
-        self.head = self.head.tailBytes(length)
+        self.head = self.head.forward(length)
         new_offset = (self.offset + length) % self.modulus
         offset_d = new_offset - self.offset
         for i, f in enumerate(self.fragments):
