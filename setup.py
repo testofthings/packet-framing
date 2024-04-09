@@ -1,5 +1,8 @@
 from setuptools import setup, find_packages
 
+with open('requirements.txt') as f:
+    requirements = f.read().splitlines()
+
 setup(
     name='packet-framing',
     version='0.1',
@@ -9,7 +12,7 @@ setup(
     long_description='Small protocol packet parsing tool for Tcsfw.',
     url='https://gitlab.com/CinCan/framing',
     packages=find_packages(),
-    install_requires=[],
+    install_requires=requirements,
     classifiers=[
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",
