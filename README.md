@@ -14,7 +14,7 @@ Installation from there should be as easy or hard as any other Python package.
 The project comes with experimental file analysis tool used in development and testing of the framework.
 
 ```
-$ python -m packet-framing traffic.pcap
+$ python -m framing traffic.pcap
 ```
 
 By default, the tool parses _IP_ traffic in _Ethernet_ frames captured by PCAP.
@@ -22,7 +22,7 @@ The protocol stack to apply in dissection is specified by _YAML_ or _JSON_ using
 For example, to parse only the TCP layer and above, use the following:
 
 ```
-$ python -m packet-framing -s '{"tcp": {}}' traffic.pcap
+$ python -m framing -s '{"tcp": {}}' traffic.pcap
 ```
 
 Disable higher layer of the stack in parsing (only `-s` shown):
