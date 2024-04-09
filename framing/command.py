@@ -190,7 +190,7 @@ def main():
     # Create the argument parser
     parser = argparse.ArgumentParser(description='PCAP printing tool')
     parser.add_argument('-s', '--stack', type=str, help='JSON/YAML-configured stack')
-    parser.add_argument('read', type=str, action='append', help='Read PCAP file(s)')
+    parser.add_argument('read_file', type=str, action='append', help='Read PCAP file(s)')
     args = parser.parse_args()
 
     # construct the filtering
@@ -199,7 +199,7 @@ def main():
     stack = StackBuilder.build_stack(filter_d)
 
     # print extracted frames from files
-    for file in args.read or []:
+    for file in args.read_file or []:
         f = pathlib.Path(file)
         data = Raw.file(f)
         try:
