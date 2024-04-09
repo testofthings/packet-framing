@@ -5,7 +5,7 @@ with open('requirements.txt') as f:
 
 setup(
     name='packet-framing',
-    version='0.2',
+    version='0.2.1',
     author="Rauli Kaksonen",
     author_email="rauli.kaksonen@gmail.com",
     description='Protocol packet parsing tool',
