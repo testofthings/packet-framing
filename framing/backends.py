@@ -1,12 +1,15 @@
+"""Backend implementations for frames"""
+
 import copy
 from typing import Dict, Any, Callable, Iterator, Optional, List, cast, Type, Tuple, Self
 
 from framing.base import FrameBackend, Frame, EncodingState, Field, F, T, LayerMapping, FieldOffset, FieldPointer
 from framing.fields import Sequence, FT, Structure, SubStructureField
-from framing.raw_data import RawData, Raw, LengthEntity
+from framing.raw_data import RawData, Raw
 
 
 class BackendImplementation(FrameBackend):
+    """Frame backend implementation"""
     def __init__(self, frame: Frame, mappings: LayerMapping):
         super().__init__(frame)
         self.mappings = mappings
@@ -136,13 +139,16 @@ class BackendImplementation(FrameBackend):
 
 
 class RawFrame(Frame):
+    """Raw data frame"""
     structure = Structure['RawFrame']()
     data = structure.raw()
 
-    def build_with_lengths(bits: int = None, bytes: int = None, min_bits: int = None, min_bytes: int = None,
-                           default: RawData = Raw.empty) -> Type[Frame]:
+    @classmethod
+    def build_with_lengths(cls, bits: int = None, bytes: int = None, min_bits: int = None,
+                           min_bytes: int = None) -> Type[Frame]:
         """Build raw frame with length limits"""
         class RawFrameWithLength(Frame):
+            """Raw frame with length limits"""
             structure = Structure['RawFrameWithLength']()
             data = structure.raw(bits=bits, bytes=bytes, min_bits=min_bits, min_bytes=min_bytes)
         return RawFrameWithLength
@@ -150,9 +156,6 @@ class RawFrame(Frame):
 
 class ComposingBackend(BackendImplementation):
     """Backend to compose a frame"""
-    def __init__(self, frame: Frame, mappings: LayerMapping):
-        super().__init__(frame, mappings)
-
     def get(self, field: Field[F, T]) -> T:
         v = self.field_values.get(field)
         if v is None:

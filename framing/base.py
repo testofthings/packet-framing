@@ -1,8 +1,9 @@
+"""Base definitions"""
+
 import inspect
 import typing
 from typing import Optional, Callable, List, Type, Any, Dict, Self
 
-from framing.codecs import IntegerCodec, IntegerFormat, ValueCodec
 from framing.raw_data import Raw, RawData, LengthEntity
 
 # Frame type
@@ -18,6 +19,7 @@ class EncodingState:
 
 
 class FieldOffset:
+    """Field offset definition"""
     def __init__(self, field: Optional['Field'] = None):
         self.prefix: Optional[FieldOffset] = None
         self.field: Optional[Field] = field
@@ -51,6 +53,7 @@ class Calculator:
 class FieldPointer(typing.Generic[F, T]):
     """Path pointing to a field"""
     def get(self, frame: 'Frame') -> T:
+        """Get pointed field value"""
         raise NotImplementedError()
 
 

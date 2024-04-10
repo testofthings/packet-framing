@@ -1,17 +1,17 @@
+"""Command-line tool for PCAP dissection"""
+
 import argparse
 import pathlib
 import re
 from typing import Any, Callable, Dict, Iterable, Optional, Type
 import yaml
 
-from framing.backends import RawFrame
 from framing.base import Field, Frame
 from framing.fields import RawField
 from framing.frame_types.ethernet_frames import EthernetII
 from framing.frame_types.ip_utilities import TCPStackLayer
 from framing.frame_types.ip_utilities import DNSStackLayer
-from framing.frame_types.ipv6_frames import IPx, IPStackLayer
-from framing.frame_types.pcap_frames import PCAP_Payloads
+from framing.frame_types.ipv6_frames import IPStackLayer
 from framing.frame_types.pcap_frames import PCAPStackLayer
 from framing.frame_types.tls_frames import TLSHandshake
 from framing.frame_types.ip_utilities import UDPStackLayer
@@ -145,26 +145,26 @@ class LayerBuilder:
 class StackBuilder:
     """Singleton for stack layers"""
 
-    dns = LayerBuilder('dns', lambda: DNSStackLayer())
+    dns = LayerBuilder('dns', DNSStackLayer)
 
     tls_handshake = LayerBuilder('tls-handshake', lambda: PayloadFieldStackLayer(TLSHandshake, TLSHandshake.HandshakeType, TLSHandshake.message))
-    tls_record = LayerBuilder('tls-record', lambda: TLSRecordLayer(),
+    tls_record = LayerBuilder('tls-record', TLSRecordLayer,
                               sub={22: tls_handshake})
 
     # basic IP protocols
 
-    tcp = LayerBuilder('tcp', lambda: TCPStackLayer(),
+    tcp = LayerBuilder('tcp', TCPStackLayer,
                        sub={53: dns, 443: tls_record})
-    udp = LayerBuilder('udp', lambda: UDPStackLayer(),
+    udp = LayerBuilder('udp', UDPStackLayer,
                        sub={53: dns})
-    ip = LayerBuilder('ip', lambda: IPStackLayer(),
+    ip = LayerBuilder('ip', IPStackLayer,
                       sub={6: tcp, 17: udp})
     eth = LayerBuilder('eth', lambda: PayloadFieldStackLayer(EthernetII, EthernetII.type, EthernetII.data),
                        sub={0x0800: ip, 0x86dd: ip})
 
-    pcap = LayerBuilder('pcap', lambda: PCAPStackLayer(),
+    pcap = LayerBuilder('pcap', PCAPStackLayer,
                         sub={1: eth})
-    raw = LayerBuilder('raw', lambda: RawStackLayer())
+    raw = LayerBuilder('raw', RawStackLayer)
 
     @classmethod
     def build_stack(cls, spec: Dict[Any, Any]) -> FrameStack:
@@ -187,6 +187,7 @@ class StackBuilder:
         return stack
 
 def main():
+    """Entry point to the command"""
     # Create the argument parser
     parser = argparse.ArgumentParser(description='PCAP printing tool')
     parser.add_argument('-s', '--stack', type=str, help='JSON/YAML-configured stack')
