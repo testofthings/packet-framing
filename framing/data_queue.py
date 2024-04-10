@@ -1,9 +1,12 @@
+"""Data queue"""
+
 from typing import Tuple, List, Self
 
 from framing.raw_data import RawData, AppendableRawData, Raw
 
 
 class RawDataQueue:
+    """Raw data quueue with offset handling"""
     def __init__(self, prefix: RawData = None, offset=0, modulus=2 ** 32):
         self.offset = offset  # bytes
         self.modulus = modulus
@@ -73,9 +76,11 @@ class RawDataQueue:
         return self.pull(self.available())
 
     def close(self):
+        """Close the queue, no more data can be added"""
         self.head.closed = True
 
     def is_closed(self) -> bool:
+        """Check if the queue is closed"""
         return self.head.closed
 
     def __repr__(self):

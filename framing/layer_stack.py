@@ -1,15 +1,15 @@
-import re
+"""Frame stack and layers"""
+
+from typing import Any, Dict, Iterable, Optional, Tuple, Type
+
 from framing.backends import RawFrame
 from framing.base import Frame
 from framing.frames import Frames
 from framing.raw_data import Raw, RawData
 
 
-from typing import Any, Callable, Dict, Iterable, Optional, Tuple, Type
-
-
 class StackState:
-    """Extractor output, frame and way to get payload data"""
+    """Frame stack state during receive"""
     def __init__(self, data: RawData, payload_type: Any = None, frame: Optional[Frame] = None, lower: Optional['StackState'] = None,
                  stream_id: Optional[Any] = None):
         self.data = data
@@ -118,7 +118,7 @@ class FrameStack:
                     payload_len = s.frame.byte_length()  # this raises exception, if partial payload(s)
                     self.layer.commit_read(s.stream_id, payload_len)
                     yield from next_receive
-                except EOFError as e:
+                except EOFError:
                     pass  # leave data to stream
         else:
             # block transport, 1-to-n relation between transport and payload frames

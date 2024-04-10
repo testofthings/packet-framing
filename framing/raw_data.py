@@ -1,3 +1,5 @@
+"""Raw data handling"""
+
 import ipaddress
 import mmap
 import pathlib
@@ -8,6 +10,7 @@ IPAddress = Union[ipaddress.IPv6Address, ipaddress.IPv4Address]
 
 
 class LengthEntity:
+    """Entity with known length"""
     def bit_length(self) -> int:
         """Length in bits or EOFError if unclosed stream"""
         raise NotImplementedError()
@@ -241,7 +244,7 @@ class RawDataSequence(RawData):
         v = 0
         c = self.components[index]
         c_len = c.bit_length()
-        for i in range(0, 8):
+        for _ in range(0, 8):
             if bit_offset >= c_len:
                 # next component buffer
                 bit_offset = 0
@@ -345,6 +348,7 @@ class ZeroData(RawData):
 
 
 class BitAlignedData(RawData):
+    """Data not necessary aligned to octet boundary"""
     def __init__(self, data: RawData, bit_offset: int, bit_length=-1):
         self.data = data
         self.offset = bit_offset
@@ -410,6 +414,7 @@ class FileData(ByteData):
 
 
 class AppendableRawData(RawData):
+    """Data that can be appended to"""
     def __init__(self, fixed: RawData):
         self.fixed = fixed
         self.closed = False
@@ -420,7 +425,8 @@ class AppendableRawData(RawData):
         self.fixed = Raw.sequence([self.fixed, data])
         return self
 
-    def forward(self, byte_length: int) -> 'AppedableRawData':
+    def forward(self, byte_length: int) -> 'AppendableRawData':
+        """Move data forward by given length"""
         r = AppendableRawData(self.fixed.tailBytes(byte_length))
         r.closed = self.closed
         return r
@@ -537,24 +543,29 @@ class Raw:
 
     @classmethod
     def bytes(cls, data: bytes) -> RawData:
+        """Create from bytes"""
         return ByteData(data, 0, len(data))
 
     @classmethod
     def octets(cls, *data: int) -> RawData:
+        """Create from octets"""
         b = bytes(data)
         return ByteData(b, 0, len(b))
 
     @classmethod
     def string(cls, value: str, encoding='ascii'):
+        """Create from string"""
         return cls.bytes(value.encode(encoding))
 
     @classmethod
     def hex(cls, hex_string: str) -> RawData:
+        """Create from hex values"""
         b = bytes.fromhex(hex_string)
         return ByteData(b, 0, len(b))
 
     @classmethod
     def bits(cls, bit_string: str) -> RawData:
+        """Create from bit values"""
         bit_string = "".join(bit_string.split())  # remove whitespace
         bit_l = len(bit_string)
         b = bytearray((bit_l + 7) // 8)
@@ -568,6 +579,7 @@ class Raw:
 
     @classmethod
     def zeroes(cls, byte_length: int = None, bit_length: int = None) -> RawData:
+        """Create zero data of given length"""
         if byte_length is not None:
             assert bit_length is None or bit_length == byte_length * 8
             return ZeroData(byte_length * 8)
@@ -577,6 +589,7 @@ class Raw:
 
     @classmethod
     def sequence(cls, components: Iterable[RawData]) -> RawData:
+        """Concatenate components into single data block"""
         cs = []
         for c in components:
             if isinstance(c, RawDataSequence):
@@ -591,13 +604,16 @@ class Raw:
 
     @classmethod
     def concat(cls, *components: RawData) -> RawData:
+        """Concatenate components into single data block"""
         return cls.sequence(components)
 
     @classmethod
     def file(cls, file_path: pathlib.Path) -> FileData:
+        """Access file as raw data"""
         f = file_path.open("rb")
         return FileData(f, file_path)
 
     @classmethod
     def stream(cls, stream: BinaryIO, name="stream", request_size=65536) -> StreamData:
+        """Access stream as raw data"""
         return StreamData(stream, name, request_size)

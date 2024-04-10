@@ -1,11 +1,13 @@
+"""Frame processors (only used in tests, remove?)"""
+
 import typing
-from typing import Generic, Iterator, Optional, Tuple, List
+from typing import Generic, Iterator, Optional, Tuple
 
 from framing.base import T
 from framing.frame_types.ethernet_frames import EthernetII
 from framing.frame_types.ip_utilities import TCPStackLayer
 from framing.frame_types.ipv4_frames import IPv4
-from framing.frame_types.ipv6_frames import IPReassembler, IPStackLayer, IPv6, IPx
+from framing.frame_types.ipv6_frames import IPStackLayer, IPv6, IPx
 from framing.frame_types.pcap_frames import PacketRecord
 from framing.frame_types.tcp_frames import TCP, TCP_Stream_Id
 from framing.frame_types.udp_frames import UDP
@@ -15,26 +17,21 @@ from framing.raw_data import RawData
 S = typing.TypeVar("S")
 
 
-class MultiProcessor(typing.Generic[S, T]):
-    def push_many(self, value: S) -> List[T]:
-        raise NotImplementedError()
-
-
-class Processor(MultiProcessor[S, T]):
+class Processor(typing.Generic[S, T]):
+    """Frame processor interface"""
     def push(self, value: S) -> Optional[T]:
+        """Push value to processor, get back processed data or None if not ready yet"""
         raise NotImplementedError()
-
-    def push_many(self, value: S) -> List[T]:
-        t = self.push(value)
-        return [t] if t else []
 
 
 class NoProcessor(typing.Generic[T], Processor[T, T]):
+    """Unity processor, just pass through"""
     def push(self, value: T) -> Optional[T]:
         return value
 
 
 class PCAP2Ethernet(Processor[PacketRecord, T]):
+    """PCAP to Ethernet processor"""
     def __init__(self, sub: Optional[Processor[EthernetII, T]] = None):
         self.sub = NoProcessor() if sub is None else sub
 
@@ -44,6 +41,7 @@ class PCAP2Ethernet(Processor[PacketRecord, T]):
 
 
 class Ethernet2IP(Processor[EthernetII, T]):
+    """Ethernet to IP processor"""
     def __init__(self, sub: Optional[Processor[IPv4, T]] = None):
         self.sub = NoProcessor() if sub is None else sub
 
@@ -55,6 +53,7 @@ class Ethernet2IP(Processor[EthernetII, T]):
 
 
 class IP2UDP(Processor[IPx, T]):
+    """IP to UDP processor, with IP reassembly"""
     def __init__(self, sub: Optional[Processor[UDP, T]] = None):
         self.sub = NoProcessor() if sub is None else sub
         self.layer = IPStackLayer()
@@ -68,7 +67,7 @@ class IP2UDP(Processor[IPx, T]):
         return None
 
 class IP2TCP(Processor[IPx, T]):
-    """Extract TCP frames from IPx frames with IP reassembly"""
+    """Extract TCP frames from IP frames with IP reassembly"""
     def __init__(self, sub: Optional[Processor[Tuple[TCP, IPx], T]] = None):
         self.sub = NoProcessor() if sub is None else sub
         self.layer = IPStackLayer()
