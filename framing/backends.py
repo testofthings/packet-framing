@@ -60,11 +60,11 @@ class BackendImplementation(FrameBackend):
         def print_value(offset: int, value: RawData):
             sv = value.dump(center_line=True).split("\n")
             i_off = offset
-            for i in range(0, len(sv)):
+            for i, v in enumerate(sv):
                 if i == 0:
-                    print_line(i_off, n, sv[i])
+                    print_line(i_off, n, v)
                 else:
-                    print_line(i_off, "", sv[i])
+                    print_line(i_off, "", v)
                 i_off += 16 * 8
 
         state = EncodingState()

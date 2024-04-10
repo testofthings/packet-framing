@@ -85,12 +85,14 @@ class Field(FieldPointer[F, T]):
         return v
 
     def get_default_value(self, frame: F) -> T:
+        """Get default value for field"""
         return self.default_value
 
     def __getitem__(self, frame: F) -> T:
         return frame.backend.get(self)
 
     def set(self, frame: F, value: T) -> F:
+        """Set value to field"""
         frame.backend.set(self, value)
         return frame
 
@@ -175,15 +177,19 @@ class FrameBackend:
         self.parent: Optional[FrameBackend] = None
 
     def structure_name(self) -> str:
+        """Get structure name"""
         return self.structure.structure_name
 
     def get(self, field: Field[F, T]) -> T:
+        """Get field value"""
         raise NotImplementedError()
 
     def set(self, field: Field[F, T], value: T) -> Self:
+        """Set field value"""
         raise NotImplementedError("Editing not allowed with this backend")
 
     def get_item(self, sequence_field: Field, item_field: Field[F, T], index: int):
+        """Get item from sequence field"""
         raise NotImplementedError()
 
     def iterate(self, sequence_field: Field, item_field: Field[F, T],
@@ -280,11 +286,13 @@ class FrameStructure(typing.Generic[F]):
 
     @classmethod
     def get_struct(cls, frame_type: F) -> 'FrameStructure[F]':
+        """"Get structure for a frame type"""
         if hasattr(frame_type, "structure_"):
             return getattr(frame_type, "structure_")  # underscored to avoid naming collision
         return getattr(frame_type, "structure")
 
     def is_field_here(self, field: Field) -> bool:
+        """Is a field defined for this field"""
         f = self.fields.get(field.field_name)
         return f == field
 
@@ -301,6 +309,7 @@ class FrameStructure(typing.Generic[F]):
         return override if override else f"__{len(self.fields)}"
 
     def finish_building(self, frame: F):
+        """Finish building the structure"""
         # find field names
         self.structure_name = type(frame).__name__
         i_names: typing.Dict[Field, str] = {}

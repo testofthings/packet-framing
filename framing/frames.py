@@ -54,10 +54,11 @@ class Frames:
         return frame
 
     @classmethod
-    def dump(cls, frame: Frame, bit_offset=80, indent='', width=0, copy_to_avoid_update=False) -> str:
+    def dump(cls, frame: Frame, bit_offset=80, indent='', width=0, copy_sub_frames=False) -> str:
+        """Dump frame to string"""
         be = cast(BackendImplementation, frame.backend)
-        if copy_to_avoid_update:
+        if copy_sub_frames:
             be = be.copy()
-        return be.dump(bit_offset, indent, width, copy_to_avoid_update)
+        return be.dump(bit_offset, indent, width, copy_sub_frames=copy_sub_frames)
 
 
