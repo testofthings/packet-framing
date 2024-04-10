@@ -1,3 +1,5 @@
+"Value codecs, such as integer codecs"
+
 import typing
 from typing import Self
 
@@ -8,7 +10,7 @@ V = typing.TypeVar("V")
 
 
 class ValueCodec(typing.Generic[V]):
-    """Base class for integer codecs"""
+    """Base class for value codecs"""
     def default_value(self) -> V:
         """Default value"""
         raise NotImplementedError()
@@ -30,26 +32,6 @@ class ValueCodec(typing.Generic[V]):
         return -1
 
 
-class RawCodec(ValueCodec[RawData]):
-    def __init__(self, fixed_bit_length=-1):
-        self.fixed_bit_length = fixed_bit_length
-
-    def default_value(self) -> RawData:
-        return Raw.empty
-
-    def encode(self, value: RawData) -> RawData:
-        return value
-
-    def decode(self, data: RawData) -> RawData:
-        return data
-
-    def get_bit_length(self, value: RawData) -> int:
-        return value.bit_length()
-
-    def get_fixed_bit_length(self) -> int:
-        return self.fixed_bit_length
-
-
 class IntegerCodec(ValueCodec[int]):
     """Base class for integer codecs"""
     def default_value(self) -> int:
@@ -61,6 +43,7 @@ class IntegerCodec(ValueCodec[int]):
 
 
 class FixedByteIntegerCodec(IntegerCodec):
+    """Fixed byte-length integer codec"""
     def __init__(self, byte_length: int, little_end=False):
         self.length = byte_length
         self.little_end = little_end
@@ -106,6 +89,7 @@ class FixedByteIntegerCodec(IntegerCodec):
 
 
 class FixedBitIntegerCodec(IntegerCodec):
+    """"""
     def __init__(self, bit_length: int, little_end=False):
         self.byte_codec = FixedByteIntegerCodec((bit_length + 7) // 8, little_end)
         self.length = bit_length
@@ -157,24 +141,28 @@ class IntegerFormat:
         self.little_end = not big_end
 
     def bits(self, bits: int) -> Self:
+        """Set bit length"""
         self.bit_length = bits
         return self
 
     def bytes(self, bytes: int) -> Self:
+        """Set byte length"""
         self.bit_length = bytes * 8
         return self
 
     def little_endian(self, flag=True) -> Self:
+        """Choose little endian format"""
         self.little_end = flag
         return self
 
     def big_endian(self, flag=True) -> Self:
+        """Choose big endian format"""
         self.little_end = not flag
         return self
 
     def create_codec(self) -> IntegerCodec:
+        """Create the codec"""
         if self.bit_length % 8 != 0:
             return FixedBitIntegerCodec(bit_length=self.bit_length, little_end=self.little_end)
         else:
             return FixedByteIntegerCodec(byte_length=self.bit_length // 8, little_end=self.little_end)
-

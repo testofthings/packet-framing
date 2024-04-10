@@ -1,10 +1,11 @@
+"""Frame utilities for processing and composing frames"""
+
 import pathlib
 from typing import Callable, cast, Type, Dict, Any, TypeVar, Optional
 
 from framing.backends import ComposingBackend, FrameBackend, DissectorBackend, BackendImplementation
 from framing.base import Frame, LayerMapping, F
 from framing.data_queue import RawDataQueue
-from framing.fields import Structure, SubStructureField
 from framing.raw_data import RawData, Raw
 
 F = TypeVar("F", bound=Frame)
@@ -12,6 +13,7 @@ V = TypeVar("V")
 
 
 class Frames:
+    """Frame processing utilities"""
     @classmethod
     def compose(cls) -> Callable[['Frame'], FrameBackend]:
         """Create new frame for composing"""
@@ -19,10 +21,12 @@ class Frames:
 
     @classmethod
     def dissect(cls, data: RawData, mappings=LayerMapping()) -> Callable[['Frame'], FrameBackend]:
+        """Dissect frame from data"""
         return lambda f: DissectorBackend(f, mappings, data)
 
     @classmethod
     def dissect_file(cls, file: pathlib.Path) -> Callable[['Frame'], FrameBackend]:
+        """Dissect frame from file"""
         data = Raw.file(file)
         return lambda f: DissectorBackend(f, LayerMapping(), data)
 
@@ -60,5 +64,4 @@ class Frames:
         if copy_sub_frames:
             be = be.copy()
         return be.dump(bit_offset, indent, width, copy_sub_frames=copy_sub_frames)
-
 

@@ -2,7 +2,6 @@ from typing import Iterable
 from framing.base import Frame, LayerMapping
 from framing.data_queue import RawDataQueue
 from framing.fields import Selection, Structure, ValueOf
-from framing.frame_processors import Processor
 from framing.frames import Frames
 from framing.layer_stack import StackLayer, StackState
 
