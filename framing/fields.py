@@ -129,7 +129,8 @@ class FieldPath(FieldPointer[Frame, T], CalculatorSource):
             for i, p in enumerate(self.path):
                 v = p.get(v)
                 if (i < len(self.path) - 1) and not isinstance(v, Frame):
-                    raise Exception(f"Bad field {p.field_name} in path: " + "/".join([p.field_name for p in self.path]))
+                    raise ValueError(f"Bad field {p.field_name} in path: " + \
+                                     "/".join([p.field_name for p in self.path]))
             return v
         if frame.backend.parent:
             return self.get(frame.backend.parent.frame)
@@ -164,7 +165,7 @@ class ConfigurableField(Field[F, T], ABC):
             return location / self
         if isinstance(location, Field):
             return FieldPath(location) / self
-        raise Exception(f"Cannot construct path from: {location}")
+        raise ValueError(f"Cannot construct path from: {location}")
 
     def length_by(self, value: CalculatorSource) -> Self:
         """This field length is calculated by the given source"""
@@ -446,7 +447,7 @@ class LVField(ConfigurableField[F, T]):
         self.structure = sub.structure
         self.length_codec = length.create_codec()
         if self.length_codec.get_fixed_bit_length() < 0:
-            raise Exception("Variable-length length in LV not supported, now")
+            raise ValueError("Variable-length length in LV not supported, now")
         self.length_resolver = LengthOfLV(self)
         sub.consumed_by = self
 
@@ -694,7 +695,7 @@ class Selection(Structure[F]):
     def choice(self, key, value: ConfigurableField[F, T]) -> ConfigurableField[F, T]:
         """Add a choice to the selection"""
         if key in self.choice_map or value in self.reverse_map:
-            raise Exception(f"Duplicate entry for key {key}")
+            raise ValueError(f"Duplicate entry for key {key}")
         assert isinstance(value, ConfigurableField), "Provide a field for choice(...)"
         self.choice_map[key] = value
         self.reverse_map[value.structure] = key

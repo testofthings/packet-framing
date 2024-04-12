@@ -180,7 +180,7 @@ class ComposingBackend(BackendImplementation):
 
     def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type[F]] = None,
                      default_frame=False) -> Optional[Frame]:
-        # FIXME: Not implemented
+        # FIXME: Not implemented  # pylint: disable=fixme
         if not default_frame:
             return None
         return RawFrame(self.factory())
@@ -258,7 +258,7 @@ class DissectorBackend(BackendImplementation):
             else:
                 v = field.decode(data, d_len, self)
         except EOFError as e:
-            raise EOFError(f"{field.field_name} {e}")
+            raise EOFError(f"Field '{field.field_name}'") from e
         return v
 
     def get_raw(self, field: Field) -> Tuple[RawData, int]:

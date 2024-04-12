@@ -243,7 +243,7 @@ class FrameBackend(ABC):
         return self
 
 
-TF = typing.TypeVar("TF", bound='Frame')
+TF = typing.TypeVar("TF", bound='Frame')  # pylint: disable=invalid-name
 
 
 class Frame(LengthEntity):
