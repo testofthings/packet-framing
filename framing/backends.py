@@ -353,7 +353,7 @@ class DissectorBackend(BackendImplementation):
                 count=-1, terminator: Optional[Callable[[T], bool]] = None) -> Iterator[FT]:
         v = self.field_values.get(sequence_field)
         if v is not None:
-            return v.__iter__()  # already value in memory (we do not store it here)
+            return iter(v)  # already value in memory (we do not store it here)
 
         backend = self
 

@@ -10,7 +10,7 @@ from framing.raw_data import Raw, RawData
 
 class StackState:
     """Frame stack state during receive"""
-    def __init__(self, data: RawData, payload_type: Any = None, frame: Optional[Frame] = None, 
+    def __init__(self, data: RawData, payload_type: Any = None, frame: Optional[Frame] = None,
                  lower: Optional['StackState'] = None, stream_id: Optional[Any] = None):
         self.data = data
         self.payload_type = payload_type
@@ -76,7 +76,6 @@ class StackLayer:
 
     def commit_read(self, _stream_id: Any, byte_length: int):
         """Commit read of bytes from underlying stream"""
-        pass
 
     def configure(self, _spec: Dict[Any, Any]) -> 'StackLayer':
         """Configure this layer"""
