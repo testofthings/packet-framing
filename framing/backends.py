@@ -268,7 +268,7 @@ class DissectorBackend(BackendImplementation):
         if bit_length < 0 and field.offset.min_tail_length:
             # length not known, limited by space required by later field(s)
             bit_length = max(0, self.data.bit_length() - bit_length - field.offset.min_tail_length)
-            bit_length = field._validate_length(bit_length)
+            bit_length = field._validate_length(bit_length)  # pylint: disable=protected-access
 
         if field.min_bit_length < field.max_bit_length:
             # variable length, check find out how much to read
@@ -278,7 +278,7 @@ class DissectorBackend(BackendImplementation):
                 return self.data.sub_block_bits(0, field.max_bit_length), field.max_bit_length
             # less than maximum surely available, must read to find out
             data_len = self.data.bit_length()
-            bit_length = field._validate_length(data_len)
+            bit_length = field._validate_length(data_len)  # pylint: disable=protected-access
 
         if bit_length < 0:
             data = self.data.tail_bits(bit_offset)
@@ -331,7 +331,7 @@ class DissectorBackend(BackendImplementation):
                         if field.offset.min_tail_length:
                             # data limited by space required by later field(s)
                             p_len = max(0, p_len - field.offset.min_tail_length)
-                        p_len = field._validate_length(p_len)
+                        p_len = field._validate_length(p_len)   # pylint: disable=protected-access
                     off += p_len
                 self.end_offset_cache[field] = off  # cache for next call
         else:

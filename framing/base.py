@@ -369,10 +369,10 @@ class LayerMapping:
     """Map lower layer selector into upper layer payload"""
     def __init__(self, payload: Field = None, base: Optional['LayerMapping'] = None):
         assert not (payload and base), "Cannot provide both payload and base mapping"
-        self._mappings: Dict[Field, Dict[FieldPointer, Dict]] = {}
+        self.mappings: Dict[Field, Dict[FieldPointer, Dict]] = {}
         self._payload = payload
         if payload:
-            self._mappings[payload] = {}
+            self.mappings[payload] = {}
         if base is not None:
             self._payload = base._payload
             base.merge(self)
@@ -400,18 +400,18 @@ class LayerMapping:
 
     def by(self, type_field: FieldPointer[Any, T], mappings: typing.Dict[T, Type[Frame]]) -> Self:
         """Add mappings for defined payload"""
-        mp = self._mappings[self._payload]
+        mp = self.mappings[self._payload]
         mp.setdefault(type_field, {}).update(mappings)
         return self
 
     def many_by(self, fields: Dict[Field, FieldPointer[Any, T]], mappings: typing.Dict[T, Type[Frame]]) -> Self:
         """Add mappings for defined payload for many type fields"""
         first = True
-        t_map = self._mappings.get(self._payload, {}).values()
+        t_map = self.mappings.get(self._payload, {}).values()
         for pf, tf in fields.items():
             if first:
                 self._payload = pf
-            mp = self._mappings.setdefault(pf, {})
+            mp = self.mappings.setdefault(pf, {})
             nt_map = mp.setdefault(tf, {})
             nt_map.update(mappings)
             for tm in t_map:
@@ -420,11 +420,11 @@ class LayerMapping:
 
     def is_mapped(self, payload: Field) -> bool:
         """Is payload mapped?"""
-        return payload in self._mappings
+        return payload in self.mappings
 
     def get_mappings(self, payload: Field) -> Optional[Dict[FieldPointer, Dict[Any, Type[Frame]]]]:
         """Get mappings for a payload, if any"""
-        return self._mappings.get(payload)
+        return self.mappings.get(payload)
 
     def add_to(self, frame: F) -> F:
         """Add mappings to a frame"""
@@ -433,8 +433,8 @@ class LayerMapping:
 
     def merge(self, mapping: 'LayerMapping') -> Self:
         """Merge mappings with other mapping object"""
-        for f, mm in self._mappings.items():
-            mapping._mappings.setdefault(f, {}).update(mm)
+        for f, mm in self.mappings.items():
+            mapping.mappings.setdefault(f, {}).update(mm)
         return self
 
     def __add__(self, other: 'LayerMapping') -> 'LayerMapping':
