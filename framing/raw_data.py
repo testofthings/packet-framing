@@ -141,6 +141,7 @@ class RawData(LengthEntity):
         h = self.byte_length()
         if h < 0:
             raise ValueError("Cannot calculate hash for stream")
+        # NOTE: We could be more efficient here, just sample beginning and end
         for i in range(0, h):
             h += self.octet(i)
         return h

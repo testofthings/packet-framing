@@ -21,8 +21,8 @@ class IPv6(Frame):
     Payload_length = structure.integer(bits=16)
     Next_header = structure.integer(bits=8)
     Hop_limit = structure.integer(bits=8)
-    Source_address = structure.raw(bytes=16)
-    Destination_address = structure.raw(bytes=16)
+    Source_address = structure.raw(octets=16)
+    Destination_address = structure.raw(octets=16)
 
     Payload = structure.raw().length_by(ValueOf(Payload_length))
 
@@ -51,7 +51,7 @@ class Fragment(Frame):
     Fragment_offset = structure.integer(bits=13)
     Res = structure.raw(bits=2)
     M = structure.integer(bits=1)
-    Identification = structure.raw(bytes=4)
+    Identification = structure.raw(octets=4)
     # NOTE: Payload starts from middle if Fragment_offset > 0, e.g. UDP headers only in first fragment
     Payload = structure.raw()
 

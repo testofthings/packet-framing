@@ -137,8 +137,8 @@ class FixedBitIntegerCodec(IntegerCodec):
 
 class IntegerFormat:
     """Codec formatter"""
-    def __init__(self, bits=0, bytes=0, big_end: bool = False):
-        self.bit_length = bits or (bytes * 8) or 16
+    def __init__(self, bits=0, octets=0, big_end: bool = False):
+        self.bit_length = bits or (octets * 8) or 16
         self.little_end = not big_end
 
     def bits(self, bits: int) -> Self:
@@ -146,9 +146,9 @@ class IntegerFormat:
         self.bit_length = bits
         return self
 
-    def bytes(self, bytes: int) -> Self:
+    def octets(self, octets: int) -> Self:
         """Set byte length"""
-        self.bit_length = bytes * 8
+        self.bit_length = octets * 8
         return self
 
     def little_endian(self, flag=True) -> Self:

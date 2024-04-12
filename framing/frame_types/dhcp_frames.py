@@ -16,11 +16,11 @@ class DHCP(Frame):
     secs = structure.integer(bits=16)
     flags = structure.raw(bits=16)
 
-    ciaddr = structure.raw(bytes=4)
-    yiaddr = structure.raw(bytes=4)
-    siaddr = structure.raw(bytes=4)
-    giaddr = structure.raw(bytes=4)
-    chaddr = structure.raw(bytes=16)  # NOTE: Should apply 'hlen'
-    file = structure.raw(bytes=128)
+    ciaddr = structure.raw(octets=4)
+    yiaddr = structure.raw(octets=4)
+    siaddr = structure.raw(octets=4)
+    giaddr = structure.raw(octets=4)
+    chaddr = structure.raw(octets=16)  # NOTE: Should apply 'hlen'
+    file = structure.raw(octets=128)
 
     options = structure.raw()

@@ -90,8 +90,8 @@ class DNSQuestion(Frame):
     structure = Structure['DNSQuestion']()
 
     QNAME = DNSName(structure)
-    QTYPE = structure.integer(bytes=2)
-    QCLASS = structure.integer(bytes=2)
+    QTYPE = structure.integer(octets=2)
+    QCLASS = structure.integer(octets=2)
 
 
 class SOA_RDATA(Frame):  # pylint: disable=invalid-name
@@ -100,10 +100,10 @@ class SOA_RDATA(Frame):  # pylint: disable=invalid-name
 
     MNAME = DNSName(structure)
     RNAME = DNSName(structure)
-    SERIAL = structure.integer(bytes=4)
-    REFRESH = structure.integer(bytes=4)
-    RETRY = structure.integer(bytes=4)
-    EXPIRE = structure.integer(bytes=4)
+    SERIAL = structure.integer(octets=4)
+    REFRESH = structure.integer(octets=4)
+    RETRY = structure.integer(octets=4)
+    EXPIRE = structure.integer(octets=4)
 
 
 class RDATA(Frame):
@@ -111,11 +111,11 @@ class RDATA(Frame):
     structure = Selection['RDATA']()
 
     Other = structure.raw()  # the default
-    A = structure.choice(1, structure.raw(bytes=4))
+    A = structure.choice(1, structure.raw(octets=4))
     NS = structure.choice(2, DNSName(structure))
     CNAME = structure.choice(5, DNSName(structure))
     SOA = structure.choice(6, structure.sub(SOA_RDATA))
-    AAAA = structure.choice(28, structure.raw(bytes=16))
+    AAAA = structure.choice(28, structure.raw(octets=16))
 
 
 class DNSResource(Frame):
@@ -123,10 +123,10 @@ class DNSResource(Frame):
     structure = Structure['DNSResource']()
 
     NAME = DNSName(structure)
-    TYPE = structure.integer(bytes=2)
-    CLASS = structure.integer(bytes=2)
-    TTL = structure.integer(bytes=4)
-    RDLENGTH = structure.integer(bytes=2)
+    TYPE = structure.integer(octets=2)
+    CLASS = structure.integer(octets=2)
+    TTL = structure.integer(octets=4)
+    RDLENGTH = structure.integer(octets=2)
     RDATA = structure.sub(RDATA).choice_by(TYPE).length_by(RDLENGTH)
 
 

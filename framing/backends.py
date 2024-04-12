@@ -145,13 +145,13 @@ class RawFrame(Frame):
     data = structure.raw()
 
     @classmethod
-    def build_with_lengths(cls, bits: int = None, bytes: int = None, min_bits: int = None,
-                           min_bytes: int = None) -> Type[Frame]:
+    def build_with_lengths(cls, bits: int = None, octets: int = None, min_bits: int = None,
+                           min_octets: int = None) -> Type[Frame]:
         """Build raw frame with length limits"""
         class RawFrameWithLength(Frame):
             """Raw frame with length limits"""
             structure = Structure['RawFrameWithLength']()
-            data = structure.raw(bits=bits, bytes=bytes, min_bits=min_bits, min_bytes=min_bytes)
+            data = structure.raw(bits=bits, octets=octets, min_bits=min_bits, min_octets=min_octets)
         return RawFrameWithLength
 
 

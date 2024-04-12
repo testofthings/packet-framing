@@ -10,19 +10,19 @@ from framing.raw_data import Raw
 class AFrame(Frame):
     structure = Structure['AFrame']()
 
-    lv_field = LVField(structure.raw(), IntegerFormat(bytes=2))
+    lv_field = LVField(structure.raw(), IntegerFormat(octets=2))
 
 
 class BFrame(Frame):
     structure = Structure['BFrame']()
 
-    s_field = Sequence(LVField(structure.raw(), IntegerFormat(bytes=2)))
+    s_field = Sequence(LVField(structure.raw(), IntegerFormat(octets=2)))
 
 
 class CFrame(Frame):
     structure = Structure['CFrame']()
 
-    s_field = Sequence(LVField(structure.raw(), IntegerFormat(bytes=2))).terminator_test(lambda r: not r)
+    s_field = Sequence(LVField(structure.raw(), IntegerFormat(octets=2))).terminator_test(lambda r: not r)
 
 
 class DFrame(Frame):
@@ -34,7 +34,7 @@ class DFrame(Frame):
 class EFrame(Frame):
     structure = Structure['EFrame']()
 
-    s_field = structure.raw(min_bytes=4, bytes=8)
+    s_field = structure.raw(min_octets=4, octets=8)
 
 
 def test_lv_compose():
@@ -99,7 +99,7 @@ def test_min_length():
     assert d == Raw.hex("0001020304050607")
 
     e_frame = EFrame(Frames.dissect(Raw.hex("00010203040506070809")))
-    d = EFrame.s_field.as_frame(e_frame, frame_type=RawFrame.build_with_lengths(min_bytes=4, bytes=7))
+    d = EFrame.s_field.as_frame(e_frame, frame_type=RawFrame.build_with_lengths(min_octets=4, octets=7))
     assert isinstance(d, Frame)
     assert d.byte_length() == 7
 

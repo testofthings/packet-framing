@@ -629,20 +629,20 @@ class Structure(FrameStructure[F]):
         self._update_fixed_length(field)
         return field
 
-    def raw(self, bits: int = None, bytes: int = None, min_bits: int = None, min_bytes: int = None,
+    def raw(self, bits: int = None, octets: int = None, min_bits: int = None, min_octets: int = None,
             default: RawData = None, name: str = None) -> RawField[F]:
         """Add raw data field"""
         fn = self._get_a_name(name)
         fix_len = -1
         if bits is not None:
             fix_len = bits
-        if bytes is not None:
-            fix_len = bytes * 8
+        if octets is not None:
+            fix_len = octets * 8
         min_len = fix_len
         if min_bits is not None:
             min_len = min_bits
-        if min_bytes is not None:
-            min_len = min_bytes * 8
+        if min_octets is not None:
+            min_len = min_octets * 8
         assert min_len <= fix_len, f"Minimun length is {min_len} bits and max length is {fix_len} bits"
         if default is None:
             default = Raw.empty if min_len < 0 else Raw.zeroes(bit_length=min_len)
@@ -652,12 +652,12 @@ class Structure(FrameStructure[F]):
         self._update_fixed_length(f)
         return f
 
-    def integer(self, int_format=IntegerFormat(), bytes=-1, bits=-1,
+    def integer(self, int_format=IntegerFormat(), octets=-1, bits=-1,
                 default=0, name: str = None) -> IntField[F]:
         """Add integer field"""
         fn = self._get_a_name(name)
-        if bytes > 0:
-            int_format = int_format.bytes(bytes)
+        if octets > 0:
+            int_format = int_format.octets(octets)
         if bits > 0:
             int_format = int_format.bits(bits)
         codec = int_format.create_codec()

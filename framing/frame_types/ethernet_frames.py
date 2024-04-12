@@ -11,9 +11,9 @@ class EthernetII(Frame):
     """Ethernet II frame"""
     structure = Structure['EthernetII']()
 
-    destination = structure.raw(bytes=6)
-    source = structure.raw(bytes=6)
-    type = structure.integer(IntegerFormat(bytes=2))
+    destination = structure.raw(octets=6)
+    source = structure.raw(octets=6)
+    type = structure.integer(IntegerFormat(octets=2))
     data = structure.raw()
     padding = structure.raw().pad_to(min_offset=64)
     # this may be missing, merged into padding, when present

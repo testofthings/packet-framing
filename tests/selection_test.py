@@ -7,15 +7,15 @@ from framing.raw_data import Raw
 class ASelection(Frame):
     structure = Selection['ASelection']()
 
-    A = structure.choice(1, structure.integer(bytes=2))
-    B = structure.choice(2, structure.raw(bytes=8))
-    C = structure.choice(3, structure.integer(bytes=4))
+    A = structure.choice(1, structure.integer(octets=2))
+    B = structure.choice(2, structure.raw(octets=8))
+    C = structure.choice(3, structure.integer(octets=4))
 
 
 class XFrame(Frame):
     structure = Structure['XFrame']()
 
-    type = structure.integer(bytes=1)
+    type = structure.integer(octets=1)
     value = structure.sub(ASelection).choice_by(type)
 
 

@@ -20,23 +20,23 @@ class FileHeader(Frame):
     """PCAP file header"""
     structure = Structure['FileHeader']()
 
-    Magic_Number = structure.raw(bytes=4, default=Raw.hex("D4C3B2A1"))
-    Major_Version = structure.integer(Int.bytes(2), default=2)
-    Minor_Version = structure.integer(Int.bytes(2), default=4)
-    Reserved1 = structure.raw(bytes=4)
-    Reserved2 = structure.raw(bytes=4)
-    SnapLen = structure.integer(Int.bytes(4))
-    LinkType = structure.integer(Int.bytes(4))
+    Magic_Number = structure.raw(octets=4, default=Raw.hex("D4C3B2A1"))
+    Major_Version = structure.integer(Int.octets(2), default=2)
+    Minor_Version = structure.integer(Int.octets(2), default=4)
+    Reserved1 = structure.raw(octets=4)
+    Reserved2 = structure.raw(octets=4)
+    SnapLen = structure.integer(Int.octets(4))
+    LinkType = structure.integer(Int.octets(4))
 
 
 class PacketRecord(Frame):
     """PCAP packet record"""
     structure = Structure['PacketRecord']()
 
-    Timestamp = structure.integer(Int.bytes(4))
-    Timestamp_2 = structure.integer(Int.bytes(4))
-    Captured_Packet_length = structure.integer(Int.bytes(4))
-    Original_Packet_length = structure.integer(Int.bytes(4))
+    Timestamp = structure.integer(Int.octets(4))
+    Timestamp_2 = structure.integer(Int.octets(4))
+    Captured_Packet_length = structure.integer(Int.octets(4))
+    Original_Packet_length = structure.integer(Int.octets(4))
     Packet_Data = structure.raw().length_by(ValueOf(Captured_Packet_length).copy_to(Original_Packet_length))
 
 

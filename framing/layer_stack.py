@@ -146,5 +146,5 @@ class RawStackLayer(StackLayer):
     def configure(self, spec: Dict[Any, Any]) -> StackLayer:
         length = int(spec.get("len", -1))
         if length > 0:
-            self.frame_type = RawFrame.build_with_lengths(min_bytes=1, bytes=length)
+            self.frame_type = RawFrame.build_with_lengths(min_octets=1, octets=length)
         return super().configure(spec)

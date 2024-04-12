@@ -12,15 +12,15 @@ class ClientHello(Frame):
     """TLS Client Hello"""
     structure = Structure['ClientHello']()
 
-    version = structure.integer(bytes=2)
-    random = structure.raw(bytes=32)
-    session_id_length = structure.integer(bytes=1)
+    version = structure.integer(octets=2)
+    random = structure.raw(octets=32)
+    session_id_length = structure.integer(octets=1)
     session_id = structure.raw().length_by(session_id_length)
-    cipher_suites_length = structure.integer(bytes=2)
+    cipher_suites_length = structure.integer(octets=2)
     cipher_suites = structure.raw().length_by(cipher_suites_length)
-    compression_methods_length = structure.integer(bytes=1)
+    compression_methods_length = structure.integer(octets=1)
     compression_methods = structure.raw().length_by(compression_methods_length)
-    extensions_length = structure.integer(bytes=2)
+    extensions_length = structure.integer(octets=2)
     extensions = structure.raw().length_by(extensions_length)
 
 
@@ -28,13 +28,13 @@ class ServerHello(Frame):
     """TLS Server Hello"""
     structure = Structure['ServerHello']()
 
-    version = structure.integer(bytes=2)
-    random = structure.raw(bytes=32)
-    session_id_length = structure.integer(bytes=1)
+    version = structure.integer(octets=2)
+    random = structure.raw(octets=32)
+    session_id_length = structure.integer(octets=1)
     session_id = structure.raw().length_by(session_id_length)
-    cipher_suite = structure.integer(bytes=2)
-    compression_method = structure.integer(bytes=1)
-    extensions_length = structure.integer(bytes=2)
+    cipher_suite = structure.integer(octets=2)
+    compression_method = structure.integer(octets=1)
+    extensions_length = structure.integer(octets=2)
     extensions = structure.raw().length_by(extensions_length)
 
 class TLSHandshakeMessage(Frame):

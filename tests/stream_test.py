@@ -20,7 +20,7 @@ def test_streams():
 class AFrame(Frame):
     structure = Structure["AFrame"]()
 
-    a_field = structure.raw(min_bytes=1, bytes=10)
+    a_field = structure.raw(min_octets=1, octets=10)
 
 
 def test_open_stream_decoding():
