@@ -153,7 +153,7 @@ FT = typing.TypeVar("FT", bound=Frame)
 V = typing.TypeVar("V")
 
 
-class ConfigurableField(Field[F, T]):
+class ConfigurableField(Field[F, T], ABC):
     """Configurable frame field"""
     def __truediv__(self, other: 'Field[Any, T]') -> 'FieldPath':
         return FieldPath(self) / other

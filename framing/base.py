@@ -1,5 +1,6 @@
 """Base definitions"""
 
+from abc import ABC
 import inspect
 import typing
 from typing import Optional, Callable, List, Type, Any, Dict, Self
@@ -56,7 +57,7 @@ class FieldPointer(typing.Generic[F, T]):
         raise NotImplementedError()
 
 
-class Field(FieldPointer[F, T]):
+class Field(FieldPointer[F, T], ABC):
     """Base class for fields"""
     def __init__(self, type_name: str, default_value: T, fixed_bit_offset=-1):
         self.field_name = "field?"
@@ -164,7 +165,7 @@ class Field(FieldPointer[F, T]):
         raise NotImplementedError()
 
 
-class FrameBackend:
+class FrameBackend(ABC):
     """Base class for frame backend"""
     def __init__(self, frame: 'Frame'):
         self.frame = frame

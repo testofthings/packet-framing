@@ -1,5 +1,6 @@
 "Value codecs, such as integer codecs"
 
+from abc import ABC
 import typing
 from typing import Self
 
@@ -9,7 +10,7 @@ from framing.raw_data import RawData, Raw
 V = typing.TypeVar("V")
 
 
-class ValueCodec(typing.Generic[V]):
+class ValueCodec(typing.Generic[V], ABC):
     """Base class for value codecs"""
     def default_value(self) -> V:
         """Default value"""
@@ -32,7 +33,7 @@ class ValueCodec(typing.Generic[V]):
         return -1
 
 
-class IntegerCodec(ValueCodec[int]):
+class IntegerCodec(ValueCodec[int], ABC):
     """Base class for integer codecs"""
     def default_value(self) -> int:
         return 0
