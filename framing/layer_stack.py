@@ -10,8 +10,8 @@ from framing.raw_data import Raw, RawData
 
 class StackState:
     """Frame stack state during receive"""
-    def __init__(self, data: RawData, payload_type: Any = None, frame: Optional[Frame] = None, lower: Optional['StackState'] = None,
-                 stream_id: Optional[Any] = None):
+    def __init__(self, data: RawData, payload_type: Any = None, frame: Optional[Frame] = None, 
+                 lower: Optional['StackState'] = None, stream_id: Optional[Any] = None):
         self.data = data
         self.payload_type = payload_type
         self.frame = frame
@@ -105,15 +105,15 @@ class FrameStack:
         if self.layer.streaming:
             # stream data m-to-n relation between transports and payload frames
             for s in layer_receive:
-                next = self.next.get(s.payload_type)
-                if next is None and self.layer.show_unmapped:
+                next_fs = self.next.get(s.payload_type)
+                if next_fs is None and self.layer.show_unmapped:
                     yield s  # show raw frames
                     continue
                 if not s.data:
                     continue  # no data added
                 assert s.stream_id, "Expected stream ID for streaming layer"
-                next = next or RawStackLayer()
-                next_receive = list(next.receive(s))  # next level payloads
+                next_fs = next_fs or RawStackLayer()
+                next_receive = list(next_fs.receive(s))  # next level payloads
                 try:
                     payload_len = s.frame.byte_length()  # this raises exception, if partial payload(s)
                     self.layer.commit_read(s.stream_id, payload_len)
@@ -123,12 +123,12 @@ class FrameStack:
         else:
             # block transport, 1-to-n relation between transport and payload frames
             for s in layer_receive:
-                next = self.next.get(s.payload_type)
-                if next is None and self.layer.show_unmapped:
+                next_fs = self.next.get(s.payload_type)
+                if next_fs is None and self.layer.show_unmapped:
                     yield s  # show raw frames
                     continue
-                next = next or RawStackLayer()
-                next_receive = next.receive(s)
+                next_fs = next_fs or RawStackLayer()
+                next_receive = next_fs.receive(s)
                 yield from next_receive
 
 
@@ -149,5 +149,3 @@ class RawStackLayer(StackLayer):
         if length > 0:
             self.frame_type = RawFrame.build_with_lengths(min_bytes=1, bytes=length)
         return super().configure(spec)
-
-

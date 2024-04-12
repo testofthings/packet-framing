@@ -164,5 +164,4 @@ class IntegerFormat:
         """Create the codec"""
         if self.bit_length % 8 != 0:
             return FixedBitIntegerCodec(bit_length=self.bit_length, little_end=self.little_end)
-        else:
-            return FixedByteIntegerCodec(byte_length=self.bit_length // 8, little_end=self.little_end)
+        return FixedByteIntegerCodec(byte_length=self.bit_length // 8, little_end=self.little_end)

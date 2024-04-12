@@ -223,7 +223,7 @@ class RawDataSequence(RawData):
     """Sequence of raw data blocks"""
     def __init__(self, components: List[RawData]):
         self.components = components
-        self.length = sum([c.bit_length() for c in components])
+        self.length = sum(c.bit_length() for c in components)
 
     def bit_length(self) -> int:
         return self.length

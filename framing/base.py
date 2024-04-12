@@ -233,7 +233,7 @@ class FrameBackend:
         """All layer mappings"""
         return self
 
-    def dump(self, bit_offset=0, indent='', width=0, copy_to_avoid_update=False) -> str:
+    def dump(self, bit_offset=0, indent='', width=0, copy_sub_frames=False) -> str:
         """Dump frame to a multi-line string"""
         raise NotImplementedError()
 

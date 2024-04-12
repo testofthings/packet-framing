@@ -50,7 +50,7 @@ class DNSName(Sequence):
     def end_check(cls, raw: RawData) -> bool:
         """DNS name end check"""
         fb = raw.octet(0)
-        return not (0 < fb < 0xc0)
+        return not (0 < fb < 0xc0)  # pylint: disable=superfluous-parens
 
     @classmethod
     def parse_string(cls, data: RawData, message: 'DNSMessage', previous_offset=-1) -> List[str]:
@@ -68,10 +68,9 @@ class DNSName(Sequence):
                 cs = cls.parse_string(cin, message, offset)
                 r.extend(cs)
                 break
-            else:
-                r.append(data.sub_block(1, fb).as_string())
-                data = data.tail_bytes(1 + fb)
-                fb = data.octet(0)
+            r.append(data.sub_block(1, fb).as_string())
+            data = data.tail_bytes(1 + fb)
+            fb = data.octet(0)
         return r
 
     @classmethod
@@ -95,7 +94,7 @@ class DNSQuestion(Frame):
     QCLASS = structure.integer(bytes=2)
 
 
-class SOA_RDATA(Frame):
+class SOA_RDATA(Frame):  # pylint: disable=invalid-name
     """DNS SOA RDATA record"""
     structure = Structure['SOA_RDATA']()
 

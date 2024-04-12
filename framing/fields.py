@@ -131,7 +131,7 @@ class FieldPath(FieldPointer[Frame, T], CalculatorSource):
                 if (i < len(self.path) - 1) and not isinstance(v, Frame):
                     raise Exception(f"Bad field {p.field_name} in path: " + "/".join([p.field_name for p in self.path]))
             return v
-        elif frame.backend.parent:
+        if frame.backend.parent:
             return self.get(frame.backend.parent.frame)
         return None
 
@@ -162,10 +162,9 @@ class ConfigurableField(Field[F, T]):
         """Construct path from this field and given location"""
         if isinstance(location, FieldPath):
             return location / self
-        elif isinstance(location, Field):
+        if isinstance(location, Field):
             return FieldPath(location) / self
-        else:
-            raise Exception(f"Cannot construct path from: {location}")
+        raise Exception(f"Cannot construct path from: {location}")
 
     def length_by(self, value: CalculatorSource) -> Self:
         """This field length is calculated by the given source"""
@@ -274,7 +273,7 @@ class RawField(ConfigurableField[F, RawData]):
         bit_len = super().decode_bit_length(data, bit_offset, None, backend)
         if bit_len >= 0 and self.min_bit_length < self.max_bit_length:
             # variable length, check limits
-            bit_len = self._validate_length()
+            bit_len = self._validate_length(bit_len)
         return bit_len
 
     def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> RawData:
@@ -629,7 +628,7 @@ class Structure(FrameStructure[F]):
         self._update_fixed_length(field)
         return field
 
-    def raw(self, bits: int = None, bytes: int = None, min_bits: int = None, min_bytes: int = None, 
+    def raw(self, bits: int = None, bytes: int = None, min_bits: int = None, min_bytes: int = None,
             default: RawData = None, name: str = None) -> RawField[F]:
         """Add raw data field"""
         fn = self._get_a_name(name)

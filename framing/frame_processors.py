@@ -59,7 +59,7 @@ class IP2UDP(Processor[IPx, T]):
         self.layer = IPStackLayer()
 
     def push(self, value: IPv4) -> Optional[T]:
-        if isinstance(value, IPv4) or isinstance(value, IPv6):
+        if isinstance(value, (IPv4, IPv6)):
             type_data = self.layer.push(value)
             if type_data is not None and type_data[0] == 0x11:
                 frame = UDP(Frames.dissect(type_data[1]))
@@ -73,7 +73,7 @@ class IP2TCP(Processor[IPx, T]):
         self.layer = IPStackLayer()
 
     def push(self, value: IPx) -> Optional[T]:
-        if isinstance(value, IPv4) or isinstance(value, IPv6):
+        if isinstance(value, (IPv4, IPv6)):
             type_data = self.layer.push(value)
             if type_data is not None and type_data[0] == 0x6:
                 frame = TCP(Frames.dissect(type_data[1]))
@@ -88,7 +88,7 @@ class IP2TCPStream(Processor[IPx, Tuple[TCP_Stream_Id, RawData]]):
         self.tcp_reassemble = TCPStackLayer()
 
     def push(self, value: IPx) -> Optional[Tuple[TCP_Stream_Id, RawData]]:
-        if isinstance(value, IPv4) or isinstance(value, IPv6):
+        if isinstance(value, (IPv4, IPv6)):
             type_data = self.layer.push(value)
             if type_data is not None and type_data[0] == 0x6:
                 tcp = TCP(Frames.dissect(type_data[1]))
