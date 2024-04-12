@@ -37,7 +37,7 @@ class NameComponent(RawField):
 
     def decode(self, data: RawData, bit_length, backend: FrameBackend) -> RawData:
         fb = data.octet(0)
-        return data.subBlock(0, fb + 1) if fb < 0xc0 else data.subBlock(0, 2)
+        return data.sub_block(0, fb + 1) if fb < 0xc0 else data.sub_block(0, 2)
 
 
 class DNSName(Sequence):
@@ -64,13 +64,13 @@ class DNSName(Sequence):
                 offset = (fb & 0x3f) << 8 | data.octet(1)
                 if previous_offset == offset:
                     raise ValueError(f"DNS compression error (offset={offset})")
-                cin = ba.input_data().tailBytes(offset)
+                cin = ba.input_data().tail_bytes(offset)
                 cs = cls.parse_string(cin, message, offset)
                 r.extend(cs)
                 break
             else:
-                r.append(data.subBlock(1, fb).as_string())
-                data = data.tailBytes(1 + fb)
+                r.append(data.sub_block(1, fb).as_string())
+                data = data.tail_bytes(1 + fb)
                 fb = data.octet(0)
         return r
 

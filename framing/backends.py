@@ -275,15 +275,15 @@ class DissectorBackend(BackendImplementation):
             avail = self.data.bits_available()
             if avail >= field.max_bit_length:
                 # maximum amount of data available
-                return self.data.subBlockBits(0, field.max_bit_length), field.max_bit_length
+                return self.data.sub_block_bits(0, field.max_bit_length), field.max_bit_length
             # less than maximum surely available, must read to find out
             data_len = self.data.bit_length()
             bit_length = field._validate_length(data_len)
 
         if bit_length < 0:
-            data = self.data.tailBits(bit_offset)
+            data = self.data.tail_bits(bit_offset)
         else:
-            data = self.data.subBlockBits(bit_offset, bit_length)
+            data = self.data.sub_block_bits(bit_offset, bit_length)
         return data, bit_length
 
     # Editing not allowed for dissected stuff
@@ -301,7 +301,7 @@ class DissectorBackend(BackendImplementation):
             assert v_len >= 0, f"Length with unknown length at {index}"
             bit_offset += v_len
             i += 1
-        data = self.data.tailBits(bit_offset)
+        data = self.data.tail_bits(bit_offset)
         v = item_field.decode(data, -1, self)
         return v
 
@@ -372,7 +372,7 @@ class DissectorBackend(BackendImplementation):
                 if self.previous is not None:
                     # move buffer to next item
                     v_len = item_field.decode_bit_length(self.window, 0, self.previous, backend)
-                    self.window = self.window.tailBits(v_len)
+                    self.window = self.window.tail_bits(v_len)
 
                 if self.window.octet(0) < 0:
                     self.count = self.items
@@ -385,7 +385,7 @@ class DissectorBackend(BackendImplementation):
                 return v
 
         off = self.get_bit_offset(sequence_field.offset)
-        window = self.data.tailBits(off)
+        window = self.data.tail_bits(off)
         return ItemIterator(window, count)
 
     def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type[F]] = None,
@@ -405,7 +405,7 @@ class DissectorBackend(BackendImplementation):
 
     def encode(self) -> RawData:
         bit_length = self.frame.bit_length()
-        return self.data.subBlockBits(0, bit_length)
+        return self.data.sub_block_bits(0, bit_length)
 
     def get_bit_length(self) -> int:
         if self.known_bit_length < 0:
@@ -424,7 +424,7 @@ class DissectorBackend(BackendImplementation):
 
     def copy(self, parent: Optional[FrameBackend] = None) -> Self:
         # do not read more data for printing
-        limited_data = self.data.subBlockBits(0, self.data.bits_available())
+        limited_data = self.data.sub_block_bits(0, self.data.bits_available())
 
         n_frame = copy.copy(self.frame)
         c = DissectorBackend(n_frame, self.mappings, limited_data)

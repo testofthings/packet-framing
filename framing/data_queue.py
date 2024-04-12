@@ -26,7 +26,7 @@ class RawDataQueue:
         fix_length = self.head.fixed.byte_length()
         if off < fix_length:
             # part of the data already in
-            data = data.tailBytes(fix_length - off)
+            data = data.tail_bytes(fix_length - off)
             if data.byte_length() == 0:
                 return data
             off = fix_length
@@ -44,7 +44,7 @@ class RawDataQueue:
         head_len = self.head.fixed.byte_length()
         while self.fragments and self.fragments[0][0] <= head_len:
             f_off, f_data = self.fragments[0]
-            add_data = f_data.tailBytes(head_len - f_off)
+            add_data = f_data.tail_bytes(head_len - f_off)
             self.head.append(add_data)
             self.fragments = self.fragments[1:]
             head_len += add_data.byte_length()
@@ -67,7 +67,7 @@ class RawDataQueue:
 
     def pull(self, byte_length: int) -> RawData:
         """Pull data from beginning of the queue"""
-        r = self.head.subBlock(0, byte_length)
+        r = self.head.sub_block(0, byte_length)
         self.forward(byte_length)
         return r
 

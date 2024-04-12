@@ -88,23 +88,23 @@ class RawData(LengthEntity):
         shift = 7 - (bit_offset % 8)
         return (octet >> shift) & 1
 
-    def subBlockBits(self, bit_offset: int, bit_length: int) -> 'RawData':
+    def sub_block_bits(self, bit_offset: int, bit_length: int) -> 'RawData':
         """Get sub-block, empty if beyond data"""
         if bit_offset % 8 == 0 and bit_length % 8 == 0:
-            return self.subBlock(bit_offset // 8, bit_length // 8)
+            return self.sub_block(bit_offset // 8, bit_length // 8)
         return BitAlignedData(self, bit_offset, bit_length)
 
-    def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
+    def sub_block(self, byte_offset: int, byte_length: int) -> 'RawData':
         """Get sub-block, empty if beyond data"""
         raise NotImplementedError()
 
-    def tailBits(self, bit_offset: int) -> 'RawData':
+    def tail_bits(self, bit_offset: int) -> 'RawData':
         """Get raw data tail, empty if beyond data"""
         if bit_offset % 8 == 0:
-            return self.tailBytes(bit_offset // 8)
+            return self.tail_bytes(bit_offset // 8)
         return BitAlignedData(self, bit_offset)
 
-    def tailBytes(self, byte_offset: int) -> 'RawData':
+    def tail_bytes(self, byte_offset: int) -> 'RawData':
         """Get raw data tail, empty if beyond data"""
         raise NotImplementedError()
 
@@ -115,7 +115,7 @@ class RawData(LengthEntity):
         while d0 >= 0 and d0 == other.octet(i):
             i += 1
             d0 = self.octet(i)
-        return self.subBlock(0, i)
+        return self.sub_block(0, i)
 
     def __repr__(self):
         return self.dump()
@@ -210,11 +210,11 @@ class ByteData(RawData):
         mo = self.start + byte_offset
         return self.data[mo:mo + ml]
 
-    def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
+    def sub_block(self, byte_offset: int, byte_length: int) -> 'RawData':
         ml = min(byte_length, max(0, self.length - byte_offset))
         return ByteData(self.data, self.start + byte_offset, ml)
 
-    def tailBytes(self, byte_offset: int) -> 'RawData':
+    def tail_bytes(self, byte_offset: int) -> 'RawData':
         ml = max(0, self.length - byte_offset)
         return ByteData(self.data, self.start + byte_offset, ml)
 
@@ -272,7 +272,7 @@ class RawDataSequence(RawData):
             off -= c_len
         return -1
 
-    def subBlockBits(self, bit_offset: int, bit_length: int) -> 'RawData':
+    def sub_block_bits(self, bit_offset: int, bit_length: int) -> 'RawData':
         """Get sub-block"""
         if bit_offset == 0 and bit_length == self.bit_length():
             return self
@@ -284,7 +284,7 @@ class RawDataSequence(RawData):
             if off + c_len > bit_offset:
                 st = max(0, bit_offset - off)
                 ln = min(c_len - st, bit_length - got)
-                nc.append(c.subBlockBits(st, ln))
+                nc.append(c.sub_block_bits(st, ln))
                 got += ln
                 if got >= bit_length:
                     return Raw.sequence(nc)
@@ -292,14 +292,14 @@ class RawDataSequence(RawData):
             off += c_len
         return Raw.sequence(nc)
 
-    def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
+    def sub_block(self, byte_offset: int, byte_length: int) -> 'RawData':
         """Get sub-block"""
-        return self.subBlockBits(byte_offset * 8, byte_length * 8)
+        return self.sub_block_bits(byte_offset * 8, byte_length * 8)
 
-    def tailBytes(self, byte_offset: int) -> 'RawData':
-        return self.tailBits(byte_offset * 8)
+    def tail_bytes(self, byte_offset: int) -> 'RawData':
+        return self.tail_bits(byte_offset * 8)
 
-    def tailBits(self, bit_offset: int) -> 'RawData':
+    def tail_bits(self, bit_offset: int) -> 'RawData':
         """Get raw data tail"""
         if bit_offset == 0:
             return self
@@ -309,7 +309,7 @@ class RawDataSequence(RawData):
         for i, c in enumerate(self.components):
             c_len = c.bit_length()
             if off < c_len:
-                nc = [c.tailBits(off)]
+                nc = [c.tail_bits(off)]
                 nc.extend(self.components[i + 1:])
                 # do not call Raw.sequence(), these components already optimized
                 if len(nc) == 1:
@@ -334,19 +334,19 @@ class ZeroData(RawData):
     def bit(self, bit_offset: int) -> int:
         return 0 if bit_offset < self.length else -1
 
-    def subBlockBits(self, bit_offset: int, bit_length: int) -> 'RawData':
+    def sub_block_bits(self, bit_offset: int, bit_length: int) -> 'RawData':
         ml = min(bit_length, max(0, self.length - bit_offset))
         return ZeroData(ml)
 
-    def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
+    def sub_block(self, byte_offset: int, byte_length: int) -> 'RawData':
         ml = min(byte_length * 8, max(0, self.length - byte_offset * 8))
         return ZeroData(ml)
 
-    def tailBits(self, bit_offset: int) -> 'RawData':
+    def tail_bits(self, bit_offset: int) -> 'RawData':
         ml = max(0, self.length - bit_offset)
         return ZeroData(ml)
 
-    def tailBytes(self, byte_offset: int) -> 'RawData':
+    def tail_bytes(self, byte_offset: int) -> 'RawData':
         ml = max(0, self.length - byte_offset * 8)
         return ZeroData(ml)
 
@@ -366,25 +366,25 @@ class BitAlignedData(RawData):
     def byte_length(self) -> int:
         return self.bit_length() // 8
 
-    def subBlockBits(self, bit_offset: int, bit_length: int) -> 'RawData':
+    def sub_block_bits(self, bit_offset: int, bit_length: int) -> 'RawData':
         ml = min(bit_length, max(0, self.length - bit_offset))
-        return self.data.subBlockBits(self.offset + bit_offset, ml)
+        return self.data.sub_block_bits(self.offset + bit_offset, ml)
 
-    def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
+    def sub_block(self, byte_offset: int, byte_length: int) -> 'RawData':
         ml = min(byte_length * 8, max(0, self.length - byte_offset * 8))
-        return self.data.subBlockBits(self.offset + byte_offset * 8, ml)
+        return self.data.sub_block_bits(self.offset + byte_offset * 8, ml)
 
-    def tailBits(self, bit_offset: int) -> 'RawData':
+    def tail_bits(self, bit_offset: int) -> 'RawData':
         if self.length < 0:
-            return self.data.tailBits(self.offset + bit_offset)
+            return self.data.tail_bits(self.offset + bit_offset)
         ml = max(0, self.length - bit_offset)
-        return self.subBlockBits(self.offset + bit_offset, ml)
+        return self.sub_block_bits(self.offset + bit_offset, ml)
 
-    def tailBytes(self, byte_offset: int) -> 'RawData':
+    def tail_bytes(self, byte_offset: int) -> 'RawData':
         if self.length < 0:
-            return self.data.tailBits(self.offset + byte_offset * 8)
+            return self.data.tail_bits(self.offset + byte_offset * 8)
         ml = max(0, self.length - byte_offset * 8)
-        return self.subBlockBits(self.offset + byte_offset * 8, ml)
+        return self.sub_block_bits(self.offset + byte_offset * 8, ml)
 
     def octet(self, byte_offset: int) -> int:
         if self.length >= 0 and byte_offset >= self.length // 8:
@@ -431,7 +431,7 @@ class AppendableRawData(RawData):
 
     def forward(self, byte_length: int) -> 'AppendableRawData':
         """Move data forward by given length"""
-        r = AppendableRawData(self.fixed.tailBytes(byte_length))
+        r = AppendableRawData(self.fixed.tail_bytes(byte_length))
         r.closed = self.closed
         return r
 
@@ -457,17 +457,17 @@ class AppendableRawData(RawData):
     def bit(self, bit_offset: int) -> int:
         return self.fixed.bit(bit_offset)
 
-    def subBlockBits(self, bit_offset: int, bit_length: int) -> 'RawData':
-        return self.fixed.subBlockBits(bit_offset, bit_length)
+    def sub_block_bits(self, bit_offset: int, bit_length: int) -> 'RawData':
+        return self.fixed.sub_block_bits(bit_offset, bit_length)
 
-    def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
-        return self.fixed.subBlock(byte_offset, byte_length)
+    def sub_block(self, byte_offset: int, byte_length: int) -> 'RawData':
+        return self.fixed.sub_block(byte_offset, byte_length)
 
-    def tailBits(self, bit_offset: int) -> 'RawData':
-        return self.fixed.tailBits(bit_offset)
+    def tail_bits(self, bit_offset: int) -> 'RawData':
+        return self.fixed.tail_bits(bit_offset)
 
-    def tailBytes(self, byte_offset: int) -> 'RawData':
-        return self.fixed.tailBytes(byte_offset)
+    def tail_bytes(self, byte_offset: int) -> 'RawData':
+        return self.fixed.tail_bytes(byte_offset)
 
     def close(self) -> 'RawData':
         self.closed = True
@@ -524,13 +524,13 @@ class StreamData(RawData):
         self._read_until(bit_offset // 8 + 1)
         return self.buffer.bit(bit_offset)
 
-    def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
+    def sub_block(self, byte_offset: int, byte_length: int) -> 'RawData':
         self._read_until(byte_offset + byte_length)
-        return self.buffer.subBlock(byte_offset, byte_length)
+        return self.buffer.sub_block(byte_offset, byte_length)
 
-    def tailBytes(self, byte_offset: int) -> 'RawData':
+    def tail_bytes(self, byte_offset: int) -> 'RawData':
         self._read_until(-1)
-        return self.buffer.tailBytes(byte_offset)
+        return self.buffer.tail_bytes(byte_offset)
 
     def close(self):
         self.stream.close()
@@ -578,7 +578,7 @@ class Raw:
             b[i // 8] += int(s)
         if bit_l % 8 != 0:
             b[-1] <<= (8 - bit_l % 8)
-        r = ByteData(b, 0, len(b)).subBlockBits(0, bit_l)
+        r = ByteData(b, 0, len(b)).sub_block_bits(0, bit_l)
         return r
 
     @classmethod

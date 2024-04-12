@@ -39,7 +39,7 @@ class IntegerCodec(ValueCodec[int]):
 
     def decode_direct(self, bit_offset: int, data: RawData) -> int:
         """Decode directly from frame data. Caller must know when supported"""
-        return self.decode(data.tailBits(bit_offset))
+        return self.decode(data.tail_bits(bit_offset))
 
 
 class FixedByteIntegerCodec(IntegerCodec):
@@ -69,7 +69,7 @@ class FixedByteIntegerCodec(IntegerCodec):
             d = data
             offset = bit_offset // 8
         else:
-            d = data.tailBits(bit_offset)
+            d = data.tail_bits(bit_offset)
             offset = 0
         v = 0
         octet = 0
@@ -97,9 +97,9 @@ class FixedBitIntegerCodec(IntegerCodec):
     def encode(self, value: int) -> RawData:
         b = self.byte_codec.encode(value)
         if self.byte_codec.little_end:
-            r = b.tailBits(8 - self.length % 8)
+            r = b.tail_bits(8 - self.length % 8)
         else:
-            r = b.subBlockBits(0, self.length)
+            r = b.sub_block_bits(0, self.length)
         return r
 
     def decode(self, data: RawData) -> int:
