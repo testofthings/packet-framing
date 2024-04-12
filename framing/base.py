@@ -83,7 +83,7 @@ class Field(FieldPointer[F, T]):
             return v.backend.choice.get(v)
         return v
 
-    def get_default_value(self, frame: F) -> T:
+    def get_default_value(self, _frame: F) -> T:
         """Get default value for field"""
         return self.default_value
 
@@ -141,7 +141,7 @@ class Field(FieldPointer[F, T]):
         """Encode a value"""
         raise NotImplementedError()
 
-    def decode_bit_length(self, data: RawData, bit_offset: int, value: Optional[T], backend: 'FrameBackend') -> int:
+    def decode_bit_length(self, _data: RawData, bit_offset: int, _value: Optional[T], backend: 'FrameBackend') -> int:
         """Resolve bit length on decoding, value is provided if known"""
         if self.fixed_bit_length >= 0:
             return self.fixed_bit_length
@@ -228,7 +228,7 @@ class FrameBackend:
         """Get input data when decoding, empty otherwise"""
         return Raw.empty
 
-    def add_mapping(self, mapping: 'LayerMapping') -> Self:
+    def add_mapping(self, _mapping: 'LayerMapping') -> Self:
         """All layer mappings"""
         return self
 

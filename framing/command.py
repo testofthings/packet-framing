@@ -50,7 +50,7 @@ class LayerBuilder:
 
     mappings: Dict[str, 'LayerBuilder'] = {}
 
-    def build_layer(self, transport: Optional[Frame], spec: Dict[Any, Any]) -> StackLayer:
+    def build_layer(self, _transport: Optional[Frame], spec: Dict[Any, Any]) -> StackLayer:
         """Build this layer"""
         return self.new().configure(spec)
 

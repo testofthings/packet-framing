@@ -65,7 +65,7 @@ class StackLayer:
         # force frame type initialization
         frame_type(Frames.compose())
 
-    def get_frame_type(self, state: StackState) -> Frame:
+    def get_frame_type(self, _state: StackState) -> Frame:
         """Get frame type, may depend on transport layer"""
         return self.frame_type
 
@@ -74,11 +74,11 @@ class StackLayer:
         frame = RawFrame(Frames.dissect(state.data))
         return [state.add(frame)]
 
-    def commit_read(self, stream_id: Any, byte_length: int):
+    def commit_read(self, _stream_id: Any, byte_length: int):
         """Commit read of bytes from underlying stream"""
         pass
 
-    def configure(self, spec: Dict[Any, Any]) -> 'StackLayer':
+    def configure(self, _spec: Dict[Any, Any]) -> 'StackLayer':
         """Configure this layer"""
         return self
 

@@ -296,13 +296,13 @@ class IntField(ConfigurableField[F, int], Calculator, CalculatorSource):
             # fixed integer in fixed offset - fast value decode from frame data
             self.direct_decode = True
 
-    def flag_values(self, definition: Type[enum.IntFlag]) -> Self:
+    def flag_values(self, _definition: Type[enum.IntFlag]) -> Self:
         return self
 
-    def encoding_bit_length(self, backend: FrameBackend, value: int) -> int:
+    def encoding_bit_length(self, _backend: FrameBackend, value: int) -> int:
         return self.codec.get_bit_length(value)
 
-    def encode(self, value: int, state: EncodingState) -> RawData:
+    def encode(self, value: int, _state: EncodingState) -> RawData:
         return self.codec.encode(value)
 
     def decode_bit_length(self, data: RawData, bit_offset: int, value: Optional[int],
@@ -449,7 +449,7 @@ class LVField(ConfigurableField[F, T]):
         d_data = data.subBlockBits(self.length_codec.get_fixed_bit_length(), d_len)
         return self.sub.decode(d_data, -1, backend)
 
-    def decode_bit_length(self, data: RawData, bit_offset: int, value: T, backend: 'FrameBackend') -> int:
+    def decode_bit_length(self, data: RawData, bit_offset: int, _value: T, _backend: 'FrameBackend') -> int:
         l_data = data.tailBits(bit_offset)
         d_len = self.length_codec.decode(l_data) * 8
         return self.length_codec.get_fixed_bit_length() + d_len
@@ -547,7 +547,7 @@ class Sequence(ConfigurableField[F, List[FT]]):
         frame.backend.set(self, v)
         return v
 
-    def get_default_value(self, frame: F) -> List[FT]:
+    def get_default_value(self, _frame: F) -> List[FT]:
         return []
 
     def encoding_bit_length(self, backend: FrameBackend, value: List[FT]) -> int:
