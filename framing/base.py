@@ -15,7 +15,6 @@ T = typing.TypeVar("T")
 
 class EncodingState:
     """Encoding state"""
-    pass
 
 
 class FieldOffset:
