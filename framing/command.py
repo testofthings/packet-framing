@@ -210,7 +210,7 @@ def main():
                 s = f"{state.get_frame()}"
                 # drop first line of frame dump, it contains extra frame name
                 first_line_len = s.find('\n')
-                if first_line_len > 0 and first_line_len < len(s):
+                if 0 < first_line_len < len(s):
                     s = s[first_line_len + 1:]
                 print(f"{state.get_layer_names()}\n{s}")
         finally:

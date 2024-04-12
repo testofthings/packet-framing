@@ -1,12 +1,12 @@
 """Field implementations"""
 
+from abc import ABC
 import enum
-from typing import Iterator
+from typing import Any, Callable, Dict, Iterator, List, Optional, Self, Type, TypeVar, cast
 
-from framing.base import *
-from framing.base import Field, FrameBackend
+from framing.base import F, T, Calculator, EncodingState, Field, FieldPointer, Frame, FrameBackend, FrameStructure
 from framing.codecs import IntegerCodec, IntegerFormat
-from framing.raw_data import RawData
+from framing.raw_data import Raw, RawData
 
 
 class Multiplier(Calculator):
@@ -149,8 +149,8 @@ class ValueFromPath(Calculator):
         raise NotImplementedError()
 
 
-FT = typing.TypeVar("FT", bound=Frame)
-V = typing.TypeVar("V")
+FT = TypeVar("FT", bound=Frame)
+V = TypeVar("V")
 
 
 class ConfigurableField(Field[F, T], ABC):
@@ -368,7 +368,7 @@ class SubStructureField(ConfigurableField[F, FT]):
 
         def proc(f: Frame):
             choice = self.get(f)
-            sel = typing.cast(Selection, choice.structure)
+            sel = cast(Selection, choice.structure)
             key = sel.reverse_map.get(choice.backend.structure, 0)
             choice_resolver.push(f.backend, key)
 
