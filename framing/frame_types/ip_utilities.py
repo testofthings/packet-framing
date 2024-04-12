@@ -1,27 +1,32 @@
-from typing import Any, Dict, Iterable, Iterator, Self, Set, Tuple, Optional
+"""Various IP utilities"""
+
+from typing import Any, Dict, Iterable, Set, Tuple, Optional
 
 from framing.base import Frame
 from framing.data_queue import RawDataQueue
 from framing.frame_types.dns_frames import DNSMessage, DNSMessageTCP
 from framing.frame_types.ipv4_frames import IPv4
 from framing.frame_types.ipv6_frames import IPx, IPv6
-from framing.frame_types.tcp_frames import TCP_Null_Stream_Id, TCP_Stream_Id, TCP, TCPFlag, TCPDataQueue, flip_tcp_stream_id
+from framing.frame_types.tcp_frames import TCP_Null_Stream_Id, TCP_Stream_Id, TCP, TCPFlag, TCPDataQueue, \
+    flip_tcp_stream_id
 from framing.frame_types.udp_frames import UDP
 from framing.frames import Frames
 from framing.layer_stack import StackLayer, StackState
 from framing.raw_data import RawData
 
 
-# Utility functions
 class IPUtility:
+    """IP utility functions"""
     @classmethod
     def get_source_destination(cls, ip: IPx) -> Tuple[RawData, RawData]:
+        """Get source and destination addresses as raw data"""
         if isinstance(ip, IPv4):
             return IPv4.Source_IP[ip], IPv4.Destination_IP[ip]
         return IPv6.Source_address[ip], IPv6.Destination_address[ip]
 
 
 class TCPStackLayer(StackLayer):
+    """TCP stack layer with data reassembly"""
     def __init__(self):
         super().__init__(TCP)
         self.streaming = True
@@ -104,6 +109,7 @@ class UDPStackLayer(StackLayer):
 
 
 class DNSStackLayer(StackLayer):
+    """DNS stack layer, autodetect TCP or UDP transport"""
     def __init__(self):
         super().__init__(DNSMessage)
 

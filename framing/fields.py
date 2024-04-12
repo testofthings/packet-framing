@@ -79,7 +79,9 @@ class PaddingValue(Calculator):
 
 
 class CalculatorSource:
+    """Object to get calculator"""
     def calculator(self) -> Calculator:
+        """Get calculator"""
         raise NotImplementedError()
 
 
@@ -103,11 +105,13 @@ class ValueOf(CalculatorSource):
         return self
 
     def copy_to(self, field: 'IntField') -> Self:
+        """Copy value to another field"""
         self.end = CopyToField(field, self.end)
         return self
 
 
 class FieldPath(FieldPointer[Frame, T], CalculatorSource):
+    """Path (or pointer) to a field"""
     def __init__(self, start: Field):
         self.path = [start]
 
@@ -133,6 +137,7 @@ class FieldPath(FieldPointer[Frame, T], CalculatorSource):
 
 
 class ValueFromPath(Calculator):
+    """Calculator to get value from path"""
     def __init__(self, pointer: FieldPointer[Frame, int]):
         super().__init__(None)
         self.pointer = pointer
@@ -149,11 +154,12 @@ V = typing.TypeVar("V")
 
 
 class ConfigurableField(Field[F, T]):
-
+    """Configurable frame field"""
     def __truediv__(self, other: 'Field[Any, T]') -> 'FieldPath':
         return FieldPath(self) / other
 
     def of(self, location: FieldPointer) -> FieldPath[T]:
+        """Construct path from this field and given location"""
         if isinstance(location, FieldPath):
             return location / self
         elif isinstance(location, Field):
@@ -162,6 +168,7 @@ class ConfigurableField(Field[F, T]):
             raise Exception(f"Cannot construct path from: {location}")
 
     def length_by(self, value: CalculatorSource) -> Self:
+        """This field length is calculated by the given source"""
         self.length_resolver = Multiplier(8, value.calculator())
         field = self
 
@@ -174,15 +181,18 @@ class ConfigurableField(Field[F, T]):
         return self
 
     def terminator(self, value: RawData) -> Self:
+        """This field uses terminator to calculate its length"""
         self.end_offset_resolver = FieldLengthByTerminator(self, value)
         return self
 
     def end_offset_by(self, value: CalculatorSource) -> Self:
+        """This field ends at the given offset, giving length implicitly"""
         calc = Multiplier(8, value.calculator())
         self.end_offset_resolver = calc
         field = self
 
         def procedure(frame: F):
+            """Procedure to perform this action"""
             v = frame.backend.get(field)
             f_off = frame.backend.get_bit_offset(field.offset)
             f_len = field.encoding_bit_length(frame.backend, v)
@@ -192,12 +202,14 @@ class ConfigurableField(Field[F, T]):
         return self
 
     def pad_to(self, min_offset: int):
+        """Pad to the given offset"""
         calc = FieldOffsetValue(self)
         calc = PaddingValue(min_offset, calc)
         self.length_resolver = calc
         field = self
 
         def procedure(frame: F):
+            """Procedure to perform this action"""
             pad_to = int(calc.pull(frame.backend))
             frame.backend.set(field, Raw.zeroes(bit_length=pad_to))
 
@@ -205,9 +217,11 @@ class ConfigurableField(Field[F, T]):
         return self
 
     def at_commit(self, procedure: Callable[[F], T]) -> Self:
+        """Add procedure to be executed at commit time"""
         field = self
 
         def commit_proc(frame: F):
+            """The procedure function"""
             value = procedure(frame)
             frame.backend.set(field, value)
 
@@ -297,6 +311,7 @@ class IntField(ConfigurableField[F, int], Calculator, CalculatorSource):
             self.direct_decode = True
 
     def flag_values(self, _definition: Type[enum.IntFlag]) -> Self:
+        """This is a flag field"""
         return self
 
     def encoding_bit_length(self, _backend: FrameBackend, value: int) -> int:
@@ -362,6 +377,7 @@ class SubStructureField(ConfigurableField[F, FT]):
         return self
 
     def select(self, frame: F, field: ConfigurableField[FT, Any]) -> FT:
+        """Select the field frame value"""
         sub = self.sub_type(frame.backend.factory())
         sub.backend.choice = field
         frame.backend.set(self, sub)
@@ -411,6 +427,7 @@ class SubStructureField(ConfigurableField[F, FT]):
 
 
 class LengthOfLV(Calculator):
+    """Calculate length of LV field"""
     def __init__(self, field: 'LVField'):
         super().__init__(None)
         self.field = field
@@ -419,6 +436,7 @@ class LengthOfLV(Calculator):
         bit_off = backend.get_bit_offset(self.field.offset)
         data = backend.input_data().subBlockBits(0, bit_off)
         return self.field.length_codec.decode(data)
+
 
 
 class LVField(ConfigurableField[F, T]):
@@ -454,46 +472,14 @@ class LVField(ConfigurableField[F, T]):
         d_len = self.length_codec.decode(l_data) * 8
         return self.length_codec.get_fixed_bit_length() + d_len
 
-    def pull(self, backend: FrameBackend) -> float:
-        return backend.get(self.sub)
-
-    def push(self, backend: FrameBackend, value: float):
-        backend.set(self.sub, value)
-
 
 class FrameIterator(Iterator[FT]):
     """Frame iterator"""
     def __init__(self, source: Iterator[FT]):
         self.source = source
 
-    def field(self, field: ConfigurableField[FT, T], as_frame=False) -> 'FieldIterator[T]':
-        i = FieldIterator(field, self.source)
-        i.frame_value = as_frame
-        return i
-
     def __next__(self) -> FT:
         return self.source.__next__()
-
-
-class FieldIterator(typing.Generic[F, T], Iterator[T]):
-    def __init__(self, field: ConfigurableField[F, T], source: Iterator[T]):
-        self.it_field = field
-        self.source = source
-        self.frame_value = False
-
-    def field(self, field: ConfigurableField[FT, T], as_frame=False) -> 'FieldIterator[T]':
-        self.frame_value = True
-        i = FieldIterator(field, self)
-        i.frame_value = as_frame
-        return i
-
-    def __next__(self) -> FT:
-        f = self.source.__next__()
-        v = self.it_field.as_frame(f) if self.frame_value else self.field.get(f)
-        while v is None:
-            f = self.source.__next__()
-            v = self.it_field.as_frame(f) if self.frame_value else self.field.get(f)
-        return v
 
 
 class Sequence(ConfigurableField[F, List[FT]]):
@@ -513,10 +499,12 @@ class Sequence(ConfigurableField[F, List[FT]]):
         sub.consumed_by = self
 
     def count_by(self, value: CalculatorSource) -> Self:
+        """Get count by the given calculator source"""
         self.count_resolver = value.calculator()
         return self
 
     def terminator_test(self, test: Callable[[Any], bool]) -> Self:
+        """Set terminator test for the sequence length"""
         self.terminator_call = test
         return self
 
@@ -527,6 +515,7 @@ class Sequence(ConfigurableField[F, List[FT]]):
         return FrameIterator(s)
 
     def get_count(self, frame: F) -> int:
+        """Get count of items in the sequence"""
         if self.count_resolver:
             return int(self.count_resolver.pull(frame.backend))
         # horrible way...
@@ -537,6 +526,7 @@ class Sequence(ConfigurableField[F, List[FT]]):
         return c
 
     def item(self, frame: F, index: int) -> FT:
+        """Get item by index"""
         return frame.backend.get_item(self, self.sub, index)
 
     def set_repeat(self, frame: F, count: int) -> List[F]:
@@ -639,8 +629,9 @@ class Structure(FrameStructure[F]):
         self._update_fixed_length(field)
         return field
 
-    def raw(self, bits: int = None, bytes: int = None, min_bits: int = None, min_bytes: int = None, default: RawData = None,
-            name: str = None) -> RawField[F]:
+    def raw(self, bits: int = None, bytes: int = None, min_bits: int = None, min_bytes: int = None, 
+            default: RawData = None, name: str = None) -> RawField[F]:
+        """Add raw data field"""
         fn = self._get_a_name(name)
         fix_len = -1
         if bits is not None:
@@ -663,6 +654,7 @@ class Structure(FrameStructure[F]):
 
     def integer(self, int_format=IntegerFormat(), bytes=-1, bits=-1,
                 default=0, name: str = None) -> IntField[F]:
+        """Add integer field"""
         fn = self._get_a_name(name)
         if bytes > 0:
             int_format = int_format.bytes(bytes)
@@ -676,6 +668,7 @@ class Structure(FrameStructure[F]):
         return f
 
     def sub(self, sub_frame: Type[FT], name: str = None) -> SubStructureField[F, FT]:
+        """Add sub-frame field"""
         fn = self._get_a_name(name)
         f = SubStructureField(sub_frame)
         f.structure = self
@@ -684,6 +677,7 @@ class Structure(FrameStructure[F]):
         return f
 
     def at_commit(self, update: Callable[[F], None]):
+        """Add procedure to be executed at commit time"""
         self.commit_procedures.append((None, update))
 
 
@@ -699,6 +693,7 @@ class Selection(Structure[F]):
         self.fields_fixed_bit_offset = 0  # all choices start from offset 0
 
     def choice(self, key, value: ConfigurableField[F, T]) -> ConfigurableField[F, T]:
+        """Add a choice to the selection"""
         if key in self.choice_map or value in self.reverse_map:
             raise Exception(f"Duplicate entry for key {key}")
         assert isinstance(value, ConfigurableField), "Provide a field for choice(...)"
@@ -715,4 +710,3 @@ class Selection(Structure[F]):
 
     def _resolve_offsets(self):
         pass  # all zeroes ok
-

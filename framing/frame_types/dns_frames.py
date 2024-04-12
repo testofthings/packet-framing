@@ -1,11 +1,14 @@
-from typing import List, Any
+"""DNS (Domain Name System)"""
 
-from framing.base import Frame, T, FrameBackend, LayerMapping
+from typing import List
+
+from framing.base import Frame, T, FrameBackend
 from framing.fields import Structure, Sequence, ValueOf, RawField, Selection
 from framing.raw_data import Raw, RawData
 
 
 class DNSHeader(Frame):
+    """DNS header"""
     structure = Structure['DNSHeader']()
 
     ID = structure.raw(bits=16)
@@ -84,6 +87,7 @@ class DNSName(Sequence):
 
 
 class DNSQuestion(Frame):
+    """DNS question"""
     structure = Structure['DNSQuestion']()
 
     QNAME = DNSName(structure)
@@ -92,6 +96,7 @@ class DNSQuestion(Frame):
 
 
 class SOA_RDATA(Frame):
+    """DNS SOA RDATA record"""
     structure = Structure['SOA_RDATA']()
 
     MNAME = DNSName(structure)
@@ -103,6 +108,7 @@ class SOA_RDATA(Frame):
 
 
 class RDATA(Frame):
+    """DNS RDATA record"""
     structure = Selection['RDATA']()
 
     Other = structure.raw()  # the default
@@ -114,6 +120,7 @@ class RDATA(Frame):
 
 
 class DNSResource(Frame):
+    """DNS resource record"""
     structure = Structure['DNSResource']()
 
     NAME = DNSName(structure)
@@ -125,6 +132,7 @@ class DNSResource(Frame):
 
 
 class DNSMessage(Frame):
+    """DNS message (for UDP)"""
     structure = Structure['DNSMessage']()
 
     Header = structure.sub(DNSHeader)
@@ -135,6 +143,7 @@ class DNSMessage(Frame):
 
 
 class DNSMessageTCP(Frame):
+    """DNS message for TCP"""
     structure = Structure['DNSMessageTCP']()
 
     Length = structure.integer(bits=16)

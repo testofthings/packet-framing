@@ -107,7 +107,7 @@ class LayerBuilder:
 
 
     def build_defaults(self, stack: FrameStack):
-        # build default sub layers
+        """build default sub layers"""
         transport = stack.layer.frame_type
         for k, v in self.sub.items():
             layer = v.build_layer(transport, {})

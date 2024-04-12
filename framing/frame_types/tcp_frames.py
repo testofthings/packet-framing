@@ -1,5 +1,7 @@
+"""TCP (Transmission Control Protocol)"""
+
 import enum
-from typing import Dict, Set, Tuple, Optional
+from typing import Tuple
 
 from framing.base import Frame
 from framing.codecs import IntegerFormat
@@ -11,6 +13,7 @@ from framing.raw_data import Raw, RawData
 # https://www.ietf.org/rfc/rfc793.txt
 
 class TCP(Frame):
+    """TCP packet"""
     structure = Structure['TCP']()
 
     Source_port = structure.integer(IntegerFormat(bits=16))

@@ -68,7 +68,7 @@ class Field(FieldPointer[F, T]):
         self.min_bit_length = -1
         self.direct_decode = False
         self.offset = FieldOffset(self)
-        self.structure: Optional['Structure'] = None  # set by structure herself
+        self.structure: Optional['FrameStructure'] = None  # set by structure herself
         self.end_offset_resolver: Optional[Calculator] = None
         self.length_resolver: Optional[Calculator] = None
         self.consumed_by: Optional[Field[F, Any]] = None
@@ -214,6 +214,7 @@ class FrameBackend:
         raise NotImplementedError()
 
     def get_bit_offset(self, offset: FieldOffset) -> int:
+        """Get bit offset using offset calculator"""
         raise NotImplementedError()
 
     def get_bit_length(self) -> int:
@@ -233,6 +234,7 @@ class FrameBackend:
         return self
 
     def dump(self, bit_offset=0, indent='', width=0, copy_to_avoid_update=False) -> str:
+        """Dump frame to a multi-line string"""
         raise NotImplementedError()
 
     def close(self) -> Self:
@@ -277,9 +279,11 @@ class FrameStructure(typing.Generic[F]):
         self.built = False
 
     def field(self, field: Field) -> Field:
+        """Introduce field to the structure"""
         raise NotImplementedError()
 
     def commit(self, frame: F):
+        """Run commit procedures"""
         for cp in self.commit_procedures:
             cp[1](frame)
 
@@ -381,7 +385,7 @@ class LayerMapping:
             p_type = m.get(type_v)
             if p_type is not None:
                 return p_type
-        from framing.backends import RawFrame
+        from framing.backends import RawFrame  # pylint: disable=import-outside-toplevel, cyclic-import
         return RawFrame
 
     def decode_payload(self, frame: Frame, field: Field, data: Optional[RawData] = None) -> Frame:

@@ -125,7 +125,8 @@ class BackendImplementation(FrameBackend):
             bit_off += f.get_bit_length(self.frame)
         return "\n".join(r)
 
-    def copy(self, parent: Optional[FrameBackend] = None) -> Self:
+    def copy(self, _parent: Optional[FrameBackend] = None) -> Self:
+        """Create a copy of the backend"""
         raise NotImplementedError()
 
     def _bad_field_access(self, field: Field) -> str:
@@ -243,6 +244,7 @@ class DissectorBackend(BackendImplementation):
         return v
 
     def get_not_cached(self, field: Field[F, T]) -> T:
+        """Get value without checking cache"""
         assert field.structure == self.structure, self._bad_field_access(field)
         layer_map = self.mappings.get_mappings(field)
         if not layer_map and field.direct_decode:
@@ -356,6 +358,7 @@ class DissectorBackend(BackendImplementation):
         backend = self
 
         class ItemIterator(Iterator[FT]):
+            """Iterate items in sequence field"""
             def __init__(self, window: RawData, count: int):
                 self.window = window  # sliding to avoid starting from first sub-block each time
                 self.count = count

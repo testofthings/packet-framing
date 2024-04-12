@@ -1,4 +1,5 @@
-from types import UnionType
+"""IPv6 (Internet Protocol version 6)"""
+
 from typing import Iterable, Tuple, Dict, Optional, Union
 
 from framing.base import Frame, LayerMapping
@@ -11,6 +12,7 @@ from framing.raw_data import IPAddress, RawData
 
 
 class IPv6(Frame):
+    """IPv6 packet"""
     structure = Structure['IPv6']()
 
     Version = structure.integer(bits=4, default=6)
@@ -31,6 +33,7 @@ class IPv6(Frame):
 
 
 class ICMPv6(Frame):
+    """ICMPv6 packet"""
     structure = Structure['ICMPv6']()
 
     Type = structure.integer(bits=8)
@@ -40,6 +43,7 @@ class ICMPv6(Frame):
 
 
 class Fragment(Frame):
+    """IPv6 fragment header"""
     structure = Structure['Fragment']()
 
     Next_Header = structure.integer(bits=8)

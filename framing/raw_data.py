@@ -64,6 +64,7 @@ class RawData(LengthEntity):
         return bytes(b)
 
     def as_ip_address(self) -> IPAddress:
+        """Get IP address from raw data"""
         bl = self.bit_length()
         if bl == 32:
             return ipaddress.IPv4Address(self.as_bytes(0, 4))
@@ -72,9 +73,11 @@ class RawData(LengthEntity):
         raise ValueError(f"Raw data ({self.bit_length()} bits) is not IP address: " + self.to_hex())
 
     def as_hw_address(self) -> str:
+        """Get HW address from raw data"""
         return ":".join([f"{self.octet(i):02x}" for i in range(0, self.byte_length())])
 
     def as_string(self, encoding='ascii', errors='strict') -> str:
+        """Get as string"""
         return self.as_bytes(0, self.byte_length()).decode(encoding, errors=errors)
 
     def bit(self, bit_offset: int) -> int:
@@ -217,6 +220,7 @@ class ByteData(RawData):
 
 
 class RawDataSequence(RawData):
+    """Sequence of raw data blocks"""
     def __init__(self, components: List[RawData]):
         self.components = components
         self.length = sum([c.bit_length() for c in components])

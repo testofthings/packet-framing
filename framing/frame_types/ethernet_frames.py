@@ -1,3 +1,5 @@
+"""Ethernet"""
+
 from framing.base import Frame, LayerMapping
 from framing.codecs import IntegerFormat
 from framing.fields import Structure
@@ -6,6 +8,7 @@ from framing.frame_types.ipv6_frames import IPv6
 
 
 class EthernetII(Frame):
+    """Ethernet II frame"""
     structure = Structure['EthernetII']()
 
     destination = structure.raw(bytes=6)

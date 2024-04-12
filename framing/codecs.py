@@ -43,7 +43,7 @@ class IntegerCodec(ValueCodec[int]):
 
 
 class FixedByteIntegerCodec(IntegerCodec):
-    """Fixed byte-length integer codec"""
+    """Fixed-length byte integer codec"""
     def __init__(self, byte_length: int, little_end=False):
         self.length = byte_length
         self.little_end = little_end
@@ -89,7 +89,7 @@ class FixedByteIntegerCodec(IntegerCodec):
 
 
 class FixedBitIntegerCodec(IntegerCodec):
-    """"""
+    """Fixed-length bit integer codec"""
     def __init__(self, bit_length: int, little_end=False):
         self.byte_codec = FixedByteIntegerCodec((bit_length + 7) // 8, little_end)
         self.length = bit_length

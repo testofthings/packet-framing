@@ -1,3 +1,5 @@
+"""TLS (Transport Layer Security)"""
+
 from typing import Iterable
 from framing.base import Frame, LayerMapping
 from framing.data_queue import RawDataQueue
@@ -7,6 +9,7 @@ from framing.layer_stack import StackLayer, StackState
 
 
 class ClientHello(Frame):
+    """TLS Client Hello"""
     structure = Structure['ClientHello']()
 
     version = structure.integer(bytes=2)
@@ -22,6 +25,7 @@ class ClientHello(Frame):
 
 
 class ServerHello(Frame):
+    """TLS Server Hello"""
     structure = Structure['ServerHello']()
 
     version = structure.integer(bytes=2)
@@ -34,6 +38,7 @@ class ServerHello(Frame):
     extensions = structure.raw().length_by(extensions_length)
 
 class TLSHandshakeMessage(Frame):
+    """TLS Handshake Message"""
     structure = Selection['TLSHandshakeMessage']()
 
     client_hello = structure.choice(1, structure.sub(ClientHello))
@@ -41,6 +46,7 @@ class TLSHandshakeMessage(Frame):
 
 
 class TLSRecord(Frame):
+    """TLS Record"""
     structure = Structure['TLSRecord']()
 
     ContentType = structure.integer(bits=8)
@@ -50,6 +56,7 @@ class TLSRecord(Frame):
 
 
 class TLSHandshake(Frame):
+    """TLS Handshake"""
     structure = Structure['TLSHandshake']()
 
     HandshakeType = structure.integer(bits=8)
@@ -58,12 +65,14 @@ class TLSHandshake(Frame):
 
 
 class TLSChangeCipherSpec(Frame):
+    """TLS Change Cipher Spec"""
     structure = Structure['TLSChangeCipherSpec']()
 
     message = structure.integer(bits=8)
 
 
 class TLSAlert(Frame):
+    """TLS Alert"""
     structure = Structure['TLSAlert']()
 
     level = structure.integer(bits=8)
@@ -71,6 +80,7 @@ class TLSAlert(Frame):
 
 
 class TLSApplicationData(Frame):
+    """TLS Application Data"""
     structure = Structure['TLSApplicationData']()
 
     data = structure.raw()
@@ -86,6 +96,7 @@ TLSRecord_Payloads = LayerMapping(TLSRecord.fragment).by(TLSRecord.ContentType, 
 
 
 class TLSRecordLayer(StackLayer):
+    """TLS Record Layer"""
     def __init__(self):
         super().__init__(TLSRecord)
         self.queue = RawDataQueue()
