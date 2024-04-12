@@ -9,7 +9,7 @@ from framing.frame_types.ip_utilities import TCPStackLayer
 from framing.frame_types.ipv4_frames import IPv4
 from framing.frame_types.ipv6_frames import IPStackLayer, IPv6, IPx
 from framing.frame_types.pcap_frames import PacketRecord
-from framing.frame_types.tcp_frames import TCP, TCP_Stream_Id
+from framing.frame_types.tcp_frames import TCP, TCPStreamId
 from framing.frame_types.udp_frames import UDP
 from framing.frames import Frames
 from framing.raw_data import RawData
@@ -81,13 +81,13 @@ class IP2TCP(Processor[IPx, T]):
         return None
 
 
-class IP2TCPStream(Processor[IPx, Tuple[TCP_Stream_Id, RawData]]):
+class IP2TCPStream(Processor[IPx, Tuple[TCPStreamId, RawData]]):
     """TCP stream processor, push IP frames, get back TCP stream data, if possible"""
     def __init__(self):
         self.layer = IPStackLayer()
         self.tcp_reassemble = TCPStackLayer()
 
-    def push(self, value: IPx) -> Optional[Tuple[TCP_Stream_Id, RawData]]:
+    def push(self, value: IPx) -> Optional[Tuple[TCPStreamId, RawData]]:
         if isinstance(value, (IPv4, IPv6)):
             type_data = self.layer.push(value)
             if type_data is not None and type_data[0] == 0x6:

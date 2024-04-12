@@ -51,11 +51,11 @@ class TCPFlag(enum.IntFlag):
 TCP.Flags.flag_values(TCPFlag)
 
 # TCP stream id: source IP address, source port, destination IP address, destination port
-TCP_Stream_Id = Tuple[RawData, int, RawData, int]
+TCPStreamId = Tuple[RawData, int, RawData, int]
 # Null TCP stream id
-TCP_Null_Stream_Id = Tuple[Raw.empty, 0, Raw.empty, 0]
+TCPNullStreamId = Tuple[Raw.empty, 0, Raw.empty, 0]
 
-def flip_tcp_stream_id(stream_id: TCP_Stream_Id) -> TCP_Stream_Id:
+def flip_tcp_stream_id(stream_id: TCPStreamId) -> TCPStreamId:
     """Flip TCP stream id"""
     return stream_id[2], stream_id[3], stream_id[0], stream_id[1]
 
