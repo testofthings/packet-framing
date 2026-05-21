@@ -5,7 +5,7 @@ build-backend   = "setuptools.build_meta"
 [project]
 name            = "packet-framing"
 version         = "0.2.1"
-requires        = ">=3.8"
+requires-python        = ">=3.8"
 description     = "Protocol packet parsing tool"
 readme          = "README.md"
 license         = {text = "MIT License"}
@@ -16,15 +16,13 @@ dependencies    = [
     "PyYAML"
 ]
 
-[pyproject.optional-dependencies]
+[project.optional-dependencies]
 dev = [
     "pytest",
     "pylint",
     "mypy"
 ]
 
-[project.scripts]
-packet-framing  = "framing.main:main"
 
 [project.urls]
 Repository      = "https://github.com/testofthings/packet-framing.git"
