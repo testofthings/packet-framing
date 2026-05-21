@@ -1,8 +1,10 @@
 # Packet framing
 
-This is a small network frame parsing module implemented for parsing PCAP files in [Tcsfw](https://github.com/ouspg/tcsfw).
+This is a small network frame parsing module implemented for parsing PCAP files for Test of Thing's tool [Toolsaf](https://github.com/testofthings/toolsaf).
 The supported protocols and packet formats are those required by the project.
 At the moment, this is not too many, so this most likely is not the software you are looking for.
+
+The module was originally created in OUSPG research group in University of Oulu (https://gitlab.com/CinCan/framing).
 
 ## PyPi
 
