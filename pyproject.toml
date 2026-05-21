@@ -1,0 +1,69 @@
+[build-system]
+requires        = ["setuptools", "wheel"]
+build-backend   = "setuptools.build_meta"
+
+[project]
+name            = "packet-framing"
+version         = "0.2.1"
+requires        = ">=3.8"
+description     = "Protocol packet parsing tool"
+readme          = "README.md"
+license         = {text = "MIT License"}
+authors         = [
+    {name = "Rauli Kaksonen", email = "rauli.kaksonen@testofthings.com"}
+]
+dependencies    = [
+    "PyYAML"
+]
+
+[pyproject.optional-dependencies]
+dev = [
+    "pytest",
+    "pylint",
+    "mypy"
+]
+
+[project.scripts]
+packet-framing  = "framing.main:main"
+
+[project.urls]
+Repository      = "https://github.com/testofthings/packet-framing.git"
+Issues          = "https://github.com/testofthings/packet-framing/issues"
+
+[tool.setuptools.packages]
+find = { where = ["."], include = [
+    "framing",
+    "framing.frame_types"
+]}
+
+# Pytest config
+[tool.pytest.ini_options]
+pythonpath = "."
+
+# Pylint config
+[tool.pylint.format]
+max-line-length = 120
+# Only trigger warnings for FIXME; ignore TODO and XXX
+notes = ["FIXME"]
+
+
+[tool.pylint.messages_control]
+disable = [
+    "too-few-public-methods",
+    "too-many-arguments",
+    "too-many-public-methods",
+    "too-many-locals",
+    "too-many-instance-attributes",
+    "too-many-branches",
+    "too-many-statements",
+    "too-many-lines",
+    "too-many-positional-arguments",
+    "too-many-return-statements"
+]
+
+# Mypy config
+[tool.mypy]
+show_error_codes    = true
+disable_error_code  = ["import_untyped"]
+strict              = true
+follow_imports      = "silent"
