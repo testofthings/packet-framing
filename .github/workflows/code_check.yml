@@ -1,36 +1,20 @@
-name: Automatic code checks
+name: Packet-framing Merge Verification
 
 on:
   push:
-    paths:
-      - framing/**
-      - tests/**
-    branches-ignore:
-      - '*no-test*'
+    branches: [ main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull') }}
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11"]
-    steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
-      with:
-        python-version: $ {{ matrix.python-version }}
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install pylint mypy pytest
-        pip install -r requirements.txt
-    - name: Analyze the code with pylint
-      run: |
-        pylint framing
-    - name: Perform static type checks with mypy
-      run:
-        mypy framing
-    - name: Run unit tests with pytest
-      run: |
-        pytest tests
+  verify:
+    uses: testofthings/.github/.github/workflows/reusable-python-merge.yaml@0.1.14
+    with:
+      python_module_name: "packet-framing"
+      use_common_library: false
+      image_name: "packet-framing"
+      run_integration_tests: false
+      docker_build_targets: ["production", migrate]
+    secrets: inherit
