@@ -3,13 +3,69 @@ name: Packet-framing Merge Verification
 on:
   push:
     branches: [ main ]
+  pull_request:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull') }}
 
 jobs:
+  per-commit-lint:
+    name: Per-Commit Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 0 # Fetches the full history to access individual commits
+
+      - name: Set up Python and PDM
+        uses: pdm-project/setup-pdm@v4.4
+        with:
+          python-version: "3.12"
+          cache: true
+
+      - name: Install dependencies
+        run: pdm sync -g -p ./ -G ci-check --no-self
+
+      - name: Lint and Type-Check each commit
+        run: |
+          # 1. Determine the commit range
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            COMMIT_RANGE="origin/${{ github.base_ref }}..HEAD"
+          else
+            # Handle new branch pushes (where 'before' is a zero hash)
+            if [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]]; then
+              COMMIT_RANGE="HEAD~1..HEAD"
+            else
+              COMMIT_RANGE="${{ github.event.before }}..${{ github.sha }}"
+            fi
+          fi
+
+          # 2. Extract the list of commit hashes
+          COMMITS=$(git rev-list --no-merges --reverse $COMMIT_RANGE)
+
+          if [ -z "$COMMITS" ]; then
+            COMMITS=${{ github.sha }}
+          fi
+
+          # 3. Loop through and test each commit
+          for COMMIT in $COMMITS; do
+            echo "=================================================="
+            echo "Validating commit: $COMMIT"
+            echo "=================================================="
+            git checkout $COMMIT
+            
+            echo "Running pylint..."
+            pylint packet-framing
+            
+            echo "Running mypy..."
+            mypy packet-framing
+          done
+
   verify:
+    name: Push Verification
+    needs: per-commit-lint # Ensures this only runs if all commits passed linting
     uses: testofthings/.github/.github/workflows/reusable-python-merge.yaml@0.1.14
     with:
       python_module_name: "packet-framing"
