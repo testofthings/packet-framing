@@ -19,7 +19,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v6
       with:
-        fetch-depth: 0 # Required to access the full commit history for the loop
+        fetch-depth: 0 # CRITICAL: Required to access the full commit history for the loop
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v6
@@ -35,29 +35,22 @@ jobs:
       run: |
         set -e # Explicitly tells bash to instantly exit if any command fails
 
-        # 1. Determine the exact commit range
-        if [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]]; then
-          # New branch: compare against the default branch to get ALL new commits
-          COMMIT_RANGE="origin/${{ github.event.repository.default_branch }}..HEAD"
+        # 1. Extract exactly which commits were pushed (Oldest to Newest)
+        if [[ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]] && git cat-file -e ${{ github.event.before }}^{commit} 2>/dev/null; then
+          # Standard push: Git perfectly isolates the newly pushed commits
+          COMMITS=$(git log --no-merges --reverse --format=%H ${{ github.event.before }}..${{ github.sha }})
         else
-          COMMIT_RANGE="${{ github.event.before }}..${{ github.sha }}"
+          # New branch or force-push: We read the exact commits directly from the GitHub push payload.
+          # Filtering by 'distinct == true' prevents it from grabbing commits belonging to parent branches.
+          COMMITS=$(jq -r '.commits[] | select(.distinct == true) | .id' "$GITHUB_EVENT_PATH")
         fi
 
-        # Safety check: If the 'before' commit is missing (e.g., force push), compare to default branch
-        if ! git cat-file -e ${{ github.event.before }}^{commit} 2>/dev/null && [[ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]]; then
-          echo "Force push detected or base commit missing. Comparing to default branch."
-          COMMIT_RANGE="origin/${{ github.event.repository.default_branch }}..HEAD"
-        fi
-
-        # 2. Extract hashes strictly from OLDEST to NEWEST
-        COMMITS=$(git log --no-merges --reverse --format=%H $COMMIT_RANGE)
-
-        # Final fallback just in case the push contains zero valid commits (e.g. empty merge)
+        # Final fallback just in case the push contains zero valid distinct commits
         if [ -z "$COMMITS" ]; then
           COMMITS=${{ github.sha }}
         fi
 
-        # 3. Loop through and run checks
+        # 2. Loop through and run checks
         for COMMIT in $COMMITS; do
           echo "=================================================="
           echo "Validating commit: $COMMIT"
