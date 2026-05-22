@@ -1,1 +1,1 @@
-# modified to see if tests actually run before linting etc
+# modified to see mypy output before pylint

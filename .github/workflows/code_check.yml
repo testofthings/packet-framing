@@ -65,10 +65,10 @@ jobs:
           echo "=================================================="
           git checkout $COMMIT
           
-          echo "Running pylint..."
-          pylint framing
-          
           echo "Running mypy..."
           mypy framing
+          
+          echo "Running pylint..."
+          pylint framing
         done
 
