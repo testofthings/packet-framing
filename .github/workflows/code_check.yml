@@ -31,7 +31,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install .[dev]
 
-- name: Lint and Type-Check each commit
+    - name: Lint and Type-Check each commit
       run: |
         set -e # Explicitly tells bash to instantly exit if any command fails
 
