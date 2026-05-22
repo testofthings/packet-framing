@@ -63,6 +63,6 @@ disable = [
 # Mypy config
 [tool.mypy]
 show_error_codes    = true
-disable_error_code  = ["import_untyped"]
+disable_error_code  = ["import-untyped"]
 strict              = true
 follow_imports      = "silent"
