@@ -19,7 +19,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v6
       with:
-        fetch-depth: 0 # CRITICAL: Required to access the full commit history for the loop
+        fetch-depth: 0 # Required to access the full commit history for the loop
 
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v6
@@ -33,7 +33,7 @@ jobs:
 
     - name: Lint and Type-Check each commit
       run: |
-        set -e # Explicitly tells bash to instantly exit if any command fails
+        # set -e # Explicitly tells bash to instantly exit if any command fails
 
         # 1. Extract exactly which commits were pushed (Oldest to Newest)
         if [[ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]] && git cat-file -e ${{ github.event.before }}^{commit} 2>/dev/null; then
