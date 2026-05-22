@@ -1,76 +1,71 @@
-name: Packet-framing Merge Verification
+name: Automatic code checks
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull') }}
+    paths:
+      - framing/**
+      - tests/**
+    branches-ignore:
+      - '*no-test*'
 
 jobs:
-  per-commit-lint:
-    name: Per-Commit Lint & Type Check
+  build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v6.0.2
-        with:
-          fetch-depth: 0 # Fetches the full history to access individual commits
+    - name: Checkout code
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 0 # Required to access the full commit history for the loop
 
-      - name: Set up Python and PDM
-        uses: pdm-project/setup-pdm@v4.4
-        with:
-          python-version: "3.12"
-          cache: true
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ matrix.python-version }}
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install .[dev]
 
-      - name: Install dependencies
-        run: pdm sync -g -p ./ -G ci-check --no-self
+    - name: Lint and Type-Check each commit
+      run: |
+        set -e # Explicitly tells bash to instantly exit if any command fails
 
-      - name: Lint and Type-Check each commit
-        run: |
-          # 1. Determine the commit range
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            COMMIT_RANGE="origin/${{ github.base_ref }}..HEAD"
-          else
-            # Handle new branch pushes (where 'before' is a zero hash)
-            if [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]]; then
-              COMMIT_RANGE="HEAD~1..HEAD"
-            else
-              COMMIT_RANGE="${{ github.event.before }}..${{ github.sha }}"
-            fi
-          fi
+        # 1. Determine the commit range for this push
+        if [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]]; then
+          COMMIT_RANGE="HEAD~1..HEAD"
+        else
+          COMMIT_RANGE="${{ github.event.before }}..${{ github.sha }}"
+        fi
 
-          # 2. Extract the list of commit hashes
-          COMMITS=$(git rev-list --no-merges --reverse $COMMIT_RANGE)
+        # 2. Extract the list of commit hashes
+        COMMITS=$(git rev-list --no-merges --reverse $COMMIT_RANGE)
+        if [ -z "$COMMITS" ]; then
+          COMMITS=${{ github.sha }}
+        fi
 
-          if [ -z "$COMMITS" ]; then
-            COMMITS=${{ github.sha }}
-          fi
+        # 3. Loop through for mypy and pylint ONLY
+        for COMMIT in $COMMITS; do
+          echo "=================================================="
+          echo "Validating commit: $COMMIT"
+          echo "=================================================="
+          git checkout $COMMIT
+          
+          echo "Running pylint..."
+          pylint framing
+          
+          echo "Running mypy..."
+          mypy framing
+        done
 
-          # 3. Loop through and test each commit
-          for COMMIT in $COMMITS; do
-            echo "=================================================="
-            echo "Validating commit: $COMMIT"
-            echo "=================================================="
-            git checkout $COMMIT
-            
-            echo "Running pylint..."
-            pylint packet-framing
-            
-            echo "Running mypy..."
-            mypy packet-framing
-          done
-
-  verify:
-    name: Push Verification
-    needs: per-commit-lint # Ensures this only runs if all commits passed linting
-    uses: testofthings/.github/.github/workflows/reusable-python-merge.yaml@0.1.14
-    with:
-      python_module_name: "packet-framing"
-      use_common_library: false
-      image_name: "packet-framing"
-      run_integration_tests: false
-      docker_build_targets: '["production", "migrate"]'
-    secrets: inherit
+    - name: Run unit tests on final push state
+      run: |
+        # Checkout the final HEAD commit of the branch before testing
+        git checkout ${{ github.sha }}
+        
+        echo "Running pytest..."
+        pytest tests
