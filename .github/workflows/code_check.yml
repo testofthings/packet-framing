@@ -41,8 +41,6 @@ jobs:
 
     - name: Lint and Type-Check each commit
       run: |
-        # set -e # Explicitly tells bash to instantly exit if any command fails
-
         # 1. Extract exactly which commits were pushed (Oldest to Newest)
         if [[ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]] && git cat-file -e ${{ github.event.before }}^{commit} 2>/dev/null; then
           # Standard push: Git perfectly isolates the newly pushed commits
@@ -66,9 +64,9 @@ jobs:
           git checkout $COMMIT
           
           echo "Running mypy..."
-          mypy framing || true
+          mypy framing
           
           echo "Running pylint..."
-          pylint framing --exit-zero
+          pylint framing
         done
 
