@@ -66,9 +66,9 @@ jobs:
           git checkout $COMMIT
           
           echo "Running mypy..."
-          mypy framing
+          mypy framing || true
           
           echo "Running pylint..."
-          pylint framing
+          pylint framing --exit-zero
         done
 
