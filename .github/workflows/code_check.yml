@@ -64,7 +64,7 @@ jobs:
           git checkout $COMMIT
           
           echo "Running mypy..."
-          # mypy framing commented out to see if pylint outputs anything
+          mypy framing
           
           echo "Running pylint..."
           pylint framing
