@@ -2,6 +2,7 @@ name: Automatic code checks for packet-framing
 
 on:
   pull_request:
+    branches: [ main ]
 
 
 jobs:
