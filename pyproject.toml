@@ -5,7 +5,7 @@ build-backend   = "setuptools.build_meta"
 [project]
 name            = "packet-framing"
 version         = "0.2.1"
-requires-python        = ">=3.12"
+requires-python = ">=3.11"
 description     = "Protocol packet parsing tool"
 readme          = "README.md"
 license         = "MIT"
