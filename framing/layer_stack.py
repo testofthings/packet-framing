@@ -107,15 +107,15 @@ class FrameStack:
         if self.layer.streaming:
             # stream data m-to-n relation between transports and payload frames
             for s in layer_receive:
-                next = self.next.get(s.payload_type)
-                if next is None and self.layer.show_unmapped:
+                next_s = self.next.get(s.payload_type)
+                if next_s is None and self.layer.show_unmapped:
                     yield s  # show raw frames
                     continue
                 if not s.data:
                     continue  # no data added
                 assert s.stream_id, "Expected stream ID for streaming layer"
-                next = next or RawStackLayer()
-                next_receive = list(next.receive(s))  # next level payloads
+                next_s = next_s or RawStackLayer()
+                next_receive = list(next_s.receive(s))  # next level payloads
                 try:
                     payload_len = s.frame.byte_length()  # this raises exception, if partial payload(s)
                     self.layer.commit_read(s.stream_id, payload_len)
@@ -125,12 +125,12 @@ class FrameStack:
         else:
             # block transport, 1-to-n relation between transport and payload frames
             for s in layer_receive:
-                next = self.next.get(s.payload_type)
-                if next is None and self.layer.show_unmapped:
+                next_s = self.next.get(s.payload_type)
+                if next_s is None and self.layer.show_unmapped:
                     yield s  # show raw frames
                     continue
-                next = next or RawStackLayer()
-                next_receive = next.receive(s)
+                next_s = next_s or RawStackLayer()
+                next_receive = next_s.receive(s)
                 yield from next_receive
 
 

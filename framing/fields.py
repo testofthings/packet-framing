@@ -639,8 +639,9 @@ class Structure(FrameStructure[F]):
         self._update_fixed_length(field)
         return field
 
-    def raw(self, bits: int = None, bytes: int = None, min_bits: int = None, min_bytes: int = None, default: RawData = None,
-            name: str = None) -> RawField[F]:
+    def raw(self, bits: int = None, bytes: int = None,  # pylint: disable=redefined-builtin
+            min_bits: int = None, min_bytes: int = None,
+            default: RawData = None, name: str = None) -> RawField[F]:
         fn = self._get_a_name(name)
         fix_len = -1
         if bits is not None:
@@ -661,7 +662,7 @@ class Structure(FrameStructure[F]):
         self._update_fixed_length(f)
         return f
 
-    def integer(self, int_format=IntegerFormat(), bytes=-1, bits=-1,
+    def integer(self, int_format=IntegerFormat(), bytes=-1, bits=-1,  # pylint: disable=redefined-builtin
                 default=0, name: str = None) -> IntField[F]:
         fn = self._get_a_name(name)
         if bytes > 0:
