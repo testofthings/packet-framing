@@ -155,6 +155,9 @@ V = TypeVar("V")
 
 
 class ConfigurableField(Field[F, T], ABC):
+    def __init__(self, type_name: str, default_value: T, fixed_bit_offset: int = -1):
+        super().__init__(type_name, default_value, fixed_bit_offset)
+        self.structure: Structure  # set by structure when field is added
 
     def __truediv__(self, other: 'Field[Any, T]') -> 'FieldPath':
         return FieldPath(self) / other
@@ -232,7 +235,7 @@ class RawField(ConfigurableField[F, RawData]):
             self.fixed_bit_length = min_bit_length
             self.direct_decode = self.fixed_bit_offset >= 0 and self.fixed_bit_length >= 0
 
-    def get(self, frame: F) -> RawData:
+    def get(self, frame: 'Frame') -> RawData:
         v = frame.backend.get(self)
         if isinstance(v, Frame):
             # payload can be a frame
@@ -609,6 +612,7 @@ class Structure(FrameStructure[F]):
             self.fields_fixed_bit_offset += field.fixed_bit_length
 
     def field(self, field: Field, name: str = "") -> Field:
+        assert isinstance(field, ConfigurableField), "I thought all fields are configurable"
         fn = self._get_a_name(name)
         field.structure = self
         self.fields[fn] = field
