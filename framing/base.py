@@ -187,7 +187,7 @@ class FrameBackend:
 
     def set(self, field: Field[F, T], value: T) -> Self:
         """Set field value"""
-        raise NotImplementedError("Editing not allowed with this backend")
+        raise Exception("Editing not allowed with this backend")
 
     def get_item(self, sequence_field: Field, item_field: Field[F, T], index: int):
         """Get item from sequence field"""

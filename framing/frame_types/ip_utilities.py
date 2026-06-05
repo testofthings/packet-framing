@@ -1,11 +1,12 @@
-from typing import Any, Dict, Iterable, Iterator, Self, Set, Tuple, Optional
+from typing import Any, Dict, Iterable, Set, Tuple, Optional
 
 from framing.base import Frame
 from framing.data_queue import RawDataQueue
 from framing.frame_types.dns_frames import DNSMessage, DNSMessageTCP
 from framing.frame_types.ipv4_frames import IPv4
 from framing.frame_types.ipv6_frames import IPx, IPv6
-from framing.frame_types.tcp_frames import TCP_Null_Stream_Id, TCP_Stream_Id, TCP, TCPFlag, TCPDataQueue, flip_tcp_stream_id
+from framing.frame_types.tcp_frames import TCP_Null_Stream_Id, TCP_Stream_Id, TCP, TCPFlag, TCPDataQueue, \
+    flip_tcp_stream_id
 from framing.frame_types.udp_frames import UDP
 from framing.frames import Frames
 from framing.layer_stack import StackLayer, StackState

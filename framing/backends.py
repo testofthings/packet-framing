@@ -174,9 +174,18 @@ class ComposingBackend(BackendImplementation):
         self.field_values[field] = value
         return self
 
-    def get_item(self, sequence_field: Field, item_field: Field[F, FT], index: int):
+    def get_item(self, sequence_field: Field, item_field: Field[F, T], index: int):
         val = self.get(sequence_field)
         return val[index]
+
+    def iterate(self, sequence_field: Field, item_field: Field[F, T],
+                count=-1, terminator: Optional[Callable[[T], bool]] = None) -> Iterator[T]:
+        """Iterate sequence field values without storing them"""
+        raise Exception("Iterating not supported with this backend")
+
+    def get_raw(self, field: Field) -> Tuple[RawData, int]:
+        """Get field raw data"""
+        raise Exception("Getting raw data not supported with this backend")
 
     def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type[F]] = None,
                      default_frame=False) -> Optional[Frame]:
@@ -353,7 +362,7 @@ class DissectorBackend(BackendImplementation):
                 count=-1, terminator: Optional[Callable[[T], bool]] = None) -> Iterator[FT]:
         v = self.field_values.get(sequence_field)
         if v is not None:
-            return v.__iter__()  # already value in memory (we do not store it here)
+            return iter(v)  # already value in memory (we do not store it here)
 
         backend = self
 

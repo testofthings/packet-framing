@@ -65,6 +65,7 @@ disable = [
     "unused-argument",
     "invalid-name",
     "arguments-renamed",
+    "broad-exception-raised",
 ]
 
 # Mypy config

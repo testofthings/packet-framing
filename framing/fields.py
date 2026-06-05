@@ -1,7 +1,8 @@
 """Field implementations"""
 
+from abc import ABC
 import enum
-from typing import Iterator, Optional, Dict, TypeVar, Self, Type, cast, Callable, List
+from typing import Iterator, Optional, Dict, TypeVar, Self, Type, cast, Callable, List, Any
 
 from framing.base import *
 from framing.base import Field, FrameBackend
@@ -153,7 +154,7 @@ FT = TypeVar("FT", bound=Frame)
 V = TypeVar("V")
 
 
-class ConfigurableField(Field[F, T]):
+class ConfigurableField(Field[F, T], ABC):
 
     def __truediv__(self, other: 'Field[Any, T]') -> 'FieldPath':
         return FieldPath(self) / other
@@ -265,7 +266,7 @@ class RawField(ConfigurableField[F, RawData]):
         bit_len = super().decode_bit_length(data, bit_offset, None, backend)
         if bit_len >= 0 and self.min_bit_length < self.max_bit_length:
             # variable length, check limits
-            bit_len = self._validate_length()
+            bit_len = self._validate_length(bit_len)
         return bit_len
 
     def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> RawData:

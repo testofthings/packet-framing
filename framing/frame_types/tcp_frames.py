@@ -1,5 +1,5 @@
 import enum
-from typing import Dict, Set, Tuple, Optional
+from typing import Tuple
 
 from framing.base import Frame
 from framing.codecs import IntegerFormat

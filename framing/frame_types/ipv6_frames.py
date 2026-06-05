@@ -1,4 +1,3 @@
-from types import UnionType
 from typing import Iterable, Tuple, Dict, Optional, Union
 
 from framing.base import Frame, LayerMapping
