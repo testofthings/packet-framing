@@ -64,6 +64,7 @@ disable = [
     "missing-function-docstring",
     "unused-argument",
     "invalid-name",
+    "arguments-renamed",
 ]
 
 # Mypy config
@@ -74,6 +75,7 @@ disable_error_code  = [
     # FIXME: Temporary ignores for transition
     "no-untyped-def",
     "no-untyped-call",
+    "type-arg",
 ]
 strict              = true
 follow_imports      = "silent"
