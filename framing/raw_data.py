@@ -187,7 +187,7 @@ class RawData(LengthEntity):
 
 class ByteData(RawData):
     """Bytes"""
-    def __init__(self, data, byte_start: int, byte_length: int):
+    def __init__(self, data: bytes, byte_start: int, byte_length: int):
         self.data = data
         self.start = byte_start
         self.length = byte_length
@@ -578,7 +578,7 @@ class Raw:
             b[i // 8] += int(s)
         if bit_l % 8 != 0:
             b[-1] <<= (8 - bit_l % 8)
-        r = ByteData(b, 0, len(b)).subBlockBits(0, bit_l)
+        r = ByteData(bytes(b), 0, len(b)).subBlockBits(0, bit_l)
         return r
 
     @classmethod
