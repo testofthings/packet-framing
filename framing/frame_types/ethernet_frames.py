@@ -6,6 +6,7 @@ from framing.frame_types.ipv6_frames import IPv6
 
 
 class EthernetII(Frame):
+    """Ethernet type II frame"""
     structure = Structure['EthernetII']()
 
     destination = structure.raw(bytes=6)
@@ -22,4 +23,3 @@ Ethernet_Payloads = LayerMapping(EthernetII.data).by(EthernetII.type, {
     0x0800: IPv4,
     0x86dd: IPv6,
 })
-

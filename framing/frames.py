@@ -64,4 +64,3 @@ class Frames:
         if copy_sub_frames:
             be = be.copy()
         return be.dump(bit_offset, indent, width, copy_sub_frames=copy_sub_frames)
-

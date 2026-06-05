@@ -84,8 +84,8 @@ class LayerBuilder:
                 if layer_builder is None:
                     raise ValueError(f'Unknown protocol "{proto_name}"')
                 layer = layer_builder.build_layer(transport, v)
-                next = stack.next[key] = FrameStack(layer)
-                layer_builder.build(next, v)
+                next_item = stack.next[key] = FrameStack(layer)
+                layer_builder.build(next_item, v)
             else:
                 # key is protocol builder, find all mappings
                 keys = []
@@ -98,8 +98,8 @@ class LayerBuilder:
                     raise ValueError(f'No mapping for "{k}" in "{self.short_name}"')
                 for key in keys:
                     layer = layer_builder.build_layer(transport, v)
-                    next = stack.next[key] = FrameStack(layer)
-                    layer_builder.build(next, v)
+                    next_value = stack.next[key] = FrameStack(layer)
+                    layer_builder.build(next_value, v)
 
         use_defaults = spec.get('defaults', True)
         if use_defaults and not stack.next:
@@ -107,12 +107,12 @@ class LayerBuilder:
 
 
     def build_defaults(self, stack: FrameStack):
-        # build default sub layers
+        """Build default sub layers"""
         transport = stack.layer.frame_type
         for k, v in self.sub.items():
             layer = v.build_layer(transport, {})
-            next = stack.next[k] = FrameStack(layer)
-            v.build_defaults(next)
+            next_item = stack.next[k] = FrameStack(layer)
+            v.build_defaults(next_item)
         stack.layer.show_unmapped = True
 
 
@@ -147,7 +147,10 @@ class StackBuilder:
 
     dns = LayerBuilder('dns', DNSStackLayer)
 
-    tls_handshake = LayerBuilder('tls-handshake', lambda: PayloadFieldStackLayer(TLSHandshake, TLSHandshake.HandshakeType, TLSHandshake.message))
+    tls_handshake = LayerBuilder('tls-handshake',
+                                 lambda: PayloadFieldStackLayer(TLSHandshake,
+                                                                 TLSHandshake.HandshakeType,
+                                                                   TLSHandshake.message))
     tls_record = LayerBuilder('tls-record', TLSRecordLayer,
                               sub={22: tls_handshake})
 

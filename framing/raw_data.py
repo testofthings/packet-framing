@@ -64,6 +64,7 @@ class RawData(LengthEntity):
         return bytes(b)
 
     def as_ip_address(self) -> IPAddress:
+        """Get data as an IP address, ValueError if length of data is not 32 or 128 bits"""
         bl = self.bit_length()
         if bl == 32:
             return ipaddress.IPv4Address(self.as_bytes(0, 4))
@@ -72,9 +73,11 @@ class RawData(LengthEntity):
         raise ValueError(f"Raw data ({self.bit_length()} bits) is not IP address: " + self.to_hex())
 
     def as_hw_address(self) -> str:
+        """Get data as a HW address"""
         return ":".join([f"{self.octet(i):02x}" for i in range(0, self.byte_length())])
 
     def as_string(self, encoding='ascii', errors='strict') -> str:
+        """Get data as a string"""
         return self.as_bytes(0, self.byte_length()).decode(encoding, errors=errors)
 
     def bit(self, bit_offset: int) -> int:
@@ -137,7 +140,7 @@ class RawData(LengthEntity):
     def __hash__(self):
         h = self.byte_length()
         if h < 0:
-            raise Exception("Cannot calculate hash for stream")
+            raise ValueError("Cannot calculate hash for stream")
         for i in range(0, h):
             h += self.octet(i)
         return h
@@ -217,6 +220,7 @@ class ByteData(RawData):
 
 
 class RawDataSequence(RawData):
+    """Sequence of RawData"""
     def __init__(self, components: List[RawData]):
         self.components = components
         self.length = sum([c.bit_length() for c in components])
