@@ -467,34 +467,8 @@ class FrameIterator(Iterator[FT]):
     def __init__(self, source: Iterator[FT]):
         self.source = source
 
-    def field(self, field: ConfigurableField[FT, T], as_frame=False) -> 'FieldIterator[T]':
-        i = FieldIterator(field, self.source)
-        i.frame_value = as_frame
-        return i
-
     def __next__(self) -> FT:
         return self.source.__next__()
-
-
-class FieldIterator(typing.Generic[F, T], Iterator[T]):
-    def __init__(self, field: ConfigurableField[F, T], source: Iterator[T]):
-        self.it_field = field
-        self.source = source
-        self.frame_value = False
-
-    def field(self, field: ConfigurableField[FT, T], as_frame=False) -> 'FieldIterator[T]':
-        self.frame_value = True
-        i = FieldIterator(field, self)
-        i.frame_value = as_frame
-        return i
-
-    def __next__(self) -> FT:
-        f = self.source.__next__()
-        v = self.it_field.as_frame(f) if self.frame_value else self.field.get(f)
-        while v is None:
-            f = self.source.__next__()
-            v = self.it_field.as_frame(f) if self.frame_value else self.field.get(f)
-        return v
 
 
 class Sequence(ConfigurableField[F, List[FT]]):
