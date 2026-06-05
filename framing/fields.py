@@ -354,6 +354,12 @@ class SubStructureField(ConfigurableField[F, FT]):
         self.sub_structure: FrameStructure[FT] = Structure.get_struct(sub_type)
         self.choice_resolver: Optional[Calculator] = None
 
+    def get_choice(self, frame: F) -> FT:
+        v = self.get(frame)
+        if v.backend.choice:
+            v = v.backend.choice.get(v)
+        return v
+
     def choice_by(self, value: CalculatorSource) -> Self:
         """Configure the choice in field by given value"""
         if not isinstance(self.sub_structure, Selection):
