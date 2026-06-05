@@ -1,6 +1,6 @@
-from typing import List, Any
+from typing import List
 
-from framing.base import Frame, T, FrameBackend, LayerMapping
+from framing.base import Frame, T, FrameBackend
 from framing.fields import Structure, Sequence, ValueOf, RawField, Selection
 from framing.raw_data import Raw, RawData
 
@@ -47,7 +47,7 @@ class DNSName(Sequence):
     def end_check(cls, raw: RawData) -> bool:
         """DNS name end check"""
         fb = raw.octet(0)
-        return not (0 < fb < 0xc0)
+        return not 0 < fb < 0xc0
 
     @classmethod
     def parse_string(cls, data: RawData, message: 'DNSMessage', previous_offset=-1) -> List[str]:
@@ -65,10 +65,9 @@ class DNSName(Sequence):
                 cs = cls.parse_string(cin, message, offset)
                 r.extend(cs)
                 break
-            else:
-                r.append(data.subBlock(1, fb).as_string())
-                data = data.tailBytes(1 + fb)
-                fb = data.octet(0)
+            r.append(data.subBlock(1, fb).as_string())
+            data = data.tailBytes(1 + fb)
+            fb = data.octet(0)
         return r
 
     @classmethod

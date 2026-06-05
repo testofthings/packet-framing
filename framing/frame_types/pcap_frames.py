@@ -73,7 +73,7 @@ class PCAPStackLayer(StackLayer):
         hdr = PCAPFile.File_Header[file]
         pay_type = FileHeader.LinkType[hdr]
         state = state.add(file)
-        for i, rec in enumerate(PCAPRecordIterator(file)):
+        for rec in PCAPRecordIterator(file):
             pay_data = PacketRecord.Packet_Data[rec]
             n_state = state.add(rec, pay_type, pay_data)
             yield n_state
