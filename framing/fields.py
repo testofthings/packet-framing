@@ -645,19 +645,19 @@ class Structure(FrameStructure[F]):
         self._update_fixed_length(field)
         return field
 
-    def raw(self, bits: int = None, bytes: int = None,  # pylint: disable=redefined-builtin
-            min_bits: int = None, min_bytes: int = None,
-            default: RawData = None, name: str = None) -> RawField[F]:
+    def raw(self, bits: int = -1, bytes: int = -1,  # pylint: disable=redefined-builtin
+            min_bits: int = -1, min_bytes: int = -1,
+            default: RawData | None = None, name: str = "") -> RawField[F]:
         fn = self._get_a_name(name)
         fix_len = -1
-        if bits is not None:
+        if bits >= 0:
             fix_len = bits
-        if bytes is not None:
+        if bytes >= 0:
             fix_len = bytes * 8
         min_len = fix_len
-        if min_bits is not None:
+        if min_bits >= 0:
             min_len = min_bits
-        if min_bytes is not None:
+        if min_bytes >= 0:
             min_len = min_bytes * 8
         assert min_len <= fix_len, f"Minimun length is {min_len} bits and max length is {fix_len} bits"
         if default is None:
