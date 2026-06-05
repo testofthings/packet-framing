@@ -583,12 +583,12 @@ class Raw:
         return r
 
     @classmethod
-    def zeroes(cls, byte_length: int = None, bit_length: int = None) -> RawData:
+    def zeroes(cls, byte_length: int = 0, bit_length: int = 0) -> RawData:
         """Create zero data of given length"""
-        if byte_length is not None:
-            assert bit_length is None or bit_length == byte_length * 8
+        if byte_length > 0:
+            assert bit_length <= 0 or bit_length == byte_length * 8
             return ZeroData(byte_length * 8)
-        if bit_length is not None:
+        if bit_length > 0:
             return ZeroData(bit_length)
         return cls.empty
 

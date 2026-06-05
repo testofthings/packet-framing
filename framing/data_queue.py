@@ -16,9 +16,9 @@ class RawDataQueue:
 
     # FIXME: Offset wrapping is not working, especially with forwarding!!!
 
-    def push(self, data: RawData, offset: int = None) -> RawData:
+    def push(self, data: RawData, offset: int = -1) -> RawData:
         """Push data to end of the queue"""
-        if offset is None:
+        if offset < 0:
             # as default, continuous data
             offset = self.offset + self.head.bytes_available()
         # avoid off-set wrapping, trust Python has enough bits in int
