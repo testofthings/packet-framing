@@ -3,6 +3,7 @@
 import ipaddress
 import mmap
 import pathlib
+from collections.abc import Buffer
 from typing import Iterable, List, BinaryIO, Union, Self
 
 # IP address, shouldn't this be defined by Python?
@@ -187,8 +188,8 @@ class RawData(LengthEntity):
 
 class ByteData(RawData):
     """Bytes"""
-    def __init__(self, data: bytes, byte_start: int, byte_length: int):
-        self.data = data
+    def __init__(self, data: Buffer, byte_start: int, byte_length: int):
+        self.data = memoryview(data)
         self.start = byte_start
         self.length = byte_length
         assert byte_start >= 0
@@ -208,7 +209,7 @@ class ByteData(RawData):
         if ml < byte_length:
             raise EOFError("Not enough bytes")
         mo = self.start + byte_offset
-        return self.data[mo:mo + ml]
+        return bytes(self.data[mo:mo + ml])
 
     def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
         ml = min(byte_length, max(0, self.length - byte_offset))
@@ -548,8 +549,7 @@ class Raw:
     @classmethod
     def bytes(cls, data: bytes | bytearray) -> RawData:
         """Create from bytes"""
-        b_data = bytes(data) if isinstance(data, bytearray) else data
-        return ByteData(b_data, 0, len(b_data))
+        return ByteData(data, 0, len(data))
 
     @classmethod
     def octets(cls, *data: int) -> RawData:
