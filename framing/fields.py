@@ -162,13 +162,14 @@ class ConfigurableField(Field[F, T]):
             raise Exception(f"Cannot construct path from: {location}")
 
     def length_by(self, value: CalculatorSource) -> Self:
-        self.length_resolver = Multiplier(8, value.calculator())
+        length_resolver = Multiplier(8, value.calculator())
+        self.length_resolver = length_resolver
         field = self
 
         def procedure(frame: F):
             v = frame.backend.get(field)
             f_len = field.encoding_bit_length(frame.backend, v)
-            field.length_resolver.push(frame.backend, f_len)
+            length_resolver.push(frame.backend, f_len)
         # call at commit to push length
         self.structure.commit_procedures.append((self, procedure))
         return self
@@ -178,27 +179,27 @@ class ConfigurableField(Field[F, T]):
         return self
 
     def end_offset_by(self, value: CalculatorSource) -> Self:
-        calc = Multiplier(8, value.calculator())
-        self.end_offset_resolver = calc
+        end_offset_resolver = Multiplier(8, value.calculator())
+        self.end_offset_resolver = end_offset_resolver
         field = self
 
         def procedure(frame: F):
             v = frame.backend.get(field)
             f_off = frame.backend.get_bit_offset(field.offset)
             f_len = field.encoding_bit_length(frame.backend, v)
-            field.end_offset_resolver.push(frame.backend, f_off + f_len)
+            end_offset_resolver.push(frame.backend, f_off + f_len)
         # call at commit to push length
         self.structure.commit_procedures.append((self, procedure))
         return self
 
     def pad_to(self, min_offset: int):
         calc = FieldOffsetValue(self)
-        calc = PaddingValue(min_offset, calc)
-        self.length_resolver = calc
+        length_resolver = PaddingValue(min_offset, calc)
+        self.length_resolver = length_resolver
         field = self
 
         def procedure(frame: F):
-            pad_to = int(calc.pull(frame.backend))
+            pad_to = int(length_resolver.pull(frame.backend))
             frame.backend.set(field, Raw.zeroes(bit_length=pad_to))
 
         self.structure.commit_procedures.append((self, procedure))
@@ -239,7 +240,7 @@ class RawField(ConfigurableField[F, RawData]):
     def process_frame(self, frame: F, procedures: Dict[Type[Frame], Callable[[Any], V]]) -> Optional[V]:
         """Process frame here differentiating by frame type"""
         v = self.as_frame(frame, default_frame=False)
-        proc = procedures.get(type(v))
+        proc = procedures.get(type(v)) if v else None
         return proc(v) if proc else None
 
     def get_bit_length(self, frame: F) -> int:
@@ -434,14 +435,14 @@ class LVField(ConfigurableField[F, T]):
         sub.consumed_by = self
 
     def encoding_bit_length(self, backend: FrameBackend, value: T) -> int:
-        len_len = self.length_codec.get_fixed_bit_length()
-        v_len = self.sub.encoding_bit_length(backend, value)
+        len_len: int = self.length_codec.get_fixed_bit_length()
+        v_len: int = self.sub.encoding_bit_length(backend, value)
         return len_len + v_len
 
     def encode(self, value: T, state: EncodingState) -> RawData:
-        value_r = self.sub.encode(value, state)
+        value_r: RawData = self.sub.encode(value, state)
         len_v = value_r.byte_length()  # NOTE: How to add calculations here (no backend)?
-        len_r = self.length_codec.encode(len_v)
+        len_r: RawData = self.length_codec.encode(len_v)
         return len_r + value_r
 
     def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> T:
@@ -451,8 +452,9 @@ class LVField(ConfigurableField[F, T]):
 
     def decode_bit_length(self, data: RawData, bit_offset: int, value: T, backend: 'FrameBackend') -> int:
         l_data = data.tailBits(bit_offset)
-        d_len = self.length_codec.decode(l_data) * 8
-        return self.length_codec.get_fixed_bit_length() + d_len
+        d_len: int = self.length_codec.decode(l_data) * 8
+        len_len: int = self.length_codec.get_fixed_bit_length()
+        return len_len + d_len
 
     def pull(self, backend: FrameBackend) -> float:
         return backend.get(self.sub)
@@ -663,7 +665,7 @@ class Structure(FrameStructure[F]):
         return f
 
     def integer(self, int_format=IntegerFormat(), bytes=-1, bits=-1,  # pylint: disable=redefined-builtin
-                default=0, name: str = None) -> IntField[F]:
+                default=0, name: str = "") -> IntField[F]:
         fn = self._get_a_name(name)
         if bytes > 0:
             int_format = int_format.bytes(bytes)
@@ -676,7 +678,7 @@ class Structure(FrameStructure[F]):
         self._update_fixed_length(f)
         return f
 
-    def sub(self, sub_frame: Type[FT], name: str = None) -> SubStructureField[F, FT]:
+    def sub(self, sub_frame: Type[FT], name: str = "") -> SubStructureField[F, FT]:
         fn = self._get_a_name(name)
         f = SubStructureField(sub_frame)
         f.structure = self

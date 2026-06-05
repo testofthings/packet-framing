@@ -546,9 +546,10 @@ class Raw:
     empty = ZeroData(0)
 
     @classmethod
-    def bytes(cls, data: bytes) -> RawData:
+    def bytes(cls, data: bytes | bytearray) -> RawData:
         """Create from bytes"""
-        return ByteData(data, 0, len(data))
+        b_data = bytes(data) if isinstance(data, bytearray) else data
+        return ByteData(b_data, 0, len(b_data))
 
     @classmethod
     def octets(cls, *data: int) -> RawData:
