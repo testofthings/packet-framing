@@ -60,7 +60,7 @@ class FieldPointer(typing.Generic[F, T]):
 
 class Field(FieldPointer[F, T]):
     """Base class for fields"""
-    def __init__(self, type_name: str, default_value: T, fixed_bit_offset=-1):
+    def __init__(self, type_name: str, default_value: T, fixed_bit_offset: int = -1):
         self.field_name = "field?"
         self.type_name = type_name
         self.default_value = default_value
@@ -70,13 +70,13 @@ class Field(FieldPointer[F, T]):
         self.min_bit_length = -1
         self.direct_decode = False
         self.offset = FieldOffset(self)
-        self.structure: Optional['Structure'] = None  # set by structure herself
         self.end_offset_resolver: Optional[Calculator] = None
         self.length_resolver: Optional[Calculator] = None
         self.consumed_by: Optional[Field[F, Any]] = None
 
-    def get(self, frame: F) -> T:
-        return frame.backend.get(self)
+    def get(self, frame: 'Frame') -> T:
+        v: T = frame.backend.get(self)
+        return v
 
     def get_choice(self, frame: F) -> T:
         """Return the selected choice, when this is a selection field, otherwise the value itself"""
