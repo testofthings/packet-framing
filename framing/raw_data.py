@@ -353,7 +353,7 @@ class ZeroData(RawData):
 
 class BitAlignedData(RawData):
     """Data not necessary aligned to octet boundary"""
-    def __init__(self, data: RawData, bit_offset: int, bit_length=-1):
+    def __init__(self, data: RawData, bit_offset: int, bit_length: int = -1):
         self.data = data
         self.offset = bit_offset
         self.length = bit_length

@@ -1,7 +1,7 @@
 """Field implementations"""
 
 import enum
-from typing import Iterator
+from typing import Iterator, Optional
 
 from framing.base import *
 from framing.base import Field, FrameBackend
