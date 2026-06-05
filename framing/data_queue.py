@@ -7,7 +7,7 @@ from framing.raw_data import RawData, AppendableRawData, Raw
 
 class RawDataQueue:
     """Raw data quueue with offset handling"""
-    def __init__(self, prefix: RawData = None, offset=0, modulus=2 ** 32):
+    def __init__(self, prefix: RawData | None = None, offset=0, modulus=2 ** 32):
         self.offset = offset  # bytes
         self.modulus = modulus
         self.head = AppendableRawData(prefix or Raw.empty)

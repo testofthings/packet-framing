@@ -36,12 +36,12 @@ class PayloadFieldStackLayer(StackLayer):
         return [s_state]
 
     def __repr__(self):
-        return f"{self.frame_type.structure.structure_name}.{self.payload_field}"
+        return f"{self.frame_type.__name__}.{self.payload_field}"
 
 
 class LayerBuilder:
     """Stack layer builder"""
-    def __init__(self, short_name: str, new: Callable[[], StackLayer], sub: Dict[Any, 'LayerBuilder'] = None):
+    def __init__(self, short_name: str, new: Callable[[], StackLayer], sub: Dict[Any, 'LayerBuilder'] | None = None):
         self.short_name = short_name
         self.new = new
         self.sub = sub or {}
@@ -50,7 +50,7 @@ class LayerBuilder:
 
     mappings: Dict[str, 'LayerBuilder'] = {}
 
-    def build_layer(self, transport: Optional[Frame], spec: Dict[Any, Any]) -> StackLayer:
+    def build_layer(self, transport: Optional[Type[Frame]], spec: Dict[Any, Any]) -> StackLayer:
         """Build this layer"""
         return self.new().configure(spec)
 
@@ -149,8 +149,8 @@ class StackBuilder:
 
     tls_handshake = LayerBuilder('tls-handshake',
                                  lambda: PayloadFieldStackLayer(TLSHandshake,
-                                                                 TLSHandshake.HandshakeType,
-                                                                   TLSHandshake.message))
+                                                                TLSHandshake.HandshakeType,
+                                                                TLSHandshake.message))
     tls_record = LayerBuilder('tls-record', TLSRecordLayer,
                               sub={22: tls_handshake})
 
@@ -212,7 +212,7 @@ def main():
                 s = f"{state.get_frame()}"
                 # drop first line of frame dump, it contains extra frame name
                 first_line_len = s.find('\n')
-                if first_line_len > 0 and first_line_len < len(s):
+                if 0 < first_line_len < len(s):
                     s = s[first_line_len + 1:]
                 print(f"{state.get_layer_names()}\n{s}")
         finally:

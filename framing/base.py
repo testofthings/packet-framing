@@ -15,7 +15,6 @@ T = typing.TypeVar("T")
 
 class EncodingState:
     """Encoding state"""
-    pass
 
 
 class FieldOffset:
@@ -43,10 +42,12 @@ class Calculator:
 
     def pull(self, backend: 'FrameBackend') -> float:
         """Pull value from source"""
+        assert self.next_step, "No next step missing"
         return self.next_step.pull(backend)
 
     def push(self, backend: 'FrameBackend', value: float) -> float:
         """Push value to source"""
+        assert self.next_step, "No next step missing"
         return self.next_step.push(backend, value)
 
 
@@ -210,7 +211,7 @@ class FrameBackend:
         """Decore raw field as a frame with given mappings"""
         raise NotImplementedError()
 
-    def factory(self, decode: RawData = None) -> Callable[['Frame'], 'FrameBackend']:
+    def factory(self, decode: RawData | None = None) -> Callable[['Frame'], 'FrameBackend']:
         """Create a fresh backend for given frame"""
         raise NotImplementedError()
 
@@ -364,7 +365,7 @@ class FrameStructure(typing.Generic[F]):
 
 class LayerMapping:
     """Map lower layer selector into upper layer payload"""
-    def __init__(self, payload: Field = None, base: Optional['LayerMapping'] = None):
+    def __init__(self, payload: Field | None = None, base: Optional['LayerMapping'] = None):
         assert not (payload and base), "Cannot provide both payload and base mapping"
         self._mappings: Dict[Field, Dict[FieldPointer, Dict]] = {}
         self._payload = payload
@@ -383,7 +384,7 @@ class LayerMapping:
             p_type = m.get(type_v)
             if p_type is not None:
                 return p_type
-        from framing.backends import RawFrame
+        from framing.backends import RawFrame  # pylint: disable=import-outside-toplevel
         return RawFrame
 
     def decode_payload(self, frame: Frame, field: Field, data: Optional[RawData] = None) -> Frame:

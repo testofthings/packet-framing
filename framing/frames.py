@@ -3,8 +3,8 @@
 import pathlib
 from typing import Callable, cast, Type, Dict, Any, TypeVar, Optional
 
-from framing.backends import ComposingBackend, FrameBackend, DissectorBackend, BackendImplementation
-from framing.base import Frame, LayerMapping, F
+from framing.backends import ComposingBackend, DissectorBackend, BackendImplementation
+from framing.base import Frame, FrameBackend, LayerMapping
 from framing.data_queue import RawDataQueue
 from framing.raw_data import RawData, Raw
 

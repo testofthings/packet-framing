@@ -423,7 +423,8 @@ class LengthOfLV(Calculator):
     def pull(self, backend: 'FrameBackend') -> float:
         bit_off = backend.get_bit_offset(self.field.offset)
         data = backend.input_data().subBlockBits(0, bit_off)
-        return self.field.length_codec.decode(data)
+        v = self.field.length_codec.decode(data)
+        return float(v)
 
 
 class LVField(ConfigurableField[F, T]):
@@ -454,17 +455,11 @@ class LVField(ConfigurableField[F, T]):
         d_data = data.subBlockBits(self.length_codec.get_fixed_bit_length(), d_len)
         return self.sub.decode(d_data, -1, backend)
 
-    def decode_bit_length(self, data: RawData, bit_offset: int, value: T, backend: 'FrameBackend') -> int:
+    def decode_bit_length(self, data: RawData, bit_offset: int, value: T | None, backend: 'FrameBackend') -> int:
         l_data = data.tailBits(bit_offset)
         d_len: int = self.length_codec.decode(l_data) * 8
         len_len: int = self.length_codec.get_fixed_bit_length()
         return len_len + d_len
-
-    def pull(self, backend: FrameBackend) -> float:
-        return backend.get(self.sub)
-
-    def push(self, backend: FrameBackend, value: float):
-        backend.set(self.sub, value)
 
 
 class FrameIterator(Iterator[FT]):
@@ -572,7 +567,7 @@ class Sequence(ConfigurableField[F, List[FT]]):
         # Note: terminator must be in the list
         return Raw.sequence(r)
 
-    def decode_bit_length(self, data: RawData, bit_offset: int, value: List[FT], backend: 'FrameBackend') -> int:
+    def decode_bit_length(self, data: RawData, bit_offset: int, value: List[FT] | None, backend: 'FrameBackend') -> int:
         if value is not None:
             known_count = len(value)
         else:
@@ -610,7 +605,7 @@ class Sequence(ConfigurableField[F, List[FT]]):
 
     def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> List[FT]:
         known_count = int(self.count_resolver.pull(backend)) if self.count_resolver else -1
-        items = []
+        items: List[FT] = []
         previous = None
         while True:
             if 0 <= known_count <= len(items):
@@ -638,7 +633,7 @@ class Structure(FrameStructure[F]):
         else:
             self.fields_fixed_bit_offset += field.fixed_bit_length
 
-    def field(self, field: Field, name: str = None) -> Field:
+    def field(self, field: Field, name: str = "") -> Field:
         fn = self._get_a_name(name)
         field.structure = self
         self.fields[fn] = field
@@ -722,4 +717,3 @@ class Selection(Structure[F]):
 
     def _resolve_offsets(self):
         pass  # all zeroes ok
-

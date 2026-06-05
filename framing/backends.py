@@ -338,8 +338,9 @@ class DissectorBackend(BackendImplementation):
         off += offset.fixed_bit_offset
         return off
 
-    def factory(self, decode: RawData = None) -> Callable[[Frame], FrameBackend]:
+    def factory(self, decode: RawData | None = None) -> Callable[[Frame], FrameBackend]:
         def f(frame: Frame):
+            b: FrameBackend
             if decode is None:
                 b = ComposingBackend(frame, self.mappings)
             else:
@@ -420,7 +421,7 @@ class DissectorBackend(BackendImplementation):
     def input_data(self) -> RawData:
         return self.data
 
-    def copy(self, parent: Optional[FrameBackend] = None) -> Self:
+    def copy(self, parent: Optional[FrameBackend] = None) -> 'DissectorBackend':
         # do not read more data for printing
         limited_data = self.data.subBlockBits(0, self.data.bits_available())
 
@@ -434,3 +435,4 @@ class DissectorBackend(BackendImplementation):
 
     def close(self) -> Self:
         self.data.close()
+        return self
