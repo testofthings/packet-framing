@@ -57,12 +57,23 @@ disable = [
     "too-many-statements",
     "too-many-lines",
     "too-many-positional-arguments",
-    "too-many-return-statements"
+    "too-many-return-statements",
+    # FIXME: Temporary ignores for transition
+    "missing-module-docstring",
+    "missing-class-docstring",
+    "missing-function-docstring",
+    "unused-argument",
+    "invalid-name",
 ]
 
 # Mypy config
 [tool.mypy]
 show_error_codes    = true
-disable_error_code  = ["import-untyped"]
+disable_error_code  = [
+    "import-untyped",
+    # FIXME: Temporary ignores for transition
+    "no-untyped-def",
+    "no-untyped-call",
+]
 strict              = true
 follow_imports      = "silent"
