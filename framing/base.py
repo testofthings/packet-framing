@@ -268,6 +268,10 @@ class Frame(LengthEntity):
         return self.backend.__repr__()
 
 
+# Frame type not used in class signature
+FT = typing.TypeVar("FT", bound=Frame)
+
+
 class FrameStructure(typing.Generic[F]):
     """Frame structure definition"""
     def __init__(self):
@@ -287,11 +291,16 @@ class FrameStructure(typing.Generic[F]):
             cp[1](frame)
 
     @classmethod
-    def get_struct(cls, frame_type: F) -> 'FrameStructure[F]':
-        """"Get structure for a frame type"""
+    def get_struct(cls, frame_type: FT | Type[FT]) -> 'FrameStructure[FT]':
+        """"Get structure for a frame or frame type"""
+        struct: Optional[FrameStructure] = None
         if hasattr(frame_type, "structure_"):
-            return getattr(frame_type, "structure_")  # underscored to avoid naming collision
-        return getattr(frame_type, "structure")
+            struct = getattr(frame_type, "structure_")  # underscored to avoid naming collision
+        elif hasattr(frame_type, "structure"):
+            struct = getattr(frame_type, "structure")
+        if not isinstance(struct, FrameStructure):
+            raise ValueError(f"Frame type {frame_type} does not have a valid structure")
+        return struct
 
     def is_field_here(self, field: Field) -> bool:
         """Is a field defined for this field"""
