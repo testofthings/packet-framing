@@ -313,7 +313,8 @@ class FrameStructure(typing.Generic[F]):
             f = self.fields.get(key)
             if f:
                 return f
-        return self.fields.values().__iter__().__next__()
+        field = next(iter(self.fields.values()))
+        return field
 
     def _get_a_name(self, override: Optional[str]) -> str:
         """Get name or temporary name for a field"""

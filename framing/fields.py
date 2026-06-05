@@ -347,13 +347,13 @@ class SubStructureField(ConfigurableField[F, FT]):
     def __init__(self, sub_type: Type[FT]):
         super().__init__("sub", None)
         self.sub_type = sub_type
-        self.sub_structure = Structure.get_struct(sub_type)
+        self.sub_structure: FrameStructure[FT] = Structure.get_struct(sub_type)
         self.choice_resolver: Optional[Calculator] = None
 
     def choice_by(self, value: CalculatorSource) -> Self:
         """Configure the choice in field by given value"""
-        assert isinstance(Structure.get_struct(self.sub_type), Selection), \
-            f"Structure {Structure.get_struct(self.sub_type).structure_name} is not a selection"
+        if not isinstance(self.sub_structure, Selection):
+            raise ValueError(f"Structure {self.sub_structure.structure_name} is not a selection, cannot use choice_by")
         choice_resolver = value.calculator()
         self.choice_resolver = choice_resolver
 
