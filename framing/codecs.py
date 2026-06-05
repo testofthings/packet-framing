@@ -1,5 +1,6 @@
 "Value codecs, such as integer codecs"
 
+from abc import ABC
 import typing
 from typing import Self
 
@@ -32,7 +33,7 @@ class ValueCodec(typing.Generic[V]):
         return -1
 
 
-class IntegerCodec(ValueCodec[int]):
+class IntegerCodec(ABC, ValueCodec[int]):
     """Base class for integer codecs"""
     def default_value(self) -> int:
         return 0
@@ -44,7 +45,7 @@ class IntegerCodec(ValueCodec[int]):
 
 class FixedByteIntegerCodec(IntegerCodec):
     """Fixed byte-length integer codec"""
-    def __init__(self, byte_length: int, little_end=False):
+    def __init__(self, byte_length: int, little_end: bool = False):
         self.length = byte_length
         self.little_end = little_end
         if little_end:
@@ -89,8 +90,8 @@ class FixedByteIntegerCodec(IntegerCodec):
 
 
 class FixedBitIntegerCodec(IntegerCodec):
-    """"""
-    def __init__(self, bit_length: int, little_end=False):
+    """Fixed bit-length integer codec"""
+    def __init__(self, bit_length: int, little_end: bool = False):
         self.byte_codec = FixedByteIntegerCodec((bit_length + 7) // 8, little_end)
         self.length = bit_length
 
@@ -136,7 +137,7 @@ class FixedBitIntegerCodec(IntegerCodec):
 
 class IntegerFormat:
     """Codec formatter"""
-    def __init__(self, bits=0, bytes=0, big_end: bool = False):  # pylint: disable=redefined-builtin
+    def __init__(self, bits: int = 0, bytes: int = 0, big_end: bool = False):  # pylint: disable=redefined-builtin
         self.bit_length = bits or (bytes * 8) or 16
         self.little_end = not big_end
 
@@ -164,5 +165,4 @@ class IntegerFormat:
         """Create the codec"""
         if self.bit_length % 8 != 0:
             return FixedBitIntegerCodec(bit_length=self.bit_length, little_end=self.little_end)
-        else:
-            return FixedByteIntegerCodec(byte_length=self.bit_length // 8, little_end=self.little_end)
+        return FixedByteIntegerCodec(byte_length=self.bit_length // 8, little_end=self.little_end)
