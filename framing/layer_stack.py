@@ -10,8 +10,10 @@ from framing.raw_data import Raw, RawData
 
 class StackState:
     """Frame stack state during receive"""
-    def __init__(self, data: RawData, payload_type: Any = None, frame: Optional[Frame] = None, lower: Optional['StackState'] = None,
-                 stream_id: Optional[Any] = None):
+    def __init__(self, data: RawData, payload_type: Any = None,
+                    frame: Optional[Frame] = None,
+                    lower: Optional['StackState'] = None,
+                    stream_id: Optional[Any] = None):
         self.data = data
         self.payload_type = payload_type
         self.frame = frame
@@ -149,5 +151,3 @@ class RawStackLayer(StackLayer):
         if length > 0:
             self.frame_type = RawFrame.build_with_lengths(min_bytes=1, bytes=length)
         return super().configure(spec)
-
-

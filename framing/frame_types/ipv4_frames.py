@@ -10,6 +10,7 @@ from framing.raw_data import IPAddress
 
 
 class IPv4(Frame):
+    """IPv4 frame"""
     structure = Structure['IPv4']()
 
     Version = structure.integer(IntegerFormat(bits=4), default=4)

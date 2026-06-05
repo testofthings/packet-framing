@@ -215,6 +215,7 @@ class FrameBackend:
         raise NotImplementedError()
 
     def get_bit_offset(self, offset: FieldOffset) -> int:
+        """Get frame bit offset"""
         raise NotImplementedError()
 
     def get_bit_length(self) -> int:
