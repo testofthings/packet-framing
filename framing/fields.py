@@ -1,12 +1,12 @@
 """Field implementations"""
 
 import enum
-from typing import Iterator, Optional
+from typing import Iterator, Optional, Dict, TypeVar, Self, Type, cast, Callable, List
 
 from framing.base import *
 from framing.base import Field, FrameBackend
 from framing.codecs import IntegerCodec, IntegerFormat
-from framing.raw_data import RawData
+from framing.raw_data import RawData, Raw
 
 
 class Multiplier(Calculator):
@@ -16,9 +16,11 @@ class Multiplier(Calculator):
         self.multiplier = multiplier
 
     def pull(self, backend: FrameBackend) -> float:
+        assert self.next_step, "Multiplier must have next step"
         return self.next_step.pull(backend) * self.multiplier
 
     def push(self, backend: FrameBackend, value: float) -> float:
+        assert self.next_step, "Multiplier must have next step"
         return self.next_step.push(backend, value / self.multiplier)
 
 
@@ -29,6 +31,7 @@ class CopyToField(Calculator):
         self.field = field
 
     def push(self, backend: FrameBackend, value: float) -> float:
+        assert self.next_step, "CopyToField must have next step"
         backend.set(self.field, int(value))
         return self.next_step.push(backend, value)
 
@@ -70,6 +73,7 @@ class PaddingValue(Calculator):
         self.target_length = target_length * 8  # target_length in bytes
 
     def pull(self, backend: FrameBackend) -> float:
+        assert self.next_step, "PaddingValue must have next step"
         if backend.is_decoder:
             # No padding on decoding
             return 0
@@ -86,10 +90,11 @@ class CalculatorSource:
 class ValueOf(CalculatorSource):
     """Get value from the given field"""
     def __init__(self, field: 'FieldPointer[Any, int]'):
+        self.end: Calculator
         if isinstance(field, IntField):
-            self.end: Calculator = field
+            self.end = field
         else:
-            self.end: Calculator = ValueFromPath(field)
+            self.end = ValueFromPath(field)
 
     def calculator(self) -> Calculator:
         return self.end
@@ -127,7 +132,7 @@ class FieldPath(FieldPointer[Frame, T], CalculatorSource):
                 if (i < len(self.path) - 1) and not isinstance(v, Frame):
                     raise Exception(f"Bad field {p.field_name} in path: " + "/".join([p.field_name for p in self.path]))
             return v
-        elif frame.backend.parent:
+        if frame.backend.parent:
             return self.get(frame.backend.parent.frame)
         return None
 
@@ -144,8 +149,8 @@ class ValueFromPath(Calculator):
         raise NotImplementedError()
 
 
-FT = typing.TypeVar("FT", bound=Frame)
-V = typing.TypeVar("V")
+FT = TypeVar("FT", bound=Frame)
+V = TypeVar("V")
 
 
 class ConfigurableField(Field[F, T]):
@@ -156,10 +161,9 @@ class ConfigurableField(Field[F, T]):
     def of(self, location: FieldPointer) -> FieldPath[T]:
         if isinstance(location, FieldPath):
             return location / self
-        elif isinstance(location, Field):
+        if isinstance(location, Field):
             return FieldPath(location) / self
-        else:
-            raise Exception(f"Cannot construct path from: {location}")
+        raise Exception(f"Cannot construct path from: {location}")
 
     def length_by(self, value: CalculatorSource) -> Self:
         length_resolver = Multiplier(8, value.calculator())
@@ -355,7 +359,7 @@ class SubStructureField(ConfigurableField[F, FT]):
 
         def proc(f: Frame):
             choice = self.get(f)
-            sel = typing.cast(Selection, choice.structure)
+            sel = cast(Selection, choice.structure)
             key = sel.reverse_map.get(choice.backend.structure, 0)
             choice_resolver.push(f.backend, key)
 
