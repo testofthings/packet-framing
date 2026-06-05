@@ -72,7 +72,7 @@ class BackendImplementation(FrameBackend):
         if self.choice is None:
             field_items = self.structure.fields.items()
         else:
-            field_items = [(self.choice.field_name, self.choice)]
+            field_items = {self.choice.field_name: self.choice}.items()
         for n, f in field_items:
             try:
                 v = self.get(f)
@@ -131,7 +131,8 @@ class BackendImplementation(FrameBackend):
     def _bad_field_access(self, field: Field) -> str:
         """Create assertion text for field accessing wrong frame"""
         # NOTE: If the field is for non-built frame, we cannot give the proper error message
-        return f"{field.structure.structure_name}.{field.field_name} is not field of {self.structure_name()}"
+        struct_name = field.structure.structure_name if field.structure else "unknown"
+        return f"{struct_name}.{field.field_name} is not field of {self.structure_name()}"
 
     def __repr__(self):
         # create a copy to show, so that we do not update state (parent not copied)
@@ -184,7 +185,7 @@ class ComposingBackend(BackendImplementation):
             return None
         return RawFrame(self.factory())
 
-    def factory(self, decode: RawData = None) -> Callable[[Frame], FrameBackend]:
+    def factory(self, decode: RawData | None = None) -> Callable[[Frame], FrameBackend]:
         def f(frame: Frame):
             b = ComposingBackend(frame, self.mappings)
             b.parent = self
