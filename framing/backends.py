@@ -187,7 +187,7 @@ class ComposingBackend(BackendImplementation):
         """Get field raw data"""
         raise Exception("Getting raw data not supported with this backend")
 
-    def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type[F]] = None,
+    def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type[Frame]] = None,
                      default_frame=False) -> Optional[Frame]:
         # FIXME: Not implemented
         if not default_frame:
@@ -396,7 +396,7 @@ class DissectorBackend(BackendImplementation):
         window = self.data.tailBits(off)
         return ItemIterator(window, count)
 
-    def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type[F]] = None,
+    def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type[Frame]] = None,
                      default_frame=False) -> Optional[Frame]:
         if frame_type:
             raw_data, _ = self.get_raw(field)

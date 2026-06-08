@@ -112,9 +112,10 @@ class Field(FieldPointer[F, T]):
         v = frame.backend.get(self)
         return self.encoding_bit_length(frame.backend, v)
 
-    def as_frame(self, frame: F, frame_type: Optional[Type[F]] = None, default_frame=True) -> Optional['Frame']:
+    def as_frame(self, frame: F, frame_type: Optional[Type['Frame']] = None, default_frame=True) -> Optional['Frame']:
         """Return value as frame, use type information when available"""
-        return frame.backend.get_as_frame(self, frame_type, default_frame)
+        v: Optional[Frame] = frame.backend.get_as_frame(self, frame_type, default_frame)
+        return v
 
     def as_raw(self, frame: F) -> Optional[RawData]:
         """Get as raw, do not try to attempt to parse payload. Does not work, if payload determines the length"""
@@ -200,7 +201,7 @@ class FrameBackend:
         """Get field raw data"""
         raise NotImplementedError()
 
-    def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type[F]] = None,
+    def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type['Frame']] = None,
                      default_frame=True) -> Optional['Frame']:
         """Get field value as frame, use implicit or explicit type"""
         raise NotImplementedError()
@@ -260,7 +261,10 @@ class Frame(LengthEntity):
         return self.backend.encode()
 
     def __truediv__(self, field: Field[Self, TF]) -> TF:
-        return field.as_frame(self)
+        sub_frame = field.as_frame(self)
+        if sub_frame is None:
+            raise ValueError(f"Field '{field.field_name}' value is not a frame")
+        return typing.cast(TF, sub_frame)
 
     def __repr__(self):
         return self.backend.__repr__()
@@ -406,12 +410,16 @@ class LayerMapping:
 
     def by(self, type_field: FieldPointer[Any, T], mappings: typing.Dict[T, Type[Frame]]) -> Self:
         """Add mappings for defined payload"""
+        if self._payload is None:
+            raise ValueError("Cannot add mapping without payload field")
         mp = self._mappings[self._payload]
         mp.setdefault(type_field, {}).update(mappings)
         return self
 
     def many_by(self, fields: Dict[Field, FieldPointer[Any, T]], mappings: typing.Dict[T, Type[Frame]]) -> Self:
         """Add mappings for defined payload for many type fields"""
+        if self._payload is None:
+            raise ValueError("Cannot add mapping without payload field")
         first = True
         t_map = self._mappings.get(self._payload, {}).values()
         for pf, tf in fields.items():
