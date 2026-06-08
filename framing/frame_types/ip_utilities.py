@@ -1,4 +1,4 @@
-from typing import Any, Dict, Iterable, Set, Tuple, Optional
+from typing import Any, Dict, Iterable, Set, Tuple, Optional, Type
 
 from framing.base import Frame
 from framing.data_queue import RawDataQueue
@@ -57,6 +57,7 @@ class TCPStackLayer(StackLayer):
 
         sd = IPUtility.get_source_destination(ip)
         key = sd[0], TCP.Source_port[tcp], sd[1], TCP.Destination_port[tcp]
+        queue: TCPDataQueue | None
         if start:
             queue = TCPDataQueue(tcp)
             self.queues[key] = queue
@@ -108,7 +109,7 @@ class DNSStackLayer(StackLayer):
     def __init__(self):
         super().__init__(DNSMessage)
 
-    def get_frame_type(self, state: StackState) -> Frame:
+    def get_frame_type(self, state: StackState) -> Type[Frame]:
         if state.lower and isinstance(state.lower.frame, TCP):
             return DNSMessageTCP
         return DNSMessage

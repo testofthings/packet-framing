@@ -161,7 +161,7 @@ class ConfigurableField(Field[F, T], ABC):
         super().__init__(type_name, default_value, fixed_bit_offset)
         self.structure: Structure  # set by structure when field is added
 
-    def __truediv__(self, other: 'Field[Any, T]') -> 'FieldPath':
+    def __truediv__(self, other: 'Field[Any, Any]') -> 'FieldPath':
         return FieldPath(self) / other
 
     def of(self, location: FieldPointer) -> FieldPath[T]:
@@ -533,7 +533,7 @@ class Sequence(ConfigurableField[F, List[FT]]):
 
     def item(self, frame: F, index: int) -> FT:
         item = frame.backend.get_item(self, self.sub, index)
-        return cast(FT, item)
+        return item
 
     def set_repeat(self, frame: F, count: int) -> List[FT]:
         """Set value by repeating item given times"""

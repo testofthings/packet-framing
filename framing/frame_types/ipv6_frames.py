@@ -1,4 +1,4 @@
-from typing import Iterable, Tuple, Dict, Optional, Union
+from typing import Any, Iterable, Tuple, Dict, Optional, Type, Union
 
 from framing.base import Frame, LayerMapping
 from framing.data_queue import RawDataQueue
@@ -6,7 +6,7 @@ from framing.fields import Structure, ValueOf
 from framing.frame_types.ipv4_frames import IP_Payloads, IPv4, IPv4Flag
 from framing.frames import Frames
 from framing.layer_stack import StackLayer, StackState
-from framing.raw_data import IPAddress, RawData
+from framing.raw_data import IPAddress, Raw, RawData
 
 
 class IPv6(Frame):
@@ -80,6 +80,7 @@ class IPReassembler:
 
     def push(self, ip: IPx) -> Optional[RawData]:
         """Push IP frame, get back reassembled data, if possible"""
+        more: Any
         if isinstance(ip, IPv4):
             more = IPv4.Flags[ip] & IPv4Flag.MF
             offset = IPv4.Fragment_Offset[ip] * 8
@@ -101,10 +102,10 @@ class IPReassembler:
         if not ent:
             ent = self.queues.setdefault(key, (RawDataQueue(), 0))
         queue, t_len = ent
-        queue.push(data, offset)
+        queue.push(data or Raw.empty, offset)
         if not more:
             # we now know how much data coming
-            t_len = offset + data.byte_length()
+            t_len = offset + (data.byte_length() if data else 0)
         if t_len and queue.head.fixed.byte_length() == t_len:
             # we have all data
             del self.queues[key]
@@ -120,7 +121,7 @@ class IPStackLayer(StackLayer):
         super().__init__(IPv4)
         self.queues: Dict[Tuple[RawData, RawData, RawData], Tuple[RawDataQueue, int]] = {}
 
-    def get_frame_type(self, state: StackState) -> Frame:
+    def get_frame_type(self, state: StackState) -> Type[Frame]:
         version = state.data.octet(0) >> 4
         if version == 4:
             return IPv4
@@ -131,6 +132,7 @@ class IPStackLayer(StackLayer):
     def receive(self, state: StackState) -> Iterable[StackState]:
         frame_type = self.get_frame_type(state)
         ip = frame_type(Frames.dissect(state.data))
+        assert isinstance(ip, (IPv4, IPv6))
         pay_data = self.push(ip)
         if pay_data is None:
             return []
@@ -139,21 +141,22 @@ class IPStackLayer(StackLayer):
 
     def push(self, ip: IPx) -> Optional[Tuple[int, RawData]]:
         """Push IP frame, return payload type and reassembled data, if available"""
+        more: Any
         if isinstance(ip, IPv4):
             more = IPv4.Flags[ip] & IPv4Flag.MF
             offset = IPv4.Fragment_Offset[ip] * 8
             pay_type = IPv4.Protocol[ip]
-            data = IPv4.Payload.as_raw(ip)  # cannot always decode payload, as only fragment
+            data = IPv4.Payload.as_raw(ip) # cannot always decode payload, as only fragment
             if offset == 0 and not more:
                 # not fragmented
-                return pay_type, data
+                return pay_type, data or Raw.empty
             key = IPv4.Source_IP[ip], IPv4.Destination_IP[ip], IPv4.Identification[ip]
         else:
             pay_type = IPv6.Next_header[ip]
             if pay_type != 0x2c:
                 # not fragmented
                 data = IPv6.Payload.as_raw(ip)
-                return pay_type, data
+                return pay_type, data or Raw.empty
             # data is fragmented
             frag = IPv6.Payload.as_frame(ip, frame_type=Fragment)
             assert isinstance(frag, Fragment)
@@ -166,10 +169,10 @@ class IPStackLayer(StackLayer):
         if not ent:
             ent = self.queues.setdefault(key, (RawDataQueue(), 0))
         queue, t_len = ent
-        queue.push(data, offset)
+        queue.push(data or Raw.empty, offset)
         if not more:
             # we now know how much data coming
-            t_len = offset + data.byte_length()
+            t_len = offset + (data.byte_length() if data else 0)
         if t_len and queue.head.fixed.byte_length() == t_len:
             # we have all data
             del self.queues[key]
