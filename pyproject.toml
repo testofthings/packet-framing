@@ -59,9 +59,6 @@ disable = [
     "too-many-positional-arguments",
     "too-many-return-statements",
     # FIXME: Temporary ignores for transition
-    "missing-module-docstring",
-    "missing-class-docstring",
-    "missing-function-docstring",
     "unused-argument",
     "invalid-name",
     "arguments-renamed",

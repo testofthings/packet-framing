@@ -127,6 +127,7 @@ class BackendImplementation(FrameBackend):
         return "\n".join(r)
 
     def copy(self, parent: Optional[FrameBackend] = None) -> Self:
+        """Copy this backend"""
         raise NotImplementedError()
 
     def _bad_field_access(self, field: Field) -> str:
@@ -258,6 +259,7 @@ class DissectorBackend(BackendImplementation):
         return v
 
     def get_not_cached(self, field: Field[F, T]) -> T:
+        """Get field value without storing it to cache"""
         assert isinstance(field, ConfigurableField)
         assert field.structure == self.structure, self._bad_field_access(field)
         layer_map = self.mappings.get_mappings(field)

@@ -1,8 +1,11 @@
+"""DHCP frame definition and related types"""
+
 from framing.base import Frame
 from framing.fields import Structure
 
 
 class DHCP(Frame):
+    """DHCP packet"""
     structure = Structure['DHCP']()
 
     op = structure.integer(bits=8)

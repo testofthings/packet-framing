@@ -1,3 +1,5 @@
+"""Ethernet frame definition"""
+
 from framing.base import Frame, LayerMapping
 from framing.codecs import IntegerFormat
 from framing.fields import Structure

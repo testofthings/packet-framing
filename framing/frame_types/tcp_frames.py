@@ -1,3 +1,5 @@
+"""TCP frame definition and related types"""
+
 import enum
 from typing import Tuple
 
@@ -11,6 +13,7 @@ from framing.raw_data import Raw, RawData
 # https://www.ietf.org/rfc/rfc793.txt
 
 class TCP(Frame):
+    """TCP frame"""
     structure = Structure['TCP']()
 
     Source_port = structure.integer(IntegerFormat(bits=16))

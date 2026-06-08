@@ -1,3 +1,5 @@
+"""IPv4 frame definition and related types"""
+
 import enum
 from typing import Tuple
 
@@ -10,7 +12,7 @@ from framing.raw_data import IPAddress
 
 
 class IPv4(Frame):
-    """IPv4 frame"""
+    """IPv4 packet"""
     structure = Structure['IPv4']()
 
     Version = structure.integer(IntegerFormat(bits=4), default=4)

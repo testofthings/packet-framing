@@ -235,6 +235,7 @@ class FrameBackend:
         return self
 
     def dump(self, bit_offset=0, indent='', width=0, copy_to_avoid_update=False) -> str:
+        """Dump frame content for debugging"""
         raise NotImplementedError()
 
     def close(self) -> Self:
@@ -287,9 +288,11 @@ class FrameStructure(typing.Generic[F]):
         self.built = False
 
     def field(self, field: Field) -> Field:
+        """Add field to structure"""
         raise NotImplementedError()
 
     def commit(self, frame: F):
+        """Commit procedure, called after frame is built, used for example to set field names"""
         for cp in self.commit_procedures:
             cp[1](frame)
 
