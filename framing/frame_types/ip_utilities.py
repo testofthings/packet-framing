@@ -1,3 +1,5 @@
+"""Utility functions for IP frames and stack layers for TCP and UDP"""
+
 from typing import Any, Dict, Iterable, Set, Tuple, Optional, Type
 
 from framing.base import Frame
@@ -15,14 +17,17 @@ from framing.raw_data import RawData
 
 # Utility functions
 class IPUtility:
+    """IP utility"""
     @classmethod
     def get_source_destination(cls, ip: IPx) -> Tuple[RawData, RawData]:
+        """Get source and destination host from IP packet"""
         if isinstance(ip, IPv4):
             return IPv4.Source_IP[ip], IPv4.Destination_IP[ip]
         return IPv6.Source_address[ip], IPv6.Destination_address[ip]
 
 
 class TCPStackLayer(StackLayer):
+    """TCP stack layer, with stream reassembly"""
     def __init__(self):
         super().__init__(TCP)
         self.streaming = True
@@ -106,6 +111,7 @@ class UDPStackLayer(StackLayer):
 
 
 class DNSStackLayer(StackLayer):
+    """DNS stack layer, for both UDP and TCP transports"""
     def __init__(self):
         super().__init__(DNSMessage)
 
