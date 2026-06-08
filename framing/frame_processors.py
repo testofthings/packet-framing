@@ -37,12 +37,13 @@ class PCAP2Ethernet(Processor[PacketRecord, T]):
 
     def push(self, value: PacketRecord) -> Optional[T]:
         fr = PacketRecord.Packet_Data.as_frame(value, frame_type=EthernetII)
+        assert isinstance(fr, EthernetII)
         return self.sub.push(fr)
 
 
 class Ethernet2IP(Processor[EthernetII, T]):
     """Ethernet to IP processor"""
-    def __init__(self, sub: Optional[Processor[IPv4, T]] = None):
+    def __init__(self, sub: Optional[Processor[IPx, T]] = None):
         self.sub = NoProcessor() if sub is None else sub
 
     def push(self, value: EthernetII) -> Optional[T]:
@@ -54,7 +55,7 @@ class Ethernet2IP(Processor[EthernetII, T]):
 
 class IP2UDP(Processor[IPx, T]):
     """IP to UDP processor, with IP reassembly"""
-    def __init__(self, sub: Optional[Processor[UDP, T]] = None):
+    def __init__(self, sub: Optional[Processor[Tuple[UDP, IPx], T]] = None):
         self.sub = NoProcessor() if sub is None else sub
         self.layer = IPStackLayer()
 
@@ -63,7 +64,7 @@ class IP2UDP(Processor[IPx, T]):
             type_data = self.layer.push(value)
             if type_data is not None and type_data[0] == 0x11:
                 frame = UDP(Frames.dissect(type_data[1]))
-                return self.sub.push(frame), value
+                return self.sub.push((frame, value))
         return None
 
 class IP2TCP(Processor[IPx, T]):
@@ -77,7 +78,7 @@ class IP2TCP(Processor[IPx, T]):
             type_data = self.layer.push(value)
             if type_data is not None and type_data[0] == 0x6:
                 frame = TCP(Frames.dissect(type_data[1]))
-                return self.sub.push(frame), value
+                return self.sub.push((frame, value))
         return None
 
 

@@ -74,8 +74,10 @@ class DNSName(Sequence):
     def string(cls, frame: Frame, field: Sequence) -> str:
         """Parse DNS name field value"""
         s = []
-        msg = frame  # find DNS message
+        msg: Frame = frame  # find DNS message
         while not isinstance(msg, DNSMessage):
+            if msg.backend is None or msg.backend.parent is None:
+                return ""
             msg = msg.backend.parent.frame
         for r in field.get(frame):
             s.extend(cls.parse_string(r, msg))
