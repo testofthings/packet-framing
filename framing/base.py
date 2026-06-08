@@ -249,6 +249,7 @@ class Frame(LengthEntity):
     """Base class for frames"""
     def __init__(self, backend_factory: Callable[['Frame'], FrameBackend]):
         self.backend = backend_factory(self)
+        self.structure: FrameStructure[Any]  # set by backend when initialized
 
     def bit_length(self) -> int:
         return self.backend.get_bit_length()
