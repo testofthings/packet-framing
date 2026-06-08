@@ -4,7 +4,7 @@ import copy
 from typing import Dict, Any, Callable, Iterator, Optional, List, cast, Type, Tuple, Self
 
 from framing.base import FrameBackend, Frame, EncodingState, Field, F, T, LayerMapping, FieldOffset, FieldPointer
-from framing.fields import Sequence, FT, Structure, SubStructureField
+from framing.fields import ConfigurableField, Sequence, FT, Structure, SubStructureField
 from framing.raw_data import RawData, Raw
 
 
@@ -102,6 +102,7 @@ class BackendImplementation(FrameBackend):
                 v = v.encode()
             if isinstance(v, Frame):
                 be = v.backend
+                assert isinstance(be, BackendImplementation)
                 if copy_sub_frames:
                     be = be.copy(parent=self)
                 print_line(bit_off, f"{n} ({be.structure_name()})")
@@ -131,7 +132,9 @@ class BackendImplementation(FrameBackend):
     def _bad_field_access(self, field: Field) -> str:
         """Create assertion text for field accessing wrong frame"""
         # NOTE: If the field is for non-built frame, we cannot give the proper error message
-        struct_name = field.structure.structure_name if field.structure else "unknown"
+        assert isinstance(field, ConfigurableField)
+        structure = field.structure
+        struct_name = structure.structure_name if structure else "unknown"
         return f"{struct_name}.{field.field_name} is not field of {self.structure_name()}"
 
     def __repr__(self):
@@ -158,14 +161,16 @@ class RawFrame(Frame):
 class ComposingBackend(BackendImplementation):
     """Backend to compose a frame"""
     def get(self, field: Field[F, T]) -> T:
+        assert isinstance(field, ConfigurableField)
         v = self.field_values.get(field)
         if v is None:
             assert field.structure == self.structure, self._bad_field_access(field)
             v = field.get_default_value(self.frame)
             self.field_values[field] = v
-        return v
+        return cast(T, v)
 
     def set(self, field: Field[F, T], value: T) -> Self:
+        assert isinstance(field, ConfigurableField)
         assert field.structure == self.structure, self._bad_field_access(field)
         if self.choice:
             # update the choice
@@ -203,7 +208,7 @@ class ComposingBackend(BackendImplementation):
 
     def get_bit_offset(self, offset: FieldOffset) -> int:
         prefix = offset.prefix
-        if prefix:
+        if prefix and prefix.field:
             # get offset of the prefix
             off = self.get_bit_offset(prefix)
             # add prefix variable length to it
@@ -227,7 +232,7 @@ class ComposingBackend(BackendImplementation):
             f_list.append(f.encode(v, state))
         return Raw.sequence(f_list)
 
-    def copy(self, parent: Optional[FrameBackend] = None) -> Self:
+    def copy(self, parent: Optional[FrameBackend] = None) -> 'ComposingBackend':
         n_frame = copy.copy(self.frame)
         c = ComposingBackend(n_frame, self.mappings)
         c.parent = parent
@@ -253,11 +258,12 @@ class DissectorBackend(BackendImplementation):
         return v
 
     def get_not_cached(self, field: Field[F, T]) -> T:
+        assert isinstance(field, ConfigurableField)
         assert field.structure == self.structure, self._bad_field_access(field)
         layer_map = self.mappings.get_mappings(field)
         if not layer_map and field.direct_decode:
             v = field.decode_direct(self.data, self)  # quick (hopefully)
-            return v
+            return cast(T, v)
         data, d_len = self.get_raw(field)
         try:
             if layer_map:
@@ -267,7 +273,7 @@ class DissectorBackend(BackendImplementation):
                 v = field.decode(data, d_len, self)
         except EOFError as e:
             raise EOFError(f"{field.field_name} {e}")
-        return v
+        return cast(T, v)
 
     def get_raw(self, field: Field) -> Tuple[RawData, int]:
         bit_offset = self.get_bit_offset(field.offset)
@@ -297,10 +303,10 @@ class DissectorBackend(BackendImplementation):
     # Editing not allowed for dissected stuff
     # def set(self, field: Field[F, T], value: T) -> Self:
 
-    def get_item(self, sequence_field: Field, item_field: Field[F, FT], index: int):
+    def get_item(self, sequence_field: Field, item_field: Field[F, T], index: int) -> T:
         v = self.field_values.get(sequence_field)
         if v is not None:
-            return v[index]
+            return cast(T, v[index])
 
         bit_offset = self.get_bit_offset(sequence_field.offset)
         i = 0
@@ -315,7 +321,7 @@ class DissectorBackend(BackendImplementation):
 
     def get_bit_offset(self, offset: FieldOffset) -> int:
         prefix = offset.prefix
-        if prefix:
+        if prefix and prefix.field:
             # get offset of the prefix
             field = prefix.field
             off = self.end_offset_cache.get(field)
@@ -358,22 +364,22 @@ class DissectorBackend(BackendImplementation):
             return b
         return f
 
-    def iterate(self, sequence_field: Field, item_field: Field[F, FT],
-                count=-1, terminator: Optional[Callable[[T], bool]] = None) -> Iterator[FT]:
+    def iterate(self, sequence_field: Field, item_field: Field[F, T],
+                count=-1, terminator: Optional[Callable[[T], bool]] = None) -> Iterator[T]:
         v = self.field_values.get(sequence_field)
         if v is not None:
             return iter(v)  # already value in memory (we do not store it here)
 
         backend = self
 
-        class ItemIterator(Iterator[FT]):
+        class ItemIterator(Iterator[T]):
             def __init__(self, window: RawData, count: int):
                 self.window = window  # sliding to avoid starting from first sub-block each time
                 self.count = count
                 self.items = 0
-                self.previous = None
+                self.previous: T | None = None
 
-            def __next__(self) -> Optional[FT]:
+            def __next__(self) -> T:
                 if 0 <= count <= self.items:
                     raise StopIteration()  # hit max. count
 
@@ -385,7 +391,7 @@ class DissectorBackend(BackendImplementation):
                 if self.window.octet(0) < 0:
                     self.count = self.items
                     raise StopIteration()
-                v = item_field.decode(self.window, -1, backend)
+                v: T = item_field.decode(self.window, -1, backend)
                 self.items += 1
                 self.previous = v
                 if terminator is not None and terminator(v):
@@ -408,8 +414,10 @@ class DissectorBackend(BackendImplementation):
             return None
         if not isinstance(v, RawData):
             # need raw data for a raw frame
-            v, _ = self.get_raw(field)
-        return RawFrame(self.factory(v))
+            raw, _ = self.get_raw(field)
+        else:
+            raw = v
+        return RawFrame(self.factory(raw))
 
     def encode(self) -> RawData:
         bit_length = self.frame.bit_length()
