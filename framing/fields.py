@@ -132,25 +132,27 @@ class FieldPath(FieldPointer[Frame, T], CalculatorSource):
                 v = p.get(v)
                 if (i < len(self.path) - 1) and not isinstance(v, Frame):
                     raise Exception(f"Bad field {p.field_name} in path: " + "/".join([p.field_name for p in self.path]))
-            return v
+            return cast(T, v)
         if frame.backend.parent:
             return self.get(frame.backend.parent.frame)
-        return None
+        raise ValueError(f"Field {self.path[0].field_name} not found in frame or its parents")
 
 
 class ValueFromPath(Calculator):
-    def __init__(self, pointer: FieldPointer[Frame, int]):
+    def __init__(self, pointer: FieldPointer[Frame, Any]):
         super().__init__(None)
         self.pointer = pointer
 
     def pull(self, backend: 'FrameBackend') -> float:
-        return self.pointer.get(backend.frame)
+        value = self.pointer.get(backend.frame)
+        if not isinstance(value, (int, float)):
+            raise ValueError(f"Value from path must be int or float, got {type(value)}")
+        return value
 
     def push(self, backend: 'FrameBackend', value: float) -> float:
         raise NotImplementedError()
 
 
-FT = TypeVar("FT", bound=Frame)
 V = TypeVar("V")
 
 
@@ -200,19 +202,6 @@ class ConfigurableField(Field[F, T], ABC):
         self.structure.commit_procedures.append((self, procedure))
         return self
 
-    def pad_to(self, min_offset: int):
-        calc = FieldOffsetValue(self)
-        length_resolver = PaddingValue(min_offset, calc)
-        self.length_resolver = length_resolver
-        field = self
-
-        def procedure(frame: F):
-            pad_to = int(length_resolver.pull(frame.backend))
-            frame.backend.set(field, Raw.zeroes(bit_length=pad_to))
-
-        self.structure.commit_procedures.append((self, procedure))
-        return self
-
     def at_commit(self, procedure: Callable[[F], T]) -> Self:
         field = self
 
@@ -234,6 +223,20 @@ class RawField(ConfigurableField[F, RawData]):
             # fixed length field
             self.fixed_bit_length = min_bit_length
             self.direct_decode = self.fixed_bit_offset >= 0 and self.fixed_bit_length >= 0
+
+    def pad_to(self, min_offset: int):
+        calc = FieldOffsetValue(self)
+        length_resolver = PaddingValue(min_offset, calc)
+        self.length_resolver = length_resolver
+        field = self
+
+        def procedure(frame: F):
+            pad_to = int(length_resolver.pull(frame.backend))
+            padding = Raw.zeroes(bit_length=pad_to)
+            frame.backend.set(field, padding)
+
+        self.structure.commit_procedures.append((self, procedure))
+        return self
 
     def get(self, frame: 'Frame') -> RawData:
         v = frame.backend.get(self)
@@ -362,15 +365,19 @@ class SubStructureField(ConfigurableField[F, FT]):
 
     def choice_by(self, value: CalculatorSource) -> Self:
         """Configure the choice in field by given value"""
-        if not isinstance(self.sub_structure, Selection):
-            raise ValueError(f"Structure {self.sub_structure.structure_name} is not a selection, cannot use choice_by")
+        selection = self.sub_structure
+        if not isinstance(selection, Selection):
+            raise ValueError(f"Structure {selection.structure_name} is not a selection, cannot use choice_by")
         choice_resolver = value.calculator()
         self.choice_resolver = choice_resolver
 
         def proc(f: Frame):
             choice = self.get(f)
-            sel = cast(Selection, choice.structure)
-            key = sel.reverse_map.get(choice.backend.structure, 0)
+            choice_struct = cast(Structure[Any], choice.backend.structure)
+            key = selection.reverse_map.get(choice_struct, 0)  # value 0 assumed be the default choice key
+            if key is None:
+                raise ValueError(
+                    f"Choice {choice_struct.structure_name} not found in selection {selection.structure_name}")
             choice_resolver.push(f.backend, key)
 
         self.structure.at_commit(proc)
@@ -388,9 +395,10 @@ class SubStructureField(ConfigurableField[F, FT]):
         if v.structure.is_selection:
             # let's assume that the selection choices are the keys
             field = v.backend.choice
-            proc = procedures.get(field)
-            if proc:
-                v = field.get(v)
+            if field:
+                proc = procedures.get(field)
+                if proc:
+                    v = field.get(v)
         else:
             proc = procedures.get(type(v))
         return proc(v) if proc else None
@@ -441,8 +449,9 @@ class LVField(ConfigurableField[F, T]):
     """Field with length prefix"""
     def __init__(self, sub: Field[F, T], length=IntegerFormat()):
         super().__init__("LV", [])
-        self.sub = sub
-        self.structure = sub.structure
+        sub_field = cast(ConfigurableField[F, T], sub)
+        self.sub = sub_field
+        self.structure = sub_field.structure
         self.length_codec = length.create_codec()
         if self.length_codec.get_fixed_bit_length() < 0:
             raise Exception("Variable-length length in LV not supported, now")
@@ -485,8 +494,9 @@ class Sequence(ConfigurableField[F, List[FT]]):
     """Field of sequence of values"""
     def __init__(self, sub: Field[F, FT]):
         super().__init__("sequence", [])
+        sub_field = cast(ConfigurableField[F, FT], sub)
         self.sub = sub
-        self.structure = sub.structure
+        self.structure = sub_field.structure
         self.item_frame: Optional[Type[FT]] = None
         if isinstance(sub, SubStructureField):
             self.item_frame = sub.sub_type
@@ -522,9 +532,10 @@ class Sequence(ConfigurableField[F, List[FT]]):
         return c
 
     def item(self, frame: F, index: int) -> FT:
-        return frame.backend.get_item(self, self.sub, index)
+        item = frame.backend.get_item(self, self.sub, index)
+        return cast(FT, item)
 
-    def set_repeat(self, frame: F, count: int) -> List[F]:
+    def set_repeat(self, frame: F, count: int) -> List[FT]:
         """Set value by repeating item given times"""
         v = []
         for _ in range(0, count):
@@ -656,7 +667,7 @@ class Structure(FrameStructure[F]):
         if bits > 0:
             int_format = int_format.bits(bits)
         codec = int_format.create_codec()
-        f = IntField(codec, default, fixed_bit_offset=self.fields_fixed_bit_offset)
+        f: IntField = IntField(codec, default, fixed_bit_offset=self.fields_fixed_bit_offset)
         f.structure = self
         self.fields[fn] = f
         self._update_fixed_length(f)
@@ -664,7 +675,7 @@ class Structure(FrameStructure[F]):
 
     def sub(self, sub_frame: Type[FT], name: str = "") -> SubStructureField[F, FT]:
         fn = self._get_a_name(name)
-        f = SubStructureField(sub_frame)
+        f: SubStructureField = SubStructureField(sub_frame)
         f.structure = self
         self.fields[fn] = f
         self._update_fixed_length(f)
@@ -685,9 +696,9 @@ class Selection(Structure[F]):
     def _update_fixed_length(self, field: Field):
         self.fields_fixed_bit_offset = 0  # all choices start from offset 0
 
-    def choice(self, key, value: ConfigurableField[F, T]) -> ConfigurableField[F, T]:
-        if key in self.choice_map or value in self.reverse_map:
-            raise Exception(f"Duplicate entry for key {key}")
+    def choice(self, key: Any, value: ConfigurableField[F, T]) -> ConfigurableField[F, T]:
+        if key in self.choice_map:
+            raise Exception(f"Duplicate key {key} in {self.structure_name}")
         assert isinstance(value, ConfigurableField), "Provide a field for choice(...)"
         self.choice_map[key] = value
         self.reverse_map[value.structure] = key
