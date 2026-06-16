@@ -463,7 +463,7 @@ class LayerMapping:
     def merge(self, mapping: 'LayerMapping') -> Self:
         """Merge mappings with other mapping object"""
         for f, mm in self._mappings.items():
-            mapping._mappings.setdefault(f, {}).update(mm)
+            mapping._mappings.setdefault(f, {}).update(mm)  # pylint: disable=protected-access
         return self
 
     def __add__(self, other: 'LayerMapping') -> 'LayerMapping':
