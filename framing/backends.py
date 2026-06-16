@@ -87,7 +87,7 @@ class BackendImplementation(FrameBackend):
                         be = be.copy(parent=self)
                     print_line(bit_off, f"{n} {num + 1}/{len(v)}")
                     v_s = be.dump(bit_offset=bit_off, indent=indent + '  ', width=width,
-                                  copy_sub_frames=copy_to_avoid_update)
+                                  copy_to_avoid_update=copy_to_avoid_update)
                     r.append(v_s)
                     bit_off += be.frame.bit_length()
                 continue
