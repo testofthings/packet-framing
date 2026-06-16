@@ -135,7 +135,8 @@ class FieldPath(FieldPointer[Frame, T], CalculatorSource):
             for i, p in enumerate(self.path):
                 v = p.get(v)
                 if (i < len(self.path) - 1) and not isinstance(v, Frame):
-                    raise Exception(f"Bad field {p.field_name} in path: " + "/".join([p.field_name for p in self.path]))
+                    raise StructureError(
+                        f"Bad field {p.field_name} in path: " + "/".join([p.field_name for p in self.path]))
             return cast(T, v)
         if frame.backend.parent:
             return self.get(frame.backend.parent.frame)
@@ -176,7 +177,7 @@ class ConfigurableField(Field[F, T], ABC):
             return location / self
         if isinstance(location, Field):
             return FieldPath(location) / self
-        raise Exception(f"Cannot construct path from: {location}")
+        raise StructureError(f"Cannot construct path from: {location}")
 
     def length_by(self, value: CalculatorSource) -> Self:
         """Configure length resolver by given value"""
@@ -471,7 +472,7 @@ class LVField(ConfigurableField[F, T]):
         self.structure = sub_field.structure
         self.length_codec = length.create_codec()
         if self.length_codec.get_fixed_bit_length() < 0:
-            raise Exception("Variable-length length in LV not supported, now")
+            raise StructureError("Variable-length length in LV not supported, yet")
         self.length_resolver = LengthOfLV(self)
         sub.consumed_by = self
 
@@ -726,7 +727,7 @@ class Selection(Structure[F]):
     def choice(self, key: Any, value: ConfigurableField[F, T]) -> ConfigurableField[F, T]:
         """Add choice to this selection by providing key value and the choice field"""
         if key in self.choice_map:
-            raise Exception(f"Duplicate key {key} in {self.structure_name}")
+            raise StructureError(f"Duplicate key {key} in {self.structure_name}")
         assert isinstance(value, ConfigurableField), "Provide a field for choice(...)"
         self.choice_map[key] = value
         self.reverse_map[value.structure] = key
