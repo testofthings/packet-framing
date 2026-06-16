@@ -102,14 +102,6 @@ class Field(FieldPointer[F, T]):
         frame.backend.set(self, value)
         return frame
 
-    def _validate_length(self, bit_length: int) -> int:
-        """Validate bit length against minimum and maximum lengths, raise error if too short"""
-        if self.min_bit_length >= 0 and bit_length < self.min_bit_length:
-            raise EOFError(f"Field '{self.field_name}' too short: {bit_length} < {self.min_bit_length} bits")
-        if self.max_bit_length > 0:
-            bit_length = min(bit_length, self.max_bit_length)
-        return bit_length
-
     def get_bit_length(self, frame: F) -> int:
         """Get bit length for a value"""
         v = frame.backend.get(self)
@@ -137,6 +129,14 @@ class Field(FieldPointer[F, T]):
         return self.field_name < other.field_name
 
     # Methods for access by backend
+
+    def validate_length(self, bit_length: int) -> int:
+        """Validate bit length against minimum and maximum lengths, raise error if too short"""
+        if self.min_bit_length >= 0 and bit_length < self.min_bit_length:
+            raise EOFError(f"Field '{self.field_name}' too short: {bit_length} < {self.min_bit_length} bits")
+        if self.max_bit_length > 0:
+            bit_length = min(bit_length, self.max_bit_length)
+        return bit_length
 
     def encoding_bit_length(self, backend: 'FrameBackend', value: T) -> int:
         """Resolve encoding length for a value"""
