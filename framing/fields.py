@@ -285,7 +285,7 @@ class RawField(ConfigurableField[F, RawData]):
         bit_len = super().decode_bit_length(data, bit_offset, None, backend)
         if bit_len >= 0 and self.min_bit_length < self.max_bit_length:
             # variable length, check limits
-            bit_len = self._validate_length(bit_len)
+            bit_len = self.validate_length(bit_len)
         return bit_len
 
     def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> RawData:
@@ -301,7 +301,7 @@ class RawField(ConfigurableField[F, RawData]):
                 return data.sub_block_bits(0, self.max_bit_length)
             # less than maximum surely available, must read to find out
             data_len = data.bit_length()
-            dec_len = self._validate_length(data_len)
+            dec_len = self.validate_length(data_len)
             return data.sub_block_bits(0, dec_len)
         return data  # read it all
 
