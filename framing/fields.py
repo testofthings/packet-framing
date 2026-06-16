@@ -164,7 +164,7 @@ V = TypeVar("V")
 
 class ConfigurableField(Field[F, T], ABC):
     """Configurable field, base class for all fields"""
-    def __init__(self, type_name: str, default_value: T, fixed_bit_offset: int = -1):
+    def __init__(self, type_name: str, default_value: T | None = None, fixed_bit_offset: int = -1):
         super().__init__(type_name, default_value, fixed_bit_offset)
         self.structure: Structure[F]  # set by structure when field is added
 
@@ -367,7 +367,7 @@ class IntField(ConfigurableField[F, int], Calculator, CalculatorSource):
 class SubStructureField(ConfigurableField[F, FT]):
     """Sub-frame field"""
     def __init__(self, sub_type: Type[FT]):
-        super().__init__("sub", None)
+        super().__init__("sub")
         self.sub_type = sub_type
         self.sub_structure: FrameStructure[FT] = Structure.get_struct(sub_type)
         self.choice_resolver: Optional[Calculator] = None
@@ -466,7 +466,7 @@ class LengthOfLV(Calculator):
 class LVField(ConfigurableField[F, T]):
     """Field with length prefix"""
     def __init__(self, sub: Field[F, T], length: IntegerFormat = IntegerFormat()) -> None:
-        super().__init__("LV", [])
+        super().__init__("LV")
         sub_field = cast(ConfigurableField[F, T], sub)
         self.sub = sub_field
         self.structure = sub_field.structure
@@ -475,6 +475,9 @@ class LVField(ConfigurableField[F, T]):
             raise StructureError("Variable-length length in LV not supported, yet")
         self.length_resolver = LengthOfLV(self)
         sub.consumed_by = self
+
+    def get_default_value(self, frame: F) -> T:
+        return self.sub.get_default_value(frame)
 
     def encoding_bit_length(self, backend: FrameBackend, value: T) -> int:
         len_len: int = self.length_codec.get_fixed_bit_length()

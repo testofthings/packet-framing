@@ -68,7 +68,7 @@ AnyFieldPointer = FieldPointer[Any, Any]
 
 class Field(FieldPointer[F, T]):
     """Base class for fields"""
-    def __init__(self, type_name: str, default_value: T, fixed_bit_offset: int = -1) -> None:
+    def __init__(self, type_name: str, default_value: T | None, fixed_bit_offset: int = -1) -> None:
         self.field_name = "field?"
         self.type_name = type_name
         self.default_value = default_value
@@ -93,6 +93,7 @@ class Field(FieldPointer[F, T]):
 
     def get_default_value(self, frame: F) -> T:  # pylint: disable=unused-argument
         """Get default value for field"""
+        assert self.default_value is not None, "Without static default value, field must override get_default_value()"
         return self.default_value
 
     def __getitem__(self, frame: F) -> T:
