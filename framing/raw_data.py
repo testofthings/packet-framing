@@ -479,7 +479,12 @@ class AppendableRawData(RawData):
         return self.fixed.__repr__()
 
     def __eq__(self, other: Any) -> bool:
-        return isinstance(other, AppendableRawData) and self.fixed == other
+        match other:
+            case AppendableRawData(fixed=of):
+                return self.fixed == of
+            case RawData():
+                return self.fixed == other
+        return False
 
     def __bool__(self) -> bool:
         return (not self.closed) or self.fixed.bit_length() > 0
