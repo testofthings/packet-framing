@@ -83,7 +83,7 @@ class Field(FieldPointer[F, T]):
         v = self.get(frame)
         return v
 
-    def get_default_value(self, frame: F) -> T:
+    def get_default_value(self, frame: F) -> T:  # pylint: disable=unused-argument
         """Get default value for field"""
         return self.default_value
 
@@ -143,7 +143,8 @@ class Field(FieldPointer[F, T]):
         """Encode a value"""
         raise NotImplementedError()
 
-    def decode_bit_length(self, data: RawData, bit_offset: int, value: Optional[T], backend: 'FrameBackend') -> int:
+    def decode_bit_length(self, data: RawData, bit_offset: int, value: Optional[T],  # pylint: disable=unused-argument
+                          backend: 'FrameBackend') -> int:
         """Resolve bit length on decoding, value is provided if known"""
         if self.fixed_bit_length >= 0:
             return self.fixed_bit_length
@@ -232,8 +233,8 @@ class FrameBackend:
         return Raw.empty
 
     def add_mapping(self, mapping: 'LayerMapping') -> Self:
-        """All layer mappings"""
-        return self
+        """Add layer mappings"""
+        raise NotImplementedError()
 
     def dump(self, bit_offset: int = 0, indent: str = '', width: int = 0, copy_to_avoid_update: bool = False) -> str:
         """Dump frame content for debugging"""

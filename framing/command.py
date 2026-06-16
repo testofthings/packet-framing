@@ -3,7 +3,7 @@
 import argparse
 import pathlib
 import re
-from typing import Any, Callable, Dict, Iterable, Optional, Self, Type
+from typing import Any, Callable, Dict, Iterable, Self, Type
 import yaml
 
 from framing.base import Field, Frame
@@ -50,14 +50,12 @@ class LayerBuilder:
 
     mappings: Dict[str, 'LayerBuilder'] = {}
 
-    def build_layer(self, transport: Optional[Type[Frame]], spec: Dict[Any, Any]) -> StackLayer:
+    def build_layer(self, spec: Dict[Any, Any]) -> StackLayer:
         """Build this layer"""
         return self.new().configure(spec)
 
     def build(self, stack: FrameStack, spec: Dict[Any, Any]) -> Self:
         """Build stack layers by specification"""
-        transport = stack.layer.frame_type
-
         p_regexp = re.compile(r"^_(\d+)$")  # '_'+number for decimal protocol type
         x_regexp = re.compile(r"^_x([0-9a-fA-F]+)$") # '_x' for hexadecimal protocol type
         for k, v in spec.items():
@@ -83,7 +81,7 @@ class LayerBuilder:
                 layer_builder = self.mappings.get(proto_name)
                 if layer_builder is None:
                     raise ValueError(f'Unknown protocol "{proto_name}"')
-                layer = layer_builder.build_layer(transport, v)
+                layer = layer_builder.build_layer(v)
                 next_item = stack.next[key] = FrameStack(layer)
                 layer_builder.build(next_item, v)
             else:
@@ -97,7 +95,7 @@ class LayerBuilder:
                 if not keys:
                     raise ValueError(f'No mapping for "{k}" in "{self.short_name}"')
                 for key in keys:
-                    layer = layer_builder.build_layer(transport, v)
+                    layer = layer_builder.build_layer(v)
                     next_value = stack.next[key] = FrameStack(layer)
                     layer_builder.build(next_value, v)
 
@@ -109,9 +107,8 @@ class LayerBuilder:
 
     def build_defaults(self, stack: FrameStack) -> Self:
         """Build default sub layers"""
-        transport = stack.layer.frame_type
         for k, v in self.sub.items():
-            layer = v.build_layer(transport, {})
+            layer = v.build_layer({})
             next_item = stack.next[k] = FrameStack(layer)
             v.build_defaults(next_item)
         stack.layer.show_unmapped = True
@@ -181,12 +178,12 @@ class StackBuilder:
             layer_builder = LayerBuilder.mappings.get(k)
             if layer_builder is None:
                 raise ValueError(f'Unknown protocol "{k}"')
-            layer = layer_builder.build_layer(None, v)
+            layer = layer_builder.build_layer(v)
             stack = FrameStack(layer)
             layer_builder.build(stack, v)
             break
         else:
-            layer = cls.pcap.build_layer(None, {})
+            layer = cls.pcap.build_layer({})
             stack = FrameStack(layer)
             cls.pcap.build_defaults(stack)
         return stack

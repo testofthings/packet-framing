@@ -321,7 +321,7 @@ class IntField(ConfigurableField[F, int], Calculator, CalculatorSource):
             # fixed integer in fixed offset - fast value decode from frame data
             self.direct_decode = True
 
-    def flag_values(self, definition: Type[enum.IntFlag]) -> Self:
+    def flag_values(self, _definition: Type[enum.IntFlag]) -> Self:
         """Configure flag values for this field, for example for TCP flags"""
         return self
 
