@@ -184,7 +184,7 @@ class ConfigurableField(Field[F, T], ABC):
         self.length_resolver = length_resolver
         field = self
 
-        def procedure(frame: F):
+        def procedure(frame: F) -> None:
             v = frame.backend.get(field)
             f_len = field.encoding_bit_length(frame.backend, v)
             length_resolver.push(frame.backend, f_len)
@@ -203,7 +203,7 @@ class ConfigurableField(Field[F, T], ABC):
         self.end_offset_resolver = end_offset_resolver
         field = self
 
-        def procedure(frame: F):
+        def procedure(frame: F) -> None:
             v = frame.backend.get(field)
             f_off = frame.backend.get_bit_offset(field.offset)
             f_len = field.encoding_bit_length(frame.backend, v)
@@ -216,7 +216,7 @@ class ConfigurableField(Field[F, T], ABC):
         """Set procedure to call on commit"""
         field = self
 
-        def commit_proc(frame: F):
+        def commit_proc(frame: F) -> None:
             value = procedure(frame)
             frame.backend.set(field, value)
 
@@ -226,7 +226,8 @@ class ConfigurableField(Field[F, T], ABC):
 
 class RawField(ConfigurableField[F, RawData]):
     """Raw data field"""
-    def __init__(self, default_value: RawData, min_bit_length=-1, max_bit_length=-1, fixed_bit_offset=-1):
+    def __init__(self, default_value: RawData, min_bit_length: int = -1, max_bit_length: int = -1,
+                 fixed_bit_offset: int = -1) -> None:
         super().__init__("raw", default_value, fixed_bit_offset)
         self.max_bit_length = max_bit_length
         self.min_bit_length = min_bit_length
@@ -235,14 +236,14 @@ class RawField(ConfigurableField[F, RawData]):
             self.fixed_bit_length = min_bit_length
             self.direct_decode = self.fixed_bit_offset >= 0 and self.fixed_bit_length >= 0
 
-    def pad_to(self, min_offset: int):
+    def pad_to(self, min_offset: int) -> Self:
         """Pad field to given offset"""
         calc = FieldOffsetValue(self)
         length_resolver = PaddingValue(min_offset, calc)
         self.length_resolver = length_resolver
         field = self
 
-        def procedure(frame: F):
+        def procedure(frame: F) -> None:
             pad_to = int(length_resolver.pull(frame.backend))
             padding = Raw.zeroes(bit_length=pad_to)
             frame.backend.set(field, padding)
@@ -384,7 +385,7 @@ class SubStructureField(ConfigurableField[F, FT]):
         choice_resolver = value.calculator()
         self.choice_resolver = choice_resolver
 
-        def proc(f: Frame):
+        def proc(f: Frame) -> None:
             choice = self.get(f)
             choice_struct = cast(Structure[Any], choice.backend.structure)
             key = selection.reverse_map.get(choice_struct, 0)  # value 0 assumed be the default choice key
@@ -462,7 +463,7 @@ class LengthOfLV(Calculator):
 
 class LVField(ConfigurableField[F, T]):
     """Field with length prefix"""
-    def __init__(self, sub: Field[F, T], length=IntegerFormat()):
+    def __init__(self, sub: Field[F, T], length: IntegerFormat = IntegerFormat()) -> None:
         super().__init__("LV", [])
         sub_field = cast(ConfigurableField[F, T], sub)
         self.sub = sub_field
@@ -640,7 +641,7 @@ class Sequence(ConfigurableField[F, List[FT]]):
 class Structure(FrameStructure[F]):
     """Frame structure definition"""
 
-    def _update_fixed_length(self, field: Field):
+    def _update_fixed_length(self, field: Field) -> None:
         """Update fixed length or reset it to -1"""
         if self.fields_fixed_bit_offset < 0 or field.fixed_bit_length < 0:
             self.fields_fixed_bit_offset = -1
@@ -679,8 +680,9 @@ class Structure(FrameStructure[F]):
         self._update_fixed_length(f)
         return f
 
-    def integer(self, int_format=IntegerFormat(), bytes=-1, bits=-1,  # pylint: disable=redefined-builtin
-                default=0, name: str = "") -> IntField[F]:
+    def integer(self, int_format: IntegerFormat = IntegerFormat(),
+                bytes: int =-1, bits: int =-1,  # pylint: disable=redefined-builtin
+                default: int = 0, name: str = "") -> IntField[F]:
         """Add integer field"""
         fn = self._get_a_name(name)
         if bytes > 0:
@@ -703,20 +705,21 @@ class Structure(FrameStructure[F]):
         self._update_fixed_length(f)
         return f
 
-    def at_commit(self, update: Callable[[F], None]):
+    def at_commit(self, update: Callable[[F], None]) -> Self:
         """Set update procedure to call on commit"""
         self.commit_procedures.append((None, update))
+        return self
 
 
 class Selection(Structure[F]):
     """A frame which only the chosen field is present"""
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.is_selection = True
         self.choice_map: Dict[Any, ConfigurableField] = {}
         self.reverse_map: Dict[Structure, Any] = {}
 
-    def _update_fixed_length(self, field: Field):
+    def _update_fixed_length(self, field: Field) -> None:
         self.fields_fixed_bit_offset = 0  # all choices start from offset 0
 
     def choice(self, key: Any, value: ConfigurableField[F, T]) -> ConfigurableField[F, T]:
@@ -728,12 +731,12 @@ class Selection(Structure[F]):
         self.reverse_map[value.structure] = key
         return value
 
-    def get_field_by(self, key=None) -> Field[F, Any]:
+    def get_field_by(self, key: Any = None) -> Field[F, Any]:
         if key is not None:
             f = self.choice_map.get(key)
             if f:
                 return f
         return super().get_field_by(key)
 
-    def _resolve_offsets(self):
+    def _resolve_offsets(self) -> None:
         pass  # all zeroes ok

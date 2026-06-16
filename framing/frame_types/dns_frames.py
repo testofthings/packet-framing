@@ -28,21 +28,21 @@ class DNSHeader(Frame):
 
 class NameComponent(RawField):
     """DNS name component"""
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(Raw.empty)
 
     def decode_bit_length(self, data: RawData, bit_offset: int, value: T, backend: FrameBackend) -> int:
         fb = data.octet(bit_offset // 8)
         return 8 + fb * 8 if fb < 0xc0 else 2 * 8
 
-    def decode(self, data: RawData, bit_length, backend: FrameBackend) -> RawData:
+    def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> RawData:
         fb = data.octet(0)
         return data.subBlock(0, fb + 1) if fb < 0xc0 else data.subBlock(0, 2)
 
 
 class DNSName(Sequence):
     """Convenience field type for DNS name"""
-    def __init__(self, structure: Structure):
+    def __init__(self, structure: Structure) -> None:
         super().__init__(structure.field(NameComponent()))
         self.terminator_test(self.end_check)
 
@@ -53,7 +53,7 @@ class DNSName(Sequence):
         return not 0 < fb < 0xc0
 
     @classmethod
-    def parse_string(cls, data: RawData, message: 'DNSMessage', previous_offset=-1) -> List[str]:
+    def parse_string(cls, data: RawData, message: 'DNSMessage', previous_offset: int = -1) -> List[str]:
         """Parse DNS encoded string"""
         ba = message.backend
         fb = data.octet(0)

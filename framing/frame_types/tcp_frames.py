@@ -62,7 +62,7 @@ def flip_tcp_stream_id(stream_id: TCP_Stream_Id) -> TCP_Stream_Id:
 
 class TCPDataQueue(RawDataQueue):
     """TCP data queue, one connection to one direction"""
-    def __init__(self, start: TCP):
+    def __init__(self, start: TCP) -> None:
         super().__init__(offset=TCP.Sequence_number[start], modulus=2 ** 32)
         if TCP.Flags[start] & TCPFlag.SYN:
             self.offset += 1

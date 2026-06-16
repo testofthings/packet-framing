@@ -71,7 +71,7 @@ IPv6_Payloads = LayerMapping(base=IP_Payloads).many_by({
 
 class IPReassembler:
     """IPx reassembler"""
-    def __init__(self):
+    def __init__(self) -> None:
         self.queues: Dict[Tuple[RawData, RawData, RawData], Tuple[RawDataQueue, int]] = {}
 
     def push_frame(self, ip: IPx) -> Optional[Frame]:
@@ -122,7 +122,7 @@ class IPReassembler:
 
 class IPStackLayer(StackLayer):
     """IPx stack layer"""
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(IPv4)
         self.queues: Dict[Tuple[RawData, RawData, RawData], Tuple[RawDataQueue, int]] = {}
 
