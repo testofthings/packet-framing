@@ -6,7 +6,7 @@ import re
 from typing import Any, Callable, Dict, Iterable, Self, Type
 import yaml
 
-from framing.base import Field, Frame
+from framing.base import AnyField, Frame
 from framing.fields import RawField
 from framing.frame_types.ethernet_frames import EthernetII
 from framing.frame_types.ip_utilities import TCPStackLayer
@@ -23,7 +23,7 @@ from framing.layer_stack import FrameStack, StackLayer, RawStackLayer, StackStat
 
 class PayloadFieldStackLayer(StackLayer):
     """Generic stack layer"""
-    def __init__(self, frame_type: Type[Frame], type_field: Field, payload_field: RawField):
+    def __init__(self, frame_type: Type[Frame], type_field: AnyField, payload_field: RawField):
         super().__init__(frame_type)
         self.type_field = type_field
         self.payload_field = payload_field

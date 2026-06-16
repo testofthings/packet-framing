@@ -3,7 +3,8 @@
 import copy
 from typing import Dict, Any, Callable, Iterator, Optional, List, cast, Type, Tuple, Self
 
-from framing.base import FrameBackend, Frame, EncodingState, Field, F, T, LayerMapping, FieldOffset, FieldPointer
+from framing.base import AnyField, AnyFieldPointer, FrameBackend, Frame, EncodingState, Field, F, T, \
+    LayerMapping, FieldOffset
 from framing.fields import ConfigurableField, Sequence, Structure, SubStructureField
 from framing.raw_data import RawData, Raw
 
@@ -14,10 +15,10 @@ class BackendImplementation(FrameBackend):
         super().__init__(frame)
         self.mappings = mappings
         self.known_bit_length = -1
-        self.field_values: Dict[Field, Any] = {}
+        self.field_values: Dict[AnyField, Any] = {}
 
     @classmethod
-    def list_resolved_fields(cls, frame: Frame) -> List[Field]:
+    def list_resolved_fields(cls, frame: Frame) -> List[AnyField]:
         """List resolved fields for unit tests"""
         be = cast(BackendImplementation, frame.backend)
         return sorted(be.field_values.keys())
@@ -34,7 +35,7 @@ class BackendImplementation(FrameBackend):
         mapping.merge(self.mappings)
         return self
 
-    def decode_as_frame(self, mapping: Dict[FieldPointer, Dict[Any, Type[Frame]]], data: RawData) -> Frame:
+    def decode_as_frame(self, mapping: Dict[AnyFieldPointer, Dict[Any, Type[Frame]]], data: RawData) -> Frame:
         for f_ptr, mm in mapping.items():
             value = f_ptr.get(self.frame)
             f_type = mm.get(value)
@@ -131,7 +132,7 @@ class BackendImplementation(FrameBackend):
         """Copy this backend"""
         raise NotImplementedError()
 
-    def _bad_field_access(self, field: Field) -> str:
+    def _bad_field_access(self, field: AnyField) -> str:
         """Create assertion text for field accessing wrong frame"""
         # NOTE: If the field is for non-built frame, we cannot give the proper error message
         assert isinstance(field, ConfigurableField)
@@ -181,16 +182,16 @@ class ComposingBackend(BackendImplementation):
         self.field_values[field] = value
         return self
 
-    def get_item(self, sequence_field: Field, item_field: Field[F, T], index: int) -> Any:
+    def get_item(self, sequence_field: AnyField, item_field: Field[F, T], index: int) -> Any:
         val = self.get(sequence_field)
         return val[index]
 
-    def iterate(self, sequence_field: Field, item_field: Field[F, T],
+    def iterate(self, sequence_field: AnyField, item_field: Field[F, T],
                 count: int = -1, terminator: Optional[Callable[[T], bool]] = None) -> Iterator[T]:
         """Iterate sequence field values without storing them"""
         raise Exception("Iterating not supported with this backend")
 
-    def get_raw(self, field: Field) -> Tuple[RawData, int]:
+    def get_raw(self, field: AnyField) -> Tuple[RawData, int]:
         """Get field raw data"""
         raise Exception("Getting raw data not supported with this backend")
 
@@ -250,7 +251,7 @@ class DissectorBackend(BackendImplementation):
         super().__init__(frame, mappings)
         self.is_decoder = True
         self.data = data
-        self.end_offset_cache: Dict[Field, int] = {}
+        self.end_offset_cache: Dict[AnyField, int] = {}
 
     def get(self, field: Field[F, T]) -> T:
         v = self.field_values.get(field)
@@ -278,7 +279,7 @@ class DissectorBackend(BackendImplementation):
             raise EOFError(f"{field.field_name} {e}")
         return cast(T, v)
 
-    def get_raw(self, field: Field) -> Tuple[RawData, int]:
+    def get_raw(self, field: AnyField) -> Tuple[RawData, int]:
         bit_offset = self.get_bit_offset(field.offset)
         bit_length = field.decode_bit_length(self.data, bit_offset, None, self)
 
@@ -306,7 +307,7 @@ class DissectorBackend(BackendImplementation):
     # Editing not allowed for dissected stuff
     # def set(self, field: Field[F, T], value: T) -> Self:
 
-    def get_item(self, sequence_field: Field, item_field: Field[F, T], index: int) -> T:
+    def get_item(self, sequence_field: AnyField, item_field: Field[F, T], index: int) -> T:
         v = self.field_values.get(sequence_field)
         if v is not None:
             return cast(T, v[index])
@@ -367,7 +368,7 @@ class DissectorBackend(BackendImplementation):
             return b
         return f
 
-    def iterate(self, sequence_field: Field, item_field: Field[F, T],
+    def iterate(self, sequence_field: AnyField, item_field: Field[F, T],
                 count: int = -1, terminator: Optional[Callable[[T], bool]] = None) -> Iterator[T]:
         v = self.field_values.get(sequence_field)
         if v is not None:
