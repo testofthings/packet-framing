@@ -12,6 +12,11 @@ F = typing.TypeVar("F", bound='Frame')
 # Field value type
 T = typing.TypeVar("T")
 
+
+class StructureError(Exception):
+    """Structure manimupulation error"""
+
+
 class EncodingState:
     """Encoding state"""
 
@@ -195,7 +200,7 @@ class FrameBackend:
 
     def set(self, field: Field[F, T], value: T) -> Self:
         """Set field value"""
-        raise Exception("Editing not allowed with this backend")
+        raise StructureError("Editing not allowed with this backend")
 
     def get_item(self, sequence_field: AnyField, item_field: Field[F, T], index: int) -> T:
         """Get item from sequence field"""

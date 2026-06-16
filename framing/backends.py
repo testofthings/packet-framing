@@ -4,7 +4,7 @@ import copy
 from typing import Dict, Any, Callable, Iterator, Optional, List, cast, Type, Tuple, Self
 
 from framing.base import AnyField, AnyFieldPointer, FrameBackend, Frame, EncodingState, Field, F, T, \
-    LayerMapping, FieldOffset
+    LayerMapping, FieldOffset, StructureError
 from framing.fields import ConfigurableField, Sequence, Structure, SubStructureField
 from framing.raw_data import RawData, Raw
 
@@ -189,11 +189,11 @@ class ComposingBackend(BackendImplementation):
     def iterate(self, sequence_field: AnyField, item_field: Field[F, T],
                 count: int = -1, terminator: Optional[Callable[[T], bool]] = None) -> Iterator[T]:
         """Iterate sequence field values without storing them"""
-        raise Exception("Iterating not supported with this backend")
+        raise StructureError("Iterating not supported with this backend")
 
     def get_raw(self, field: AnyField) -> Tuple[RawData, int]:
         """Get field raw data"""
-        raise Exception("Getting raw data not supported with this backend")
+        raise StructureError("Getting raw data not supported with this backend")
 
     def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type[Frame]] = None,
                      default_frame: bool = False) -> Optional[Frame]:
@@ -276,7 +276,7 @@ class DissectorBackend(BackendImplementation):
             else:
                 v = field.decode(data, d_len, self)
         except EOFError as e:
-            raise EOFError(f"{field.field_name} {e}")
+            raise EOFError(field.field_name) from e
         return cast(T, v)
 
     def get_raw(self, field: AnyField) -> Tuple[RawData, int]:
