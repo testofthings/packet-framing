@@ -176,7 +176,7 @@ class ConfigurableField(Field[F, T], ABC):
         if isinstance(location, FieldPath):
             return location / self
         if isinstance(location, Field):
-            return FieldPath(location) / self
+            return FieldPath(location) / cast(AnyField, self)
         raise StructureError(f"Cannot construct path from: {location}")
 
     def length_by(self, value: CalculatorSource) -> Self:
@@ -452,7 +452,7 @@ class SubStructureField(ConfigurableField[F, FT]):
 
 class LengthOfLV(Calculator):
     """Get length of length-value field"""
-    def __init__(self, field: 'LVField'):
+    def __init__(self, field: 'LVField[Any, Any]'):
         super().__init__(None)
         self.field = field
 

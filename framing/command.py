@@ -23,7 +23,7 @@ from framing.layer_stack import FrameStack, StackLayer, RawStackLayer, StackStat
 
 class PayloadFieldStackLayer(StackLayer):
     """Generic stack layer"""
-    def __init__(self, frame_type: Type[Frame], type_field: AnyField, payload_field: RawField):
+    def __init__(self, frame_type: Type[Frame], type_field: AnyField, payload_field: RawField[Any]):
         super().__init__(frame_type)
         self.type_field = type_field
         self.payload_field = payload_field
