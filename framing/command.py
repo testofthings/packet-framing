@@ -22,16 +22,17 @@ from framing.layer_stack import FrameStack, StackLayer, RawStackLayer, StackStat
 
 
 class PayloadFieldStackLayer(StackLayer):
-    """Generic stack layer"""
-    def __init__(self, frame_type: Type[Frame], type_field: AnyField, payload_field: RawField[Any]):
+    """Stack layer with data in payload field"""
+    def __init__(self, frame_type: Type[Frame], type_field: AnyField, payload_field: AnyField):
         super().__init__(frame_type)
         self.type_field = type_field
         self.payload_field = payload_field
 
     def receive(self, state: StackState) -> Iterable[StackState]:
+        # TODO: This code is never tested for!
         frame = self.frame_type(Frames.dissect(state.data))
         pay_type = self.type_field[frame]
-        pay_data = self.payload_field[frame]
+        pay_data = self.payload_field.as_raw(frame) or Raw.empty
         s_state = state.add(frame, pay_type, pay_data)
         return [s_state]
 
