@@ -436,7 +436,7 @@ class LayerMapping:
         mp.setdefault(type_field, {}).update(mappings)
         return self
 
-    def many_by(self, fields: Dict[AnyField, FieldPointer[Any, T]], mappings: typing.Dict[Any, Type[Frame]]) -> Self:
+    def many_by(self, fields: Dict[AnyField, AnyFieldPointer], mappings: typing.Dict[Any, Type[Frame]]) -> Self:
         """Add mappings for defined payload for many type fields"""
         if self._payload is None:
             raise ValueError("Cannot add mapping without payload field")
