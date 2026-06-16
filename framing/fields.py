@@ -719,7 +719,7 @@ class Selection(Structure[F]):
         super().__init__()
         self.is_selection = True
         self.choice_map: Dict[Any, AnyField] = {}
-        self.reverse_map: Dict[Structure[Frame], Any] = {}
+        self.reverse_map: Dict[Structure[Any], Any] = {}
 
     def _update_fixed_length(self, field: AnyField) -> None:
         self.fields_fixed_bit_offset = 0  # all choices start from offset 0
