@@ -41,14 +41,14 @@ def test_bit():
 def test_subBlock():
     stream = io.BytesIO(b'\x01\x02\x03')
     data = StreamData(stream, "test_stream")
-    sub_block = data.subBlock(1, 2)
+    sub_block = data.sub_block(1, 2)
     assert sub_block.byte_length() == 2
     assert sub_block.bytes_available() == 2
 
 def test_tailBytes():
     stream = io.BytesIO(b'\x01\x02\x03')
     data = StreamData(stream, "test_stream")
-    tail_bytes = data.tailBytes(1)
+    tail_bytes = data.tail_bytes(1)
     assert tail_bytes.byte_length() == 2
     assert tail_bytes.bytes_available() == 2
 

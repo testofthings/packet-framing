@@ -12,6 +12,8 @@ from framing.raw_data import Raw, RawData
 
 # https://www.ietf.org/rfc/rfc793.txt
 
+# pylint: disable=invalid-name
+
 class TCP(Frame):
     """TCP frame"""
     structure = Structure['TCP']()

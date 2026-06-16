@@ -11,6 +11,8 @@ from framing.layer_stack import StackLayer, StackState
 from framing.raw_data import IPAddress, Raw, RawData
 
 
+# pylint: disable=invalid-name
+
 class IPv6(Frame):
     """IPv6 packet"""
     structure = Structure['IPv6']()

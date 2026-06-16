@@ -3,6 +3,7 @@
 from framing.base import Frame
 from framing.fields import Structure
 
+# pylint: disable=invalid-name
 
 class DHCP(Frame):
     """DHCP packet"""
