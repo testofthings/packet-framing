@@ -4,7 +4,7 @@ import ipaddress
 import mmap
 import pathlib
 from collections.abc import Buffer
-from typing import Iterable, List, BinaryIO, Union, Self
+from typing import Any, Iterable, List, BinaryIO, Union, Self
 
 # IP address, shouldn't this be defined by Python?
 IPAddress = Union[ipaddress.IPv6Address, ipaddress.IPv4Address]
@@ -77,7 +77,7 @@ class RawData(LengthEntity):
         """Get data as a HW address"""
         return ":".join([f"{self.octet(i):02x}" for i in range(0, self.byte_length())])
 
-    def as_string(self, encoding='ascii', errors='strict') -> str:
+    def as_string(self, encoding: str ='ascii', errors: str = 'strict') -> str:
         """Get data as a string"""
         return self.as_bytes(0, self.byte_length()).decode(encoding, errors=errors)
 
@@ -118,13 +118,13 @@ class RawData(LengthEntity):
             d0 = self.octet(i)
         return self.subBlock(0, i)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.dump()
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         return self.get_bit_length() != 0
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         if not isinstance(other, RawData):
             return False
         blen = self.get_bit_length()
@@ -138,7 +138,7 @@ class RawData(LengthEntity):
                 return False
         return True
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         h = self.byte_length()
         if h < 0:
             raise ValueError("Cannot calculate hash for stream")
@@ -153,13 +153,13 @@ class RawData(LengthEntity):
         """Show as hex string"""
         return "".join([f"{self.octet(i):02x}" for i in range(0, self.byte_length())])
 
-    def dump(self, center_line=False) -> str:
+    def dump(self, center_line: bool = False) -> str:
         """Print a classic data dump"""
         if self.bit_length() == 0:
             return "()"
         if self.bit_length() % 8 != 0:
             bl = self.bit_length()
-            def div(i: int):
+            def div(i: int) -> bool:
                 return i < bl - 1 and (bl - i - 1) % 4 == 0
 
             return "".join([f"{self.bit(i)}" + (" " if div(i) else "") for i in range(0, bl)])
@@ -414,8 +414,9 @@ class FileData(ByteData):
         self.file = file
         self.file_path = file_path
 
-    def close(self):
+    def close(self) -> Self:
         self.file.close()
+        return self
 
 
 class AppendableRawData(RawData):
@@ -474,25 +475,25 @@ class AppendableRawData(RawData):
         self.closed = True
         return self
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.fixed.__repr__()
 
-    def __eq__(self, other):
-        return self.fixed == other
+    def __eq__(self, other: Any) -> bool:
+        return isinstance(other, AppendableRawData) and self.fixed == other
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         return (not self.closed) or self.fixed.bit_length() > 0
 
 
 class StreamData(RawData):
     """Stream data, input stream should be in blocking mode"""
-    def __init__(self, stream: BinaryIO, name: str, request_size=65536):
+    def __init__(self, stream: BinaryIO, name: str, request_size: int = 65536) -> None:
         self.stream = stream
         self.stream_name = name
         self.buffer = AppendableRawData(Raw.empty)
         self.request_size = request_size
 
-    def _read_until(self, to_byte_length: int):
+    def _read_until(self, to_byte_length: int) -> None:
         """Read until given data length or EOF (-1 to read until EOF)"""
         while not self.buffer.closed:
             if 0 <= to_byte_length <= self.buffer.fixed.bytes_available():
@@ -533,11 +534,12 @@ class StreamData(RawData):
         self._read_until(-1)
         return self.buffer.tailBytes(byte_offset)
 
-    def close(self):
+    def close(self) -> Self:
         self.stream.close()
         self.buffer.close()
+        return self
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.stream_name} read={self.buffer.bytes_available()}\n{self.buffer}"
 
 
@@ -558,7 +560,7 @@ class Raw:
         return ByteData(b, 0, len(b))
 
     @classmethod
-    def string(cls, value: str, encoding='ascii'):
+    def string(cls, value: str, encoding: str ='ascii') -> RawData:
         """Create from string"""
         return cls.bytes(value.encode(encoding))
 
@@ -619,6 +621,6 @@ class Raw:
         return FileData(f, file_path)
 
     @classmethod
-    def stream(cls, stream: BinaryIO, name="stream", request_size=65536) -> StreamData:
+    def stream(cls, stream: BinaryIO, name: str = "stream", request_size: int =65536) -> StreamData:
         """Access stream as raw data"""
         return StreamData(stream, name, request_size)

@@ -3,7 +3,7 @@
 import argparse
 import pathlib
 import re
-from typing import Any, Callable, Dict, Iterable, Optional, Type
+from typing import Any, Callable, Dict, Iterable, Optional, Self, Type
 import yaml
 
 from framing.base import Field, Frame
@@ -35,7 +35,7 @@ class PayloadFieldStackLayer(StackLayer):
         s_state = state.add(frame, pay_type, pay_data)
         return [s_state]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.frame_type.__name__}.{self.payload_field}"
 
 
@@ -54,7 +54,7 @@ class LayerBuilder:
         """Build this layer"""
         return self.new().configure(spec)
 
-    def build(self, stack: FrameStack, spec: Dict[Any, Any]):
+    def build(self, stack: FrameStack, spec: Dict[Any, Any]) -> Self:
         """Build stack layers by specification"""
         transport = stack.layer.frame_type
 
@@ -104,9 +104,10 @@ class LayerBuilder:
         use_defaults = spec.get('defaults', True)
         if use_defaults and not stack.next:
             self.build_defaults(stack)
+        return self
 
 
-    def build_defaults(self, stack: FrameStack):
+    def build_defaults(self, stack: FrameStack) -> Self:
         """Build default sub layers"""
         transport = stack.layer.frame_type
         for k, v in self.sub.items():
@@ -114,6 +115,7 @@ class LayerBuilder:
             next_item = stack.next[k] = FrameStack(layer)
             v.build_defaults(next_item)
         stack.layer.show_unmapped = True
+        return self
 
 
     def prepare_full_spec(self, spec: Dict[Any, Any]) -> Dict[Any, Any]:
@@ -189,7 +191,7 @@ class StackBuilder:
             cls.pcap.build_defaults(stack)
         return stack
 
-def main():
+def main() -> None:
     """Entry point to the command"""
     # Create the argument parser
     parser = argparse.ArgumentParser(description='PCAP printing tool')

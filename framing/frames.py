@@ -20,7 +20,7 @@ class Frames:
         return lambda f: ComposingBackend(f, LayerMapping())
 
     @classmethod
-    def dissect(cls, data: RawData, mappings=LayerMapping()) -> Callable[['Frame'], FrameBackend]:
+    def dissect(cls, data: RawData, mappings: LayerMapping = LayerMapping()) -> Callable[['Frame'], FrameBackend]:
         """Dissect frame from data"""
         return lambda f: DissectorBackend(f, mappings, data)
 
@@ -31,7 +31,8 @@ class Frames:
         return lambda f: DissectorBackend(f, LayerMapping(), data)
 
     @classmethod
-    def dissect_pull(cls, frame_type: Type[F], queue: RawDataQueue, mappings=LayerMapping()) -> Optional[F]:
+    def dissect_pull(cls, frame_type: Type[F], queue: RawDataQueue,
+                     mappings: LayerMapping = LayerMapping()) -> Optional[F]:
         """Dissect frame from queue, if enough data. Pulls the frame data if success."""
         if not queue.head:
             return None  # no data
@@ -58,9 +59,10 @@ class Frames:
         return frame
 
     @classmethod
-    def dump(cls, frame: Frame, bit_offset=80, indent='', width=0, copy_sub_frames=False) -> str:
+    def dump(cls, frame: Frame, bit_offset: int = 80, indent: str = '', width: int = 0,
+             copy_sub_frames: bool =False) -> str:
         """Dump frame to string"""
         be = cast(BackendImplementation, frame.backend)
         if copy_sub_frames:
             be = be.copy()
-        return be.dump(bit_offset, indent, width, copy_sub_frames=copy_sub_frames)
+        return be.dump(bit_offset, indent, width, copy_to_avoid_update=copy_sub_frames)

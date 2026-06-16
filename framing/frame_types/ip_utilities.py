@@ -1,6 +1,6 @@
 """Utility functions for IP frames and stack layers for TCP and UDP"""
 
-from typing import Any, Dict, Iterable, Set, Tuple, Optional, Type
+from typing import Any, Dict, Iterable, Self, Set, Tuple, Optional, Type
 
 from framing.base import Frame
 from framing.data_queue import RawDataQueue
@@ -28,7 +28,7 @@ class IPUtility:
 
 class TCPStackLayer(StackLayer):
     """TCP stack layer, with stream reassembly"""
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(TCP)
         self.streaming = True
         self.queues: Dict[TCP_Stream_Id, TCPDataQueue] = {}
@@ -47,10 +47,11 @@ class TCPStackLayer(StackLayer):
         # With stream ID, stream can produce more data
         return [state.add(tcp, server_port, data, stream_id=key)]
 
-    def commit_read(self, stream_id: Any, byte_length: int):
+    def commit_read(self, stream_id: Any, byte_length: int) -> Self:
         queue = self.queues.get(stream_id)
         assert queue, f"Unexpected TCP stream id {stream_id}"
         queue.forward(byte_length)
+        return self
 
     def push_queue(self, packets: Optional[Tuple[TCP, IPx]]) -> Tuple[TCP_Stream_Id, Optional[RawDataQueue]]:
         """Push TCP frame, get back raw data queue"""
@@ -90,7 +91,7 @@ class TCPStackLayer(StackLayer):
 
 class UDPStackLayer(StackLayer):
     """UDP stack layer"""
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(UDP)
         self.to_server: Set[Tuple[RawData, int]] = set()  # packets towards server
 
@@ -112,7 +113,7 @@ class UDPStackLayer(StackLayer):
 
 class DNSStackLayer(StackLayer):
     """DNS stack layer, for both UDP and TCP transports"""
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(DNSMessage)
 
     def get_frame_type(self, state: StackState) -> Type[Frame]:

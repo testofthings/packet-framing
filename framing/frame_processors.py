@@ -84,7 +84,7 @@ class IP2TCP(Processor[IPx, T]):
 
 class IP2TCPStream(Processor[IPx, Tuple[TCP_Stream_Id, RawData]]):
     """TCP stream processor, push IP frames, get back TCP stream data, if possible"""
-    def __init__(self):
+    def __init__(self) -> None:
         self.layer = IPStackLayer()
         self.tcp_reassemble = TCPStackLayer()
 

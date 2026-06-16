@@ -25,7 +25,7 @@ class FieldOffset:
         self.fixed_bit_offset = 0
         self.min_tail_length = 0
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         r = []
         if self.prefix:
             r.append(f"{self.prefix}")
@@ -37,7 +37,7 @@ class FieldOffset:
 
 class Calculator:
     """Integer value calculator"""
-    def __init__(self, next_step: Optional['Calculator']):
+    def __init__(self, next_step: Optional['Calculator']) -> None:
         self.next_step = next_step
 
     def pull(self, backend: 'FrameBackend') -> float:
@@ -60,7 +60,7 @@ class FieldPointer(typing.Generic[F, T]):
 
 class Field(FieldPointer[F, T]):
     """Base class for fields"""
-    def __init__(self, type_name: str, default_value: T, fixed_bit_offset: int = -1):
+    def __init__(self, type_name: str, default_value: T, fixed_bit_offset: int = -1) -> None:
         self.field_name = "field?"
         self.type_name = type_name
         self.default_value = default_value
@@ -112,7 +112,8 @@ class Field(FieldPointer[F, T]):
         v = frame.backend.get(self)
         return self.encoding_bit_length(frame.backend, v)
 
-    def as_frame(self, frame: F, frame_type: Optional[Type['Frame']] = None, default_frame=True) -> Optional['Frame']:
+    def as_frame(self, frame: F, frame_type: Optional[Type['Frame']] = None,
+                 default_frame: bool = True) -> Optional['Frame']:
         """Return value as frame, use type information when available"""
         v: Optional[Frame] = frame.backend.get_as_frame(self, frame_type, default_frame)
         return v
@@ -126,7 +127,7 @@ class Field(FieldPointer[F, T]):
         enc = self.encode(self.get(frame), EncodingState())
         return f"{enc}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.field_name}: {self.type_name}"
 
     def __lt__(self, other: 'Field') -> bool:
@@ -193,7 +194,7 @@ class FrameBackend:
         raise NotImplementedError()
 
     def iterate(self, sequence_field: Field, item_field: Field[F, T],
-                count=-1, terminator: Optional[Callable[[T], bool]] = None) -> typing.Iterator[T]:
+                count: int = -1, terminator: Optional[Callable[[T], bool]] = None) -> typing.Iterator[T]:
         """Iterate sequence field values without storing them"""
         raise NotImplementedError()
 
@@ -202,7 +203,7 @@ class FrameBackend:
         raise NotImplementedError()
 
     def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type['Frame']] = None,
-                     default_frame=True) -> Optional['Frame']:
+                     default_frame: bool = True) -> Optional['Frame']:
         """Get field value as frame, use implicit or explicit type"""
         raise NotImplementedError()
 
@@ -234,7 +235,7 @@ class FrameBackend:
         """All layer mappings"""
         return self
 
-    def dump(self, bit_offset=0, indent='', width=0, copy_to_avoid_update=False) -> str:
+    def dump(self, bit_offset: int = 0, indent: str = '', width: int = 0, copy_to_avoid_update: bool = False) -> str:
         """Dump frame content for debugging"""
         raise NotImplementedError()
 
@@ -268,7 +269,7 @@ class Frame(LengthEntity):
             raise ValueError(f"Field '{field.field_name}' value is not a frame")
         return typing.cast(TF, sub_frame)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.backend.__repr__()
 
 
@@ -278,7 +279,7 @@ FT = typing.TypeVar("FT", bound=Frame)
 
 class FrameStructure(typing.Generic[F]):
     """Frame structure definition"""
-    def __init__(self):
+    def __init__(self) -> None:
         self.structure_name = "Unnamed"
         self.is_selection = False
         self.fields: typing.Dict[str, Field] = {}
@@ -291,10 +292,11 @@ class FrameStructure(typing.Generic[F]):
         """Add field to structure"""
         raise NotImplementedError()
 
-    def commit(self, frame: F):
+    def commit(self, frame: F) -> Self:
         """Commit procedure, called after frame is built, used for example to set field names"""
         for cp in self.commit_procedures:
             cp[1](frame)
+        return self
 
     @classmethod
     def get_struct(cls, frame_type: FT | Type[FT]) -> 'FrameStructure[FT]':
@@ -313,7 +315,7 @@ class FrameStructure(typing.Generic[F]):
         f = self.fields.get(field.field_name)
         return f == field
 
-    def get_field_by(self, key=None) -> Field[F, Any]:
+    def get_field_by(self, key: Any = None) -> Field[F, Any]:
         """The field by key or the default field, used for selections"""
         if key is not None:
             f = self.fields.get(key)
@@ -326,7 +328,7 @@ class FrameStructure(typing.Generic[F]):
         """Get name or temporary name for a field"""
         return override if override else f"__{len(self.fields)}"
 
-    def finish_building(self, frame: F):
+    def finish_building(self, frame: F) -> Self:
         """Finish building the structure"""
         # find field names
         self.structure_name = type(frame).__name__
@@ -348,8 +350,9 @@ class FrameStructure(typing.Generic[F]):
             v.field_name = nn
         self._resolve_offsets()
         self.built = True
+        return self
 
-    def _resolve_offsets(self):
+    def _resolve_offsets(self) -> None:
         """Resolve offsets"""
         prefix = None
         prefix_offset = 0

@@ -97,7 +97,7 @@ TLSRecord_Payloads = LayerMapping(TLSRecord.fragment).by(TLSRecord.ContentType, 
 
 class TLSRecordLayer(StackLayer):
     """TLS record layer"""
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(TLSRecord)
         self.queue = RawDataQueue()
 

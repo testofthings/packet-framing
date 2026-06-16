@@ -58,11 +58,6 @@ disable = [
     "too-many-lines",
     "too-many-positional-arguments",
     "too-many-return-statements",
-    # FIXME: Temporary ignores for transition
-    "unused-argument",
-    "invalid-name",
-    "arguments-renamed",
-    "broad-exception-raised",
 ]
 
 # Mypy config
@@ -70,10 +65,6 @@ disable = [
 show_error_codes    = true
 disable_error_code  = [
     "import-untyped",
-    # FIXME: Temporary ignores for transition
-    "no-untyped-def",
-    "no-untyped-call",
-    "type-arg",
 ]
 strict              = true
 follow_imports      = "silent"

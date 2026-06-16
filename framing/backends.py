@@ -4,13 +4,13 @@ import copy
 from typing import Dict, Any, Callable, Iterator, Optional, List, cast, Type, Tuple, Self
 
 from framing.base import FrameBackend, Frame, EncodingState, Field, F, T, LayerMapping, FieldOffset, FieldPointer
-from framing.fields import ConfigurableField, Sequence, FT, Structure, SubStructureField
+from framing.fields import ConfigurableField, Sequence, Structure, SubStructureField
 from framing.raw_data import RawData, Raw
 
 
 class BackendImplementation(FrameBackend):
     """Frame backend implementation"""
-    def __init__(self, frame: Frame, mappings: LayerMapping):
+    def __init__(self, frame: Frame, mappings: LayerMapping) -> None:
         super().__init__(frame)
         self.mappings = mappings
         self.known_bit_length = -1
@@ -44,10 +44,10 @@ class BackendImplementation(FrameBackend):
         # just raw frame
         return RawFrame(self.factory(data))
 
-    def dump(self, bit_offset=0, indent='', width=80, copy_sub_frames=False) -> str:
+    def dump(self, bit_offset: int = 0, indent: str = '', width: int = 80, copy_to_avoid_update: bool = False) -> str:
         r = []
 
-        def print_line(offset: int, name: str, data=""):
+        def print_line(offset: int, name: str, data: str = "") -> None:
             s = f"{offset // 8:06x} {indent} "
             s_len = width - 8 - len(indent) - len(name) - len(data)
             if s_len < 1:
@@ -57,7 +57,7 @@ class BackendImplementation(FrameBackend):
             s_len = max(0, s_len)
             r.append(s + name + " " * s_len + f"{data}")
 
-        def print_value(offset: int, value: RawData):
+        def print_value(offset: int, value: RawData) -> None:
             sv = value.dump(center_line=True).split("\n")
             i_off = offset
             for i, v in enumerate(sv):
@@ -83,11 +83,11 @@ class BackendImplementation(FrameBackend):
                 # Sequence of frames
                 for num, i in enumerate(v):
                     be = i.backend
-                    if copy_sub_frames:
+                    if copy_to_avoid_update:
                         be = be.copy(parent=self)
                     print_line(bit_off, f"{n} {num + 1}/{len(v)}")
                     v_s = be.dump(bit_offset=bit_off, indent=indent + '  ', width=width,
-                                  copy_sub_frames=copy_sub_frames)
+                                  copy_sub_frames=copy_to_avoid_update)
                     r.append(v_s)
                     bit_off += be.frame.bit_length()
                 continue
@@ -103,10 +103,11 @@ class BackendImplementation(FrameBackend):
             if isinstance(v, Frame):
                 be = v.backend
                 assert isinstance(be, BackendImplementation)
-                if copy_sub_frames:
+                if copy_to_avoid_update:
                     be = be.copy(parent=self)
                 print_line(bit_off, f"{n} ({be.structure_name()})")
-                v_s = be.dump(bit_offset=bit_off, indent=indent + '  ', width=width, copy_sub_frames=copy_sub_frames)
+                v_s = be.dump(bit_offset=bit_off, indent=indent + '  ', width=width,
+                              copy_to_avoid_update=copy_to_avoid_update)
                 r.append(v_s)
                 try:
                     bit_off += be.frame.bit_length()
@@ -138,9 +139,9 @@ class BackendImplementation(FrameBackend):
         struct_name = structure.structure_name if structure else "unknown"
         return f"{struct_name}.{field.field_name} is not field of {self.structure_name()}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         # create a copy to show, so that we do not update state (parent not copied)
-        return f"{self.structure_name()}\n{self.copy().dump(copy_sub_frames=True)}"
+        return f"{self.structure_name()}\n{self.copy().dump(copy_to_avoid_update=True)}"
 
 
 class RawFrame(Frame):
@@ -180,12 +181,12 @@ class ComposingBackend(BackendImplementation):
         self.field_values[field] = value
         return self
 
-    def get_item(self, sequence_field: Field, item_field: Field[F, T], index: int):
+    def get_item(self, sequence_field: Field, item_field: Field[F, T], index: int) -> Any:
         val = self.get(sequence_field)
         return val[index]
 
     def iterate(self, sequence_field: Field, item_field: Field[F, T],
-                count=-1, terminator: Optional[Callable[[T], bool]] = None) -> Iterator[T]:
+                count: int = -1, terminator: Optional[Callable[[T], bool]] = None) -> Iterator[T]:
         """Iterate sequence field values without storing them"""
         raise Exception("Iterating not supported with this backend")
 
@@ -194,14 +195,14 @@ class ComposingBackend(BackendImplementation):
         raise Exception("Getting raw data not supported with this backend")
 
     def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type[Frame]] = None,
-                     default_frame=False) -> Optional[Frame]:
+                     default_frame: bool = False) -> Optional[Frame]:
         # FIXME: Not implemented
         if not default_frame:
             return None
         return RawFrame(self.factory())
 
     def factory(self, decode: RawData | None = None) -> Callable[[Frame], FrameBackend]:
-        def f(frame: Frame):
+        def f(frame: Frame) -> FrameBackend:
             b = ComposingBackend(frame, self.mappings)
             b.parent = self
             return b
@@ -356,7 +357,7 @@ class DissectorBackend(BackendImplementation):
         return off
 
     def factory(self, decode: RawData | None = None) -> Callable[[Frame], FrameBackend]:
-        def f(frame: Frame):
+        def f(frame: Frame) -> FrameBackend:
             b: FrameBackend
             if decode is None:
                 b = ComposingBackend(frame, self.mappings)
@@ -367,7 +368,7 @@ class DissectorBackend(BackendImplementation):
         return f
 
     def iterate(self, sequence_field: Field, item_field: Field[F, T],
-                count=-1, terminator: Optional[Callable[[T], bool]] = None) -> Iterator[T]:
+                count: int = -1, terminator: Optional[Callable[[T], bool]] = None) -> Iterator[T]:
         v = self.field_values.get(sequence_field)
         if v is not None:
             return iter(v)  # already value in memory (we do not store it here)
@@ -375,6 +376,7 @@ class DissectorBackend(BackendImplementation):
         backend = self
 
         class ItemIterator(Iterator[T]):
+            """Sequence item iterator"""
             def __init__(self, window: RawData, count: int):
                 self.window = window  # sliding to avoid starting from first sub-block each time
                 self.count = count
@@ -405,7 +407,7 @@ class DissectorBackend(BackendImplementation):
         return ItemIterator(window, count)
 
     def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type[Frame]] = None,
-                     default_frame=False) -> Optional[Frame]:
+                     default_frame: bool = False) -> Optional[Frame]:
         if frame_type:
             raw_data, _ = self.get_raw(field)
             return frame_type(self.factory(raw_data))

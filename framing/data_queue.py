@@ -7,7 +7,7 @@ from framing.raw_data import RawData, AppendableRawData, Raw
 
 class RawDataQueue:
     """Raw data quueue with offset handling"""
-    def __init__(self, prefix: RawData | None = None, offset=0, modulus=2 ** 32):
+    def __init__(self, prefix: RawData | None = None, offset: int = 0, modulus: int = 2 ** 32) -> None:
         self.offset = offset  # bytes
         self.modulus = modulus
         self.head = AppendableRawData(prefix or Raw.empty)
@@ -50,7 +50,7 @@ class RawDataQueue:
             head_len += add_data.byte_length()
         return data
 
-    def forward(self, length) -> Self:
+    def forward(self, length: int) -> Self:
         """Forward offset from beginning of the queue"""
         assert length <= self.head.fixed.byte_length(), "Forwarding queue too fast"
         self.head = self.head.forward(length)
@@ -75,15 +75,16 @@ class RawDataQueue:
         """Pull all data from beginning of the queue"""
         return self.pull(self.available())
 
-    def close(self):
+    def close(self) -> Self:
         """Close the queue, no more data can be added"""
         self.head.closed = True
+        return self
 
     def is_closed(self) -> bool:
         """Check if the queue is closed"""
         return self.head.closed
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         r = [
             f"offset={self.offset} length={self.head.bytes_available()}",
             f"{self.head}"

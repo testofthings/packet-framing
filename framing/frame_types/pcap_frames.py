@@ -71,7 +71,7 @@ class PCAPRecordIterator(Iterator[PacketRecord]):
 
 class PCAPStackLayer(StackLayer):
     """PCAP stack layer"""
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(PCAPFile)
 
     def receive(self, state: StackState) -> Iterable[StackState]:

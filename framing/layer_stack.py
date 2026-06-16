@@ -1,6 +1,6 @@
 """Frame stack and layers"""
 
-from typing import Any, Dict, Iterable, Optional, Type, List
+from typing import Any, Dict, Iterable, Optional, Self, Type, List
 
 from framing.backends import RawFrame
 from framing.base import Frame
@@ -13,14 +13,15 @@ class StackState:
     def __init__(self, data: RawData, payload_type: Any = None,
                     frame: Optional[Frame] = None,
                     lower: Optional['StackState'] = None,
-                    stream_id: Optional[Any] = None):
+                    stream_id: Optional[Any] = None) -> None:
         self.data = data
         self.payload_type = payload_type
         self.frame = frame
         self.lower = lower
         self.stream_id = stream_id  # for streaming layers
 
-    def add(self, frame: Frame, payload_type: Any = None, data: RawData = Raw.empty, stream_id: Optional[Any] = None):
+    def add(self, frame: Frame, payload_type: Any = None, data: RawData = Raw.empty,
+            stream_id: Optional[Any] = None) -> 'StackState':
         """Add frame to the stack"""
         self.frame = frame  # update this frame
         return StackState(data, payload_type, lower=self, stream_id=stream_id)
@@ -79,8 +80,9 @@ class StackLayer:
         frame = RawFrame(Frames.dissect(state.data))
         return [state.add(frame)]
 
-    def commit_read(self, stream_id: Any, byte_length: int):
+    def commit_read(self, stream_id: Any, byte_length: int) -> Self:
         """Commit read of bytes from underlying stream"""
+        return self
 
     def configure(self, spec: Dict[Any, Any]) -> 'StackLayer':
         """Configure this layer"""
@@ -145,7 +147,7 @@ class FrameStack:
 
 class RawStackLayer(StackLayer):
     """Raw frame stack layer"""
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(RawFrame)
 
     def configure(self, spec: Dict[Any, Any]) -> StackLayer:
