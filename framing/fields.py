@@ -27,7 +27,7 @@ class Multiplier(Calculator):
 
 class CopyToField(Calculator):
     """Copy value to other field on push"""
-    def __init__(self, field: 'IntField', next_step: Calculator):
+    def __init__(self, field: 'IntField[F]', next_step: Calculator):
         super().__init__(next_step)
         self.field = field
 
@@ -39,7 +39,7 @@ class CopyToField(Calculator):
 
 class FieldOffsetValue(Calculator):
     """Get field offset value"""
-    def __init__(self, field: Field):
+    def __init__(self, field: AnyField):
         super().__init__(None)
         self.field = field
 
@@ -49,7 +49,7 @@ class FieldOffsetValue(Calculator):
 
 class FieldLengthByTerminator(Calculator):
     """Get field offset value"""
-    def __init__(self, field: Field, terminator: RawData):
+    def __init__(self, field: AnyField, terminator: RawData):
         super().__init__(None)
         self.field = field
         assert terminator.bit_length() == 8, "Only supporting 8-bit terminators"
@@ -110,7 +110,7 @@ class ValueOf(CalculatorSource):
         self.end = Multiplier(1 / value, self.end)
         return self
 
-    def copy_to(self, field: 'IntField') -> Self:
+    def copy_to(self, field: 'IntField[F]') -> Self:
         """Copy value to other field on push"""
         self.end = CopyToField(field, self.end)
         return self
@@ -118,7 +118,7 @@ class ValueOf(CalculatorSource):
 
 class FieldPath(FieldPointer[Frame, T], CalculatorSource):
     """Path to field, for example to get length"""
-    def __init__(self, start: Field):
+    def __init__(self, start: AnyField):
         self.path = [start]
 
     def __truediv__(self, other: Field[Any, T]) -> 'FieldPath[T]':
@@ -165,12 +165,12 @@ class ConfigurableField(Field[F, T], ABC):
     """Configurable field, base class for all fields"""
     def __init__(self, type_name: str, default_value: T, fixed_bit_offset: int = -1):
         super().__init__(type_name, default_value, fixed_bit_offset)
-        self.structure: Structure  # set by structure when field is added
+        self.structure: Structure[F]  # set by structure when field is added
 
-    def __truediv__(self, other: 'Field[Any, Any]') -> 'FieldPath':
+    def __truediv__(self, other: AnyField) -> 'FieldPath[AnyFieldPointer]':
         return FieldPath(self) / other
 
-    def of(self, location: FieldPointer) -> FieldPath[T]:
+    def of(self, location: AnyFieldPointer) -> FieldPath[T]:
         """Get field path to this field from given location"""
         if isinstance(location, FieldPath):
             return location / self
@@ -404,8 +404,9 @@ class SubStructureField(ConfigurableField[F, FT]):
         frame.backend.set(self, sub)
         return sub
 
-    def process_frame(self, frame: F, procedures: Dict[Type, Callable[[Any], V]]) -> Optional[V]:
-        """Process frame here differentiating by frame type"""
+    def process_frame(self, frame: F, procedures: Dict[Type[Frame] | AnyField, Callable[[Any], V]]) -> Optional[V]:
+        """Process frame here differentiating by frame type or choice field"""
+        # TODO: Refactor, now this takes the confusing procedure dict and method is not unit tested but used in Toolsaf
         v = self.get(frame)
         if v.structure.is_selection:
             # let's assume that the selection choices are the keys
@@ -641,14 +642,14 @@ class Sequence(ConfigurableField[F, List[FT]]):
 class Structure(FrameStructure[F]):
     """Frame structure definition"""
 
-    def _update_fixed_length(self, field: Field) -> None:
+    def _update_fixed_length(self, field: AnyField) -> None:
         """Update fixed length or reset it to -1"""
         if self.fields_fixed_bit_offset < 0 or field.fixed_bit_length < 0:
             self.fields_fixed_bit_offset = -1
         else:
             self.fields_fixed_bit_offset += field.fixed_bit_length
 
-    def field(self, field: Field, name: str = "") -> Field:
+    def field(self, field: AnyField, name: str = "") -> AnyField:
         assert isinstance(field, ConfigurableField), "I thought all fields are configurable"
         fn = self._get_a_name(name)
         field.structure = self
@@ -690,7 +691,7 @@ class Structure(FrameStructure[F]):
         if bits > 0:
             int_format = int_format.bits(bits)
         codec = int_format.create_codec()
-        f: IntField = IntField(codec, default, fixed_bit_offset=self.fields_fixed_bit_offset)
+        f: IntField[F] = IntField(codec, default, fixed_bit_offset=self.fields_fixed_bit_offset)
         f.structure = self
         self.fields[fn] = f
         self._update_fixed_length(f)
@@ -699,7 +700,7 @@ class Structure(FrameStructure[F]):
     def sub(self, sub_frame: Type[FT], name: str = "") -> SubStructureField[F, FT]:
         """Add sub-frame field"""
         fn = self._get_a_name(name)
-        f: SubStructureField = SubStructureField(sub_frame)
+        f: SubStructureField[F, FT] = SubStructureField(sub_frame)
         f.structure = self
         self.fields[fn] = f
         self._update_fixed_length(f)
@@ -716,10 +717,10 @@ class Selection(Structure[F]):
     def __init__(self) -> None:
         super().__init__()
         self.is_selection = True
-        self.choice_map: Dict[Any, ConfigurableField] = {}
-        self.reverse_map: Dict[Structure, Any] = {}
+        self.choice_map: Dict[Any, AnyField] = {}
+        self.reverse_map: Dict[Structure[Frame], Any] = {}
 
-    def _update_fixed_length(self, field: Field) -> None:
+    def _update_fixed_length(self, field: AnyField) -> None:
         self.fields_fixed_bit_offset = 0  # all choices start from offset 0
 
     def choice(self, key: Any, value: ConfigurableField[F, T]) -> ConfigurableField[F, T]:

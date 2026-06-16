@@ -2,7 +2,7 @@
 
 from typing import List
 
-from framing.base import Frame, T, FrameBackend
+from framing.base import F, FT, Frame, T, FrameBackend
 from framing.fields import Structure, Sequence, ValueOf, RawField, Selection
 from framing.raw_data import Raw, RawData
 
@@ -28,7 +28,7 @@ class DNSHeader(Frame):
     ARCOUNT = structure.integer(bits=16)
 
 
-class NameComponent(RawField):
+class NameComponent(RawField[Frame]):
     """DNS name component"""
     def __init__(self) -> None:
         super().__init__(Raw.empty)
@@ -42,9 +42,9 @@ class NameComponent(RawField):
         return data.sub_block(0, fb + 1) if fb < 0xc0 else data.sub_block(0, 2)
 
 
-class DNSName(Sequence):
+class DNSName(Sequence[F, FT]):
     """Convenience field type for DNS name"""
-    def __init__(self, structure: Structure) -> None:
+    def __init__(self, structure: Structure['DNSQuestion']) -> None:
         super().__init__(structure.field(NameComponent()))
         self.terminator_test(self.end_check)
 
@@ -76,7 +76,7 @@ class DNSName(Sequence):
         return r
 
     @classmethod
-    def string(cls, frame: Frame, field: Sequence) -> str:
+    def string(cls, frame: Frame, field: Sequence[F, FT]) -> str:
         """Parse DNS name field value"""
         s = []
         msg: Frame = frame  # find DNS message
