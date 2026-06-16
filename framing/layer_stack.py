@@ -71,7 +71,7 @@ class StackLayer:
         # force frame type initialization
         frame_type(Frames.compose())
 
-    def get_frame_type(self, state: StackState) -> Type[Frame]:
+    def get_frame_type(self, state: StackState) -> Type[Frame]:  # pylint: disable=unused-argument
         """Get frame type, may depend on transport layer"""
         return self.frame_type
 
@@ -80,11 +80,11 @@ class StackLayer:
         frame = RawFrame(Frames.dissect(state.data))
         return [state.add(frame)]
 
-    def commit_read(self, stream_id: Any, byte_length: int) -> Self:
+    def commit_read(self, stream_id: Any, byte_length: int) -> Self:  # pylint: disable=unused-argument
         """Commit read of bytes from underlying stream"""
         return self
 
-    def configure(self, spec: Dict[Any, Any]) -> 'StackLayer':
+    def configure(self, spec: Dict[Any, Any]) -> 'StackLayer':  # pylint: disable=unused-argument
         """Configure this layer"""
         return self
 
