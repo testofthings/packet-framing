@@ -94,7 +94,7 @@ class FrameStack:
     """Frame stack comprising layers"""
     def __init__(self, layer: StackLayer = StackLayer()):
         self.layer = layer
-        self.next: Dict[Any, StackLayer] = {}  # higher layers keyed by payload types
+        self.next: Dict[Any, FrameStack] = {}  # higher layers keyed by payload types
 
     def receive(self, state: StackState) -> Iterable[StackState]:
         """Receive data through the stack"""
@@ -109,14 +109,15 @@ class FrameStack:
         if self.layer.streaming:
             # stream data m-to-n relation between transports and payload frames
             for stack_state in layer_receive:
-                next_s: StackLayer | None = self.next.get(stack_state.payload_type)
-                if next_s is None and self.layer.show_unmapped:
+                next_s: FrameStack | None = self.next.get(stack_state.payload_type)
+                if not stack_state.data or not stack_state.frame:
+                    if self.layer.show_unmapped:
+                        yield stack_state  # show raw frames
+                    continue
+                if next_s is None:
                     yield stack_state  # show raw frames
                     continue
-                if not stack_state.data or not stack_state.frame:
-                    continue  # no data added
                 assert stack_state.stream_id, "Expected stream ID for streaming layer"
-                next_s = next_s or RawStackLayer()
                 next_receive: Iterable[StackState] = list(next_s.receive(stack_state))  # next level payloads
                 try:
                     payload_len = stack_state.frame.byte_length()  # this raises exception, if partial payload(s)
@@ -128,10 +129,9 @@ class FrameStack:
             # block transport, 1-to-n relation between transport and payload frames
             for stack_state in layer_receive:
                 next_s = self.next.get(stack_state.payload_type)
-                if next_s is None and self.layer.show_unmapped:
+                if next_s is None:
                     yield stack_state  # show raw frames
                     continue
-                next_s = next_s or RawStackLayer()
                 next_receive = next_s.receive(stack_state)
                 yield from next_receive
 
@@ -139,7 +139,7 @@ class FrameStack:
     def __repr__(self) -> str:
         s = f"{self.layer}"
         for k, v in self.next.items():
-            s += f"\n  {k}: {v.frame_type.__name__}"
+            s += f"\n  {k}: {v.layer.frame_type.__name__}"
         return s
 
 
