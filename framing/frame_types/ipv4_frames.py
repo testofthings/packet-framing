@@ -10,6 +10,7 @@ from framing.frame_types.tcp_frames import TCP
 from framing.frame_types.udp_frames import UDP
 from framing.raw_data import IPAddress
 
+# pylint: disable=invalid-name
 
 class IPv4(Frame):
     """IPv4 packet"""

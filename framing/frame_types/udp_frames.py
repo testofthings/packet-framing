@@ -6,6 +6,8 @@ from framing.fields import Structure, ValueOf
 from framing.frame_types.dns_frames import DNSMessage
 
 
+# pylint: disable=invalid-name
+
 class UDP(Frame):
     """UDP packet"""
     structure = Structure['UDP']()

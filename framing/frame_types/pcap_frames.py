@@ -13,6 +13,10 @@ from framing.raw_data import Raw
 
 # https://datatracker.ietf.org/doc/id/draft-gharris-opsawg-pcap-00.html
 
+
+# pylint: disable=invalid-name
+
+
 Int = IntegerFormat().big_endian()  # big endian integers
 
 

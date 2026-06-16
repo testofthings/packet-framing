@@ -8,6 +8,8 @@ from framing.frames import Frames
 from framing.layer_stack import StackLayer, StackState
 
 
+# pylint: disable=invalid-name
+
 class ClientHello(Frame):
     """TLS ClientHello message"""
     structure = Structure['ClientHello']()

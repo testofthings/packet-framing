@@ -290,23 +290,23 @@ class RawField(ConfigurableField[F, RawData]):
 
     def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> RawData:
         if self.fixed_bit_length >= 0:
-            return data.subBlockBits(0, self.fixed_bit_length)
+            return data.sub_block_bits(0, self.fixed_bit_length)
         if bit_length >= 0:
-            return data.subBlockBits(0, bit_length)
+            return data.sub_block_bits(0, bit_length)
         if self.min_bit_length < self.max_bit_length:
             # variable length, check find out how much to read
             avail = data.bits_available()
             if avail >= self.max_bit_length:
                 # maximum amount of data available
-                return data.subBlockBits(0, self.max_bit_length)
+                return data.sub_block_bits(0, self.max_bit_length)
             # less than maximum surely available, must read to find out
             data_len = data.bit_length()
             dec_len = self._validate_length(data_len)
-            return data.subBlockBits(0, dec_len)
+            return data.sub_block_bits(0, dec_len)
         return data  # read it all
 
     def decode_direct(self, frame_data: RawData, backend: FrameBackend) -> RawData:
-        v = frame_data.subBlockBits(self.fixed_bit_offset, self.fixed_bit_length)
+        v = frame_data.sub_block_bits(self.fixed_bit_offset, self.fixed_bit_length)
         return v
 
 
@@ -435,7 +435,7 @@ class SubStructureField(ConfigurableField[F, FT]):
         if b_len >= 0:
             return b_len
         # if self.choice_resolver: ... not trying to resolve, as we would need to create the backend for it
-        v = self.decode(data.tailBits(bit_offset), -1, backend)
+        v = self.decode(data.tail_bits(bit_offset), -1, backend)
         return v.bit_length()
 
     def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> FT:
@@ -456,7 +456,7 @@ class LengthOfLV(Calculator):
 
     def pull(self, backend: 'FrameBackend') -> float:
         bit_off = backend.get_bit_offset(self.field.offset)
-        data = backend.input_data().subBlockBits(0, bit_off)
+        data = backend.input_data().sub_block_bits(0, bit_off)
         v = self.field.length_codec.decode(data)
         return float(v)
 
@@ -487,11 +487,11 @@ class LVField(ConfigurableField[F, T]):
 
     def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> T:
         d_len = self.length_codec.decode(data) * 8
-        d_data = data.subBlockBits(self.length_codec.get_fixed_bit_length(), d_len)
+        d_data = data.sub_block_bits(self.length_codec.get_fixed_bit_length(), d_len)
         return self.sub.decode(d_data, -1, backend)
 
     def decode_bit_length(self, data: RawData, bit_offset: int, value: T | None, backend: 'FrameBackend') -> int:
-        l_data = data.tailBits(bit_offset)
+        l_data = data.tail_bits(bit_offset)
         d_len: int = self.length_codec.decode(l_data) * 8
         len_len: int = self.length_codec.get_fixed_bit_length()
         return len_len + d_len
@@ -604,7 +604,7 @@ class Sequence(ConfigurableField[F, List[FT]]):
         while True:
             if 0 <= known_count <= i:
                 break
-            b_data = data.tailBits(bit_offset + b_off)
+            b_data = data.tail_bits(bit_offset + b_off)
             if b_data.octet(0) < 0:
                 break  # no more data to read
             i_value = None if value is None else value[i]
@@ -627,7 +627,7 @@ class Sequence(ConfigurableField[F, List[FT]]):
                 break
             if previous is not None:
                 v_len = self.sub.decode_bit_length(data, 0, previous, backend)
-                data = data.tailBits(v_len)
+                data = data.tail_bits(v_len)
             if data.octet(0) < 0:
                 break  # no more data to read
             v = self.sub.decode(data, -1, backend)
