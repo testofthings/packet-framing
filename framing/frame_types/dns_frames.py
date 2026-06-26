@@ -42,10 +42,10 @@ class NameComponent(RawField[Frame]):
         return data.sub_block(0, fb + 1) if fb < 0xc0 else data.sub_block(0, 2)
 
 
-class DNSName(Sequence[F, FrameT]):
+class DNSName(Sequence[F, NameComponent]):
     """Convenience field type for DNS name"""
-    def __init__(self, structure: Structure['DNSQuestion']) -> None:
-        super().__init__(structure.field(NameComponent()))
+    def __init__(self, structure: Structure[F]) -> None:
+        super().__init__(structure.field(NameComponent()))  # creates field of type NameComponent
         self.terminator_test(self.end_check)
 
     @classmethod
@@ -76,7 +76,7 @@ class DNSName(Sequence[F, FrameT]):
         return r
 
     @classmethod
-    def string(cls, frame: Frame, field: Sequence[F, FrameT]) -> str:
+    def string(cls, frame: Frame, field: Sequence[F, RawData]) -> str:
         """Parse DNS name field value"""
         s = []
         msg: Frame = frame  # find DNS message
