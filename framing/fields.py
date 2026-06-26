@@ -503,30 +503,21 @@ class LVField(ConfigurableField[F, T]):
         return len_len + d_len
 
 
-class FrameIterator(Iterator[FrameT]):
-    """Frame iterator"""
-    def __init__(self, source: Iterator[FrameT]):
-        self.source = source
-
-    def __next__(self) -> FrameT:
-        return self.source.__next__()
-
-
-class Sequence(ConfigurableField[F, List[FrameT]]):
+class Sequence(ConfigurableField[F, List[T]]):
     """Field of sequence of values"""
-    def __init__(self, sub: Field[F, FrameT]):
+    def __init__(self, sub: Field[F, T]):
         super().__init__("sequence", [])
-        sub_field = cast(ConfigurableField[F, FrameT], sub)
+        sub_field = cast(ConfigurableField[F, T], sub)
         self.sub = sub
         self.structure = sub_field.structure
-        self.item_frame: Optional[Type[FrameT]] = None
+        self.item_frame: Optional[Type[T]] = None
         if isinstance(sub, SubStructureField):
             self.item_frame = sub.sub_type
             self.item_fixed_bit_length = -1  # Note: Structure should support this!
         else:
             self.item_fixed_bit_length = self.sub.fixed_bit_length
         self.count_resolver: Optional[Calculator] = None
-        self.terminator_call: Optional[Callable[[FrameT], bool]] = None
+        self.terminator_call: Optional[Callable[[V], bool]] = None
         sub.consumed_by = self
 
     def count_by(self, value: CalculatorSource) -> Self:
@@ -539,11 +530,11 @@ class Sequence(ConfigurableField[F, List[FrameT]]):
         self.terminator_call = test
         return self
 
-    def iterate(self, frame: F) -> FrameIterator[FrameT]:
+    def iterate(self, frame: F) -> Iterator[T]:
         """Get item by index"""
         known_count = int(self.count_resolver.pull(frame.backend)) if self.count_resolver else -1
         s = frame.backend.iterate(self, self.sub, known_count, self.terminator_call)
-        return FrameIterator(s)
+        return s
 
     def get_count(self, frame: F) -> int:
         """Get count of items in this sequence"""
@@ -551,17 +542,17 @@ class Sequence(ConfigurableField[F, List[FrameT]]):
             return int(self.count_resolver.pull(frame.backend))
         # horrible way...
         c = 0
-        it = self.iterate(frame)
+        it: Iterator[T] = self.iterate(frame)
         for _ in it:
             c += 1
         return c
 
-    def item(self, frame: F, index: int) -> FrameT:
+    def item(self, frame: F, index: int) -> T:
         """Get item by index"""
         item = frame.backend.get_item(self, self.sub, index)
         return item
 
-    def set_repeat(self, frame: F, count: int) -> List[FrameT]:
+    def set_repeat(self, frame: F, count: int) -> List[T]:
         """Set value by repeating item given times"""
         v = []
         for _ in range(0, count):
@@ -569,10 +560,10 @@ class Sequence(ConfigurableField[F, List[FrameT]]):
         frame.backend.set(self, v)
         return v
 
-    def get_default_value(self, frame: F) -> List[FrameT]:
+    def get_default_value(self, frame: F) -> List[T]:
         return []
 
-    def encoding_bit_length(self, backend: FrameBackend, value: List[FrameT]) -> int:
+    def encoding_bit_length(self, backend: FrameBackend, value: List[T]) -> int:
         if self.sub.fixed_bit_length >= 0:
             return self.sub.fixed_bit_length * len(value)
         b_len = 0
@@ -581,14 +572,14 @@ class Sequence(ConfigurableField[F, List[FrameT]]):
         # Note: terminator must be in the list
         return b_len
 
-    def encode(self, value: List[FrameT], state: EncodingState) -> RawData:
+    def encode(self, value: List[T], state: EncodingState) -> RawData:
         r = []
         for v in value:
             r.append(self.sub.encode(v, state))
         # Note: terminator must be in the list
         return Raw.sequence(r)
 
-    def decode_bit_length(self, data: RawData, bit_offset: int, value: Optional[List[FrameT]],
+    def decode_bit_length(self, data: RawData, bit_offset: int, value: Optional[List[T]],
                           backend: 'FrameBackend') -> int:
         if value is not None:
             known_count = len(value)
@@ -625,9 +616,9 @@ class Sequence(ConfigurableField[F, List[FrameT]]):
             i += 1
         return b_off
 
-    def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> List[FrameT]:
+    def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> List[T]:
         known_count = int(self.count_resolver.pull(backend)) if self.count_resolver else -1
-        items: List[FrameT] = []
+        items: List[T] = []
         previous = None
         while True:
             if 0 <= known_count <= len(items):
