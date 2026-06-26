@@ -4,11 +4,10 @@ import pathlib
 from typing import Callable, cast, Type, Dict, Any, TypeVar, Optional
 
 from framing.backends import ComposingBackend, DissectorBackend, BackendImplementation
-from framing.base import Frame, FrameBackend, LayerMapping
+from framing.base import Frame, FrameBackend, LayerMapping, F
 from framing.data_queue import RawDataQueue
 from framing.raw_data import RawData, Raw
 
-F = TypeVar("F", bound=Frame)
 V = TypeVar("V")
 
 

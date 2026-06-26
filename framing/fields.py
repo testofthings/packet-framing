@@ -4,8 +4,8 @@ from abc import ABC
 import enum
 from typing import Iterator, Optional, Dict, TypeVar, Self, Type, cast, Callable, List, Any
 
-from framing.base import *
-from framing.base import Field, FrameBackend
+from framing.base import F, T, AnyField, AnyFieldPointer, Calculator, EncodingState, Field, FieldPointer, \
+    FrameBackend, FrameStructure, FrameT, StructureError, Frame
 from framing.codecs import IntegerCodec, IntegerFormat
 from framing.raw_data import RawData, Raw
 
@@ -92,7 +92,7 @@ class CalculatorSource:
 
 class ValueOf(CalculatorSource):
     """Get value from the given field"""
-    def __init__(self, field: 'FieldPointer[Any, int]'):
+    def __init__(self, field: FieldPointer[Any, int]):
         self.end: Calculator
         if isinstance(field, IntField):
             self.end = field
@@ -168,7 +168,7 @@ class ConfigurableField(Field[F, T], ABC):
         super().__init__(type_name, default_value, fixed_bit_offset)
         self.structure: Structure[F]  # set by structure when field is added
 
-    def __truediv__(self, other: AnyField) -> 'FieldPath[AnyFieldPointer]':
+    def __truediv__(self, other: AnyField) -> FieldPath[AnyFieldPointer]:
         return FieldPath(self) / other
 
     def of(self, location: AnyFieldPointer) -> FieldPath[T]:
