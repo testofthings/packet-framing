@@ -364,15 +364,15 @@ class IntField(ConfigurableField[F, int], Calculator, CalculatorSource):
         return value
 
 
-class SubStructureField(ConfigurableField[F, FT]):
+class SubStructureField(ConfigurableField[F, FrameT]):
     """Sub-frame field"""
-    def __init__(self, sub_type: Type[FT]):
+    def __init__(self, sub_type: Type[FrameT]):
         super().__init__("sub")
         self.sub_type = sub_type
-        self.sub_structure: FrameStructure[FT] = Structure.get_struct(sub_type)
+        self.sub_structure: FrameStructure[FrameT] = Structure.get_struct(sub_type)
         self.choice_resolver: Optional[Calculator] = None
 
-    def get_choice(self, frame: F) -> FT:
+    def get_choice(self, frame: F) -> FrameT:
         v = self.get(frame)
         if v.backend.choice:
             v = v.backend.choice.get(v)
@@ -398,7 +398,7 @@ class SubStructureField(ConfigurableField[F, FT]):
         self.structure.at_commit(proc)
         return self
 
-    def select(self, frame: F, field: ConfigurableField[FT, Any]) -> FT:
+    def select(self, frame: F, field: ConfigurableField[FrameT, Any]) -> FrameT:
         """Select sub-frame type for this frame"""
         sub = self.sub_type(frame.backend.factory())
         sub.backend.choice = field
@@ -420,17 +420,18 @@ class SubStructureField(ConfigurableField[F, FT]):
             proc = procedures.get(type(v))
         return proc(v) if proc else None
 
-    def get_default_value(self, frame: F) -> FT:
+    def get_default_value(self, frame: F) -> FrameT:
         return self.sub_type(frame.backend.factory())
 
-    def encoding_bit_length(self, backend: FrameBackend, value: FT) -> int:
+    def encoding_bit_length(self, backend: FrameBackend, value: FrameT) -> int:
         return value.bit_length()
 
-    def encode(self, value: FT, state: EncodingState) -> RawData:
+    def encode(self, value: FrameT, state: EncodingState) -> RawData:
         enc = value.encode()
         return enc
 
-    def decode_bit_length(self, data: RawData, bit_offset: int, value: Optional[FT], backend: 'FrameBackend') -> int:
+    def decode_bit_length(self, data: RawData, bit_offset: int, value: Optional[FrameT],
+                          backend: 'FrameBackend') -> int:
         if value is not None:
             return value.bit_length()
         b_len = super().decode_bit_length(data, bit_offset, None, backend)
@@ -440,7 +441,7 @@ class SubStructureField(ConfigurableField[F, FT]):
         v = self.decode(data.tail_bits(bit_offset), -1, backend)
         return v.bit_length()
 
-    def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> FT:
+    def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> FrameT:
         sub_f = self.sub_type(backend.factory(decode=data))
         if self.choice_resolver:
             # make the choice
@@ -502,30 +503,30 @@ class LVField(ConfigurableField[F, T]):
         return len_len + d_len
 
 
-class FrameIterator(Iterator[FT]):
+class FrameIterator(Iterator[FrameT]):
     """Frame iterator"""
-    def __init__(self, source: Iterator[FT]):
+    def __init__(self, source: Iterator[FrameT]):
         self.source = source
 
-    def __next__(self) -> FT:
+    def __next__(self) -> FrameT:
         return self.source.__next__()
 
 
-class Sequence(ConfigurableField[F, List[FT]]):
+class Sequence(ConfigurableField[F, List[FrameT]]):
     """Field of sequence of values"""
-    def __init__(self, sub: Field[F, FT]):
+    def __init__(self, sub: Field[F, FrameT]):
         super().__init__("sequence", [])
-        sub_field = cast(ConfigurableField[F, FT], sub)
+        sub_field = cast(ConfigurableField[F, FrameT], sub)
         self.sub = sub
         self.structure = sub_field.structure
-        self.item_frame: Optional[Type[FT]] = None
+        self.item_frame: Optional[Type[FrameT]] = None
         if isinstance(sub, SubStructureField):
             self.item_frame = sub.sub_type
             self.item_fixed_bit_length = -1  # Note: Structure should support this!
         else:
             self.item_fixed_bit_length = self.sub.fixed_bit_length
         self.count_resolver: Optional[Calculator] = None
-        self.terminator_call: Optional[Callable[[FT], bool]] = None
+        self.terminator_call: Optional[Callable[[FrameT], bool]] = None
         sub.consumed_by = self
 
     def count_by(self, value: CalculatorSource) -> Self:
@@ -538,7 +539,7 @@ class Sequence(ConfigurableField[F, List[FT]]):
         self.terminator_call = test
         return self
 
-    def iterate(self, frame: F) -> FrameIterator[FT]:
+    def iterate(self, frame: F) -> FrameIterator[FrameT]:
         """Get item by index"""
         known_count = int(self.count_resolver.pull(frame.backend)) if self.count_resolver else -1
         s = frame.backend.iterate(self, self.sub, known_count, self.terminator_call)
@@ -555,12 +556,12 @@ class Sequence(ConfigurableField[F, List[FT]]):
             c += 1
         return c
 
-    def item(self, frame: F, index: int) -> FT:
+    def item(self, frame: F, index: int) -> FrameT:
         """Get item by index"""
         item = frame.backend.get_item(self, self.sub, index)
         return item
 
-    def set_repeat(self, frame: F, count: int) -> List[FT]:
+    def set_repeat(self, frame: F, count: int) -> List[FrameT]:
         """Set value by repeating item given times"""
         v = []
         for _ in range(0, count):
@@ -568,10 +569,10 @@ class Sequence(ConfigurableField[F, List[FT]]):
         frame.backend.set(self, v)
         return v
 
-    def get_default_value(self, frame: F) -> List[FT]:
+    def get_default_value(self, frame: F) -> List[FrameT]:
         return []
 
-    def encoding_bit_length(self, backend: FrameBackend, value: List[FT]) -> int:
+    def encoding_bit_length(self, backend: FrameBackend, value: List[FrameT]) -> int:
         if self.sub.fixed_bit_length >= 0:
             return self.sub.fixed_bit_length * len(value)
         b_len = 0
@@ -580,14 +581,15 @@ class Sequence(ConfigurableField[F, List[FT]]):
         # Note: terminator must be in the list
         return b_len
 
-    def encode(self, value: List[FT], state: EncodingState) -> RawData:
+    def encode(self, value: List[FrameT], state: EncodingState) -> RawData:
         r = []
         for v in value:
             r.append(self.sub.encode(v, state))
         # Note: terminator must be in the list
         return Raw.sequence(r)
 
-    def decode_bit_length(self, data: RawData, bit_offset: int, value: List[FT] | None, backend: 'FrameBackend') -> int:
+    def decode_bit_length(self, data: RawData, bit_offset: int, value: Optional[List[FrameT]],
+                          backend: 'FrameBackend') -> int:
         if value is not None:
             known_count = len(value)
         else:
@@ -623,9 +625,9 @@ class Sequence(ConfigurableField[F, List[FT]]):
             i += 1
         return b_off
 
-    def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> List[FT]:
+    def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> List[FrameT]:
         known_count = int(self.count_resolver.pull(backend)) if self.count_resolver else -1
-        items: List[FT] = []
+        items: List[FrameT] = []
         previous = None
         while True:
             if 0 <= known_count <= len(items):
@@ -701,10 +703,10 @@ class Structure(FrameStructure[F]):
         self._update_fixed_length(f)
         return f
 
-    def sub(self, sub_frame: Type[FT], name: str = "") -> SubStructureField[F, FT]:
+    def sub(self, sub_frame: Type[FrameT], name: str = "") -> SubStructureField[F, FrameT]:
         """Add sub-frame field"""
         fn = self._get_a_name(name)
-        f: SubStructureField[F, FT] = SubStructureField(sub_frame)
+        f: SubStructureField[F, FrameT] = SubStructureField(sub_frame)
         f.structure = self
         self.fields[fn] = f
         self._update_fixed_length(f)
