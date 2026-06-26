@@ -413,7 +413,7 @@ class LayerMapping:
             p_type = m.get(type_v)
             if p_type is not None:
                 return p_type
-        from framing.backends import RawFrame  # pylint: disable=import-outside-toplevel
+        from framing.backends import RawFrame  # pylint: disable=import-outside-toplevel,cyclic-import
         return RawFrame
 
     def decode_payload(self, frame: Frame, field: AnyField, data: Optional[RawData] = None) -> Frame:

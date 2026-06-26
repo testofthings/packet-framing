@@ -2,7 +2,7 @@
 
 from typing import List
 
-from framing.base import F, FrameT, Frame, T, FrameBackend
+from framing.base import F, Frame, T, FrameBackend
 from framing.fields import Structure, Sequence, ValueOf, RawField, Selection
 from framing.raw_data import Raw, RawData
 
