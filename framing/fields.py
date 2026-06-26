@@ -2,7 +2,7 @@
 
 from abc import ABC
 import enum
-from typing import Iterator, Optional, Dict, TypeVar, Self, Type, cast, Callable, List, Any
+from typing import Iterator, Optional, Dict, Self, Type, cast, Callable, List, Any
 
 from framing.base import F, T, AnyField, AnyFieldPointer, Calculator, EncodingState, Field, FieldPointer, \
     FrameBackend, FrameStructure, FrameT, StructureError, Frame
@@ -159,9 +159,6 @@ class ValueFromPath(Calculator):
         raise NotImplementedError()
 
 
-V = TypeVar("V")
-
-
 class ConfigurableField(Field[F, T], ABC):
     """Configurable field, base class for all fields"""
     def __init__(self, type_name: str, default_value: T | None = None, fixed_bit_offset: int = -1):
@@ -262,7 +259,7 @@ class RawField(ConfigurableField[F, RawData]):
     def __getitem__(self, frame: F) -> RawData:
         return self.get(frame)
 
-    def process_frame(self, frame: F, procedures: Dict[Type[Frame], Callable[[Any], V]]) -> Optional[V]:
+    def process_frame(self, frame: F, procedures: Dict[Type[Frame], Callable[[Any], T]]) -> Optional[T]:
         """Process frame here differentiating by frame type"""
         v = self.as_frame(frame, default_frame=False)
         proc = procedures.get(type(v)) if v else None
@@ -405,7 +402,7 @@ class SubStructureField(ConfigurableField[F, FrameT]):
         frame.backend.set(self, sub)
         return sub
 
-    def process_frame(self, frame: F, procedures: Dict[Type[Frame] | AnyField, Callable[[Any], V]]) -> Optional[V]:
+    def process_frame(self, frame: F, procedures: Dict[Type[Frame] | AnyField, Callable[[Any], T]]) -> Optional[T]:
         """Process frame here differentiating by frame type or choice field"""
         # TODO: Refactor, now this takes the confusing procedure dict and method is not unit tested but used in Toolsaf
         v = self.get(frame)
@@ -517,7 +514,7 @@ class Sequence(ConfigurableField[F, List[T]]):
         else:
             self.item_fixed_bit_length = self.sub.fixed_bit_length
         self.count_resolver: Optional[Calculator] = None
-        self.terminator_call: Optional[Callable[[V], bool]] = None
+        self.terminator_call: Optional[Callable[[T], bool]] = None
         sub.consumed_by = self
 
     def count_by(self, value: CalculatorSource) -> Self:

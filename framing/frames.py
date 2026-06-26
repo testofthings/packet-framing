@@ -1,15 +1,12 @@
 """Frame utilities for processing and composing frames"""
 
 import pathlib
-from typing import Callable, cast, Type, Dict, Any, TypeVar, Optional
+from typing import Callable, cast, Type, Dict, Any, Optional
 
 from framing.backends import ComposingBackend, DissectorBackend, BackendImplementation
-from framing.base import Frame, FrameBackend, LayerMapping, F
+from framing.base import Frame, FrameBackend, LayerMapping, F, T
 from framing.data_queue import RawDataQueue
 from framing.raw_data import RawData, Raw
-
-V = TypeVar("V")
-
 
 class Frames:
     """Frame processing utilities"""
@@ -44,7 +41,7 @@ class Frames:
             return None
 
     @classmethod
-    def process(cls, frame: F, procedures: Dict[Type[Frame], Callable[[Any], V]]) -> Optional[V]:
+    def process(cls, frame: F, procedures: Dict[Type[Frame], Callable[[Any], T]]) -> Optional[T]:
         """Process frame here differentiating by frame type"""
         proc = procedures.get(type(frame))
         if not proc:
