@@ -7,7 +7,6 @@ from typing import Any, Callable, Dict, Iterable, Self, Type
 import yaml
 
 from framing.base import AnyField, Frame
-from framing.fields import RawField
 from framing.frame_types.ethernet_frames import EthernetII
 from framing.frame_types.ip_utilities import TCPStackLayer
 from framing.frame_types.ip_utilities import DNSStackLayer
