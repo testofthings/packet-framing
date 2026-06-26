@@ -12,6 +12,9 @@ F = typing.TypeVar("F", bound='Frame')
 # Field value type
 T = typing.TypeVar("T")
 
+# Field frame value type
+FrameT = typing.TypeVar("FrameT", bound='Frame')
+
 
 class StructureError(Exception):
     """Structure manimupulation error"""
@@ -258,9 +261,6 @@ class FrameBackend:
         return self
 
 
-TF = typing.TypeVar("TF", bound='Frame')
-
-
 class Frame(LengthEntity):
     """Base class for frames"""
     def __init__(self, backend_factory: Callable[['Frame'], FrameBackend]):
@@ -277,18 +277,14 @@ class Frame(LengthEntity):
         """Encode the frame into bytes"""
         return self.backend.encode()
 
-    def __truediv__(self, field: Field[Self, TF]) -> TF:
+    def __truediv__(self, field: Field[Self, F]) -> F:
         sub_frame = field.as_frame(self)
         if sub_frame is None:
             raise ValueError(f"Field '{field.field_name}' value is not a frame")
-        return typing.cast(TF, sub_frame)
+        return typing.cast(F, sub_frame)
 
     def __repr__(self) -> str:
         return self.backend.__repr__()
-
-
-# Frame type not used in class signature
-FT = typing.TypeVar("FT", bound=Frame)
 
 
 class FrameStructure(typing.Generic[F]):
@@ -313,7 +309,7 @@ class FrameStructure(typing.Generic[F]):
         return self
 
     @classmethod
-    def get_struct(cls, frame_type: FT | Type[FT]) -> 'FrameStructure[FT]':
+    def get_struct(cls, frame_type: FrameT | Type[FrameT]) -> 'FrameStructure[FrameT]':
         """"Get structure for a frame or frame type"""
         struct: Optional[FrameStructure[Any]] = None
         if hasattr(frame_type, "structure_"):
