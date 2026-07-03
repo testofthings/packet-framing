@@ -1,10 +1,15 @@
+"""UDP frame definitions"""
+
 from framing.base import Frame, LayerMapping
 from framing.codecs import IntegerFormat
 from framing.fields import Structure, ValueOf
 from framing.frame_types.dns_frames import DNSMessage
 
 
+# pylint: disable=invalid-name
+
 class UDP(Frame):
+    """UDP packet"""
     structure = Structure['UDP']()
 
     Source_port = structure.integer(IntegerFormat(bits=16))

@@ -1,3 +1,5 @@
+"""PCAP frame definitions and related types"""
+
 import pathlib
 from typing import Iterable, Optional, Iterator
 
@@ -11,10 +13,15 @@ from framing.raw_data import Raw
 
 # https://datatracker.ietf.org/doc/id/draft-gharris-opsawg-pcap-00.html
 
+
+# pylint: disable=invalid-name
+
+
 Int = IntegerFormat().big_endian()  # big endian integers
 
 
 class FileHeader(Frame):
+    """PCAP file header"""
     structure = Structure['FileHeader']()
 
     Magic_Number = structure.raw(bytes=4, default=Raw.hex("D4C3B2A1"))
@@ -27,6 +34,7 @@ class FileHeader(Frame):
 
 
 class PacketRecord(Frame):
+    """PCAP packet record"""
     structure = Structure['PacketRecord']()
 
     Timestamp = structure.integer(Int.bytes(4))
@@ -37,6 +45,7 @@ class PacketRecord(Frame):
 
 
 class PCAPFile(Frame):
+    """PCAP file"""
     structure = Structure['PCAPFile']()
 
     File_Header = structure.sub(FileHeader)
@@ -44,6 +53,7 @@ class PCAPFile(Frame):
 
     @classmethod
     def open_file(cls, file: pathlib.Path, mappings: Optional[LayerMapping]) -> 'PCAPFile':
+        """Open and dissect a PCAP file"""
         f = PCAPFile(Frames.dissect_file(file))
         return mappings.add_to(f) if mappings else f
 
@@ -65,7 +75,7 @@ class PCAPRecordIterator(Iterator[PacketRecord]):
 
 class PCAPStackLayer(StackLayer):
     """PCAP stack layer"""
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(PCAPFile)
 
     def receive(self, state: StackState) -> Iterable[StackState]:
@@ -73,7 +83,7 @@ class PCAPStackLayer(StackLayer):
         hdr = PCAPFile.File_Header[file]
         pay_type = FileHeader.LinkType[hdr]
         state = state.add(file)
-        for i, rec in enumerate(PCAPRecordIterator(file)):
+        for rec in PCAPRecordIterator(file):
             pay_data = PacketRecord.Packet_Data[rec]
             n_state = state.add(rec, pay_type, pay_data)
             yield n_state

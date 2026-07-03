@@ -1,16 +1,12 @@
 """Frame utilities for processing and composing frames"""
 
 import pathlib
-from typing import Callable, cast, Type, Dict, Any, TypeVar, Optional
+from typing import Callable, cast, Type, Dict, Any, Optional
 
-from framing.backends import ComposingBackend, FrameBackend, DissectorBackend, BackendImplementation
-from framing.base import Frame, LayerMapping, F
+from framing.backends import ComposingBackend, DissectorBackend, BackendImplementation
+from framing.base import Frame, FrameBackend, LayerMapping, F, T
 from framing.data_queue import RawDataQueue
 from framing.raw_data import RawData, Raw
-
-F = TypeVar("F", bound=Frame)
-V = TypeVar("V")
-
 
 class Frames:
     """Frame processing utilities"""
@@ -20,8 +16,10 @@ class Frames:
         return lambda f: ComposingBackend(f, LayerMapping())
 
     @classmethod
-    def dissect(cls, data: RawData, mappings=LayerMapping()) -> Callable[['Frame'], FrameBackend]:
+    def dissect(cls, data: RawData, mappings: LayerMapping | None = None) -> Callable[['Frame'], FrameBackend]:
         """Dissect frame from data"""
+        if mappings is None:
+            mappings = LayerMapping()
         return lambda f: DissectorBackend(f, mappings, data)
 
     @classmethod
@@ -31,10 +29,13 @@ class Frames:
         return lambda f: DissectorBackend(f, LayerMapping(), data)
 
     @classmethod
-    def dissect_pull(cls, frame_type: Type[F], queue: RawDataQueue, mappings=LayerMapping()) -> Optional[F]:
+    def dissect_pull(cls, frame_type: Type[F], queue: RawDataQueue,
+                     mappings: LayerMapping | None = None) -> Optional[F]:
         """Dissect frame from queue, if enough data. Pulls the frame data if success."""
         if not queue.head:
             return None  # no data
+        if mappings is None:
+            mappings = LayerMapping()
         try:
             f = frame_type(cls.dissect(queue.head.fixed, mappings=mappings))
             length = f.byte_length()
@@ -44,7 +45,7 @@ class Frames:
             return None
 
     @classmethod
-    def process(cls, frame: F, procedures: Dict[Type[Frame], Callable[[Any], V]]) -> Optional[V]:
+    def process(cls, frame: F, procedures: Dict[Type[Frame], Callable[[Any], T]]) -> Optional[T]:
         """Process frame here differentiating by frame type"""
         proc = procedures.get(type(frame))
         if not proc:
@@ -58,9 +59,10 @@ class Frames:
         return frame
 
     @classmethod
-    def dump(cls, frame: Frame, bit_offset=80, indent='', width=0, copy_sub_frames=False) -> str:
+    def dump(cls, frame: Frame, bit_offset: int = 80, indent: str = '', width: int = 0,
+             copy_sub_frames: bool =False) -> str:
         """Dump frame to string"""
         be = cast(BackendImplementation, frame.backend)
         if copy_sub_frames:
             be = be.copy()
-        return be.dump(bit_offset, indent, width, copy_sub_frames=copy_sub_frames)
+        return be.dump(bit_offset, indent, width, copy_to_avoid_update=copy_sub_frames)

@@ -1,6 +1,6 @@
 """Frame stack and layers"""
 
-from typing import Any, Dict, Iterable, Optional, Tuple, Type
+from typing import Any, Dict, Iterable, Optional, Self, Type, List
 
 from framing.backends import RawFrame
 from framing.base import Frame
@@ -13,32 +13,36 @@ class StackState:
     def __init__(self, data: RawData, payload_type: Any = None,
                     frame: Optional[Frame] = None,
                     lower: Optional['StackState'] = None,
-                    stream_id: Optional[Any] = None):
+                    stream_id: Optional[Any] = None) -> None:
         self.data = data
         self.payload_type = payload_type
         self.frame = frame
         self.lower = lower
         self.stream_id = stream_id  # for streaming layers
 
-    def add(self, frame: Frame, payload_type: Any = None, data: RawData = Raw.empty, stream_id: Optional[Any] = None):
+    def add(self, frame: Frame, payload_type: Any = None, data: RawData = Raw.empty,
+            stream_id: Optional[Any] = None) -> 'StackState':
         """Add frame to the stack"""
         self.frame = frame  # update this frame
         return StackState(data, payload_type, lower=self, stream_id=stream_id)
 
     def get_frame(self) -> Frame:
         """Get the top frame, look for it"""
-        return self.frame or (self.lower.get_frame() if self.lower else None)
+        frame = self.frame or (self.lower.get_frame() if self.lower else None)
+        if frame is None:
+            raise ValueError("No frame found in stack state")
+        return frame
 
     def get_layer_names(self) -> str:
         """Get the string of layers names"""
-        ls = []
-        s = self
+        ls: List[str] = []
+        s: StackState | None = self
         while s:
             lower = s.lower
             if s.frame:
                 fs = s.frame.structure.structure_name
                 p = s.payload_type
-                if isinstance(p, Tuple) and len(p) == 4:
+                if isinstance(p, tuple) and len(p) == 4:
                     # Assuming source address+port and destination address+port
                     ks = f"{p[0].as_ip_address()}.{p[1]}, {p[2].as_ip_address()}.{p[3]}"
                     fs = f"{ks}={fs}"
@@ -67,7 +71,7 @@ class StackLayer:
         # force frame type initialization
         frame_type(Frames.compose())
 
-    def get_frame_type(self, state: StackState) -> Frame:
+    def get_frame_type(self, state: StackState) -> Type[Frame]:  # pylint: disable=unused-argument
         """Get frame type, may depend on transport layer"""
         return self.frame_type
 
@@ -76,16 +80,16 @@ class StackLayer:
         frame = RawFrame(Frames.dissect(state.data))
         return [state.add(frame)]
 
-    def commit_read(self, stream_id: Any, byte_length: int):
+    def commit_read(self, stream_id: Any, byte_length: int) -> Self:  # pylint: disable=unused-argument
         """Commit read of bytes from underlying stream"""
-        pass
+        return self
 
-    def configure(self, spec: Dict[Any, Any]) -> 'StackLayer':
+    def configure(self, spec: Dict[Any, Any]) -> 'StackLayer':  # pylint: disable=unused-argument
         """Configure this layer"""
         return self
 
     def __repr__(self) -> str:
-        return f"{self.frame_type.structure.structure_name}"
+        return f"{self.frame_type.__name__}"
 
 
 class FrameStack:
@@ -106,44 +110,44 @@ class FrameStack:
         layer_receive = self.layer.receive(state)
         if self.layer.streaming:
             # stream data m-to-n relation between transports and payload frames
-            for s in layer_receive:
-                next = self.next.get(s.payload_type)
-                if next is None and self.layer.show_unmapped:
-                    yield s  # show raw frames
+            for stack_state in layer_receive:
+                next_s: FrameStack | None = self.next.get(stack_state.payload_type)
+                if not stack_state.data or not stack_state.frame:
+                    if self.layer.show_unmapped:
+                        yield stack_state  # show raw frames
                     continue
-                if not s.data:
-                    continue  # no data added
-                assert s.stream_id, "Expected stream ID for streaming layer"
-                next = next or RawStackLayer()
-                next_receive = list(next.receive(s))  # next level payloads
+                if next_s is None:
+                    yield stack_state  # show raw frames
+                    continue
+                assert stack_state.stream_id, "Expected stream ID for streaming layer"
+                next_receive: Iterable[StackState] = list(next_s.receive(stack_state))  # next level payloads
                 try:
-                    payload_len = s.frame.byte_length()  # this raises exception, if partial payload(s)
-                    self.layer.commit_read(s.stream_id, payload_len)
+                    payload_len = stack_state.frame.byte_length()  # this raises exception, if partial payload(s)
+                    self.layer.commit_read(stack_state.stream_id, payload_len)
                     yield from next_receive
                 except EOFError:
                     pass  # leave data to stream
         else:
             # block transport, 1-to-n relation between transport and payload frames
-            for s in layer_receive:
-                next = self.next.get(s.payload_type)
-                if next is None and self.layer.show_unmapped:
-                    yield s  # show raw frames
+            for stack_state in layer_receive:
+                next_s = self.next.get(stack_state.payload_type)
+                if next_s is None:
+                    yield stack_state  # show raw frames
                     continue
-                next = next or RawStackLayer()
-                next_receive = next.receive(s)
+                next_receive = next_s.receive(stack_state)
                 yield from next_receive
 
 
     def __repr__(self) -> str:
         s = f"{self.layer}"
         for k, v in self.next.items():
-            s += f"\n  {k}: {v.layer}"
+            s += f"\n  {k}: {v.layer.frame_type.__name__}"
         return s
 
 
 class RawStackLayer(StackLayer):
     """Raw frame stack layer"""
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(RawFrame)
 
     def configure(self, spec: Dict[Any, Any]) -> StackLayer:

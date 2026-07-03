@@ -1,9 +1,13 @@
+"""Ethernet frame definition"""
+
 from framing.base import Frame, LayerMapping
 from framing.codecs import IntegerFormat
 from framing.fields import Structure
 from framing.frame_types.ipv4_frames import IPv4
 from framing.frame_types.ipv6_frames import IPv6
 
+
+# pylint: disable=invalid-name
 
 class EthernetII(Frame):
     """Ethernet type II frame"""

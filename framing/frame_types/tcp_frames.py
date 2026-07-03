@@ -1,5 +1,7 @@
+"""TCP frame definition and related types"""
+
 import enum
-from typing import Dict, Set, Tuple, Optional
+from typing import Tuple
 
 from framing.base import Frame
 from framing.codecs import IntegerFormat
@@ -10,7 +12,10 @@ from framing.raw_data import Raw, RawData
 
 # https://www.ietf.org/rfc/rfc793.txt
 
+# pylint: disable=invalid-name
+
 class TCP(Frame):
+    """TCP frame"""
     structure = Structure['TCP']()
 
     Source_port = structure.integer(IntegerFormat(bits=16))
@@ -48,9 +53,9 @@ class TCPFlag(enum.IntFlag):
 TCP.Flags.flag_values(TCPFlag)
 
 # TCP stream id: source IP address, source port, destination IP address, destination port
-TCP_Stream_Id = Tuple[RawData, int, RawData, int]
+TCP_Stream_Id = tuple[RawData, int, RawData, int]
 # Null TCP stream id
-TCP_Null_Stream_Id = Tuple[Raw.empty, 0, Raw.empty, 0]
+TCP_Null_Stream_Id: TCP_Stream_Id = (Raw.empty, 0, Raw.empty, 0)
 
 def flip_tcp_stream_id(stream_id: TCP_Stream_Id) -> TCP_Stream_Id:
     """Flip TCP stream id"""
@@ -59,7 +64,7 @@ def flip_tcp_stream_id(stream_id: TCP_Stream_Id) -> TCP_Stream_Id:
 
 class TCPDataQueue(RawDataQueue):
     """TCP data queue, one connection to one direction"""
-    def __init__(self, start: TCP):
+    def __init__(self, start: TCP) -> None:
         super().__init__(offset=TCP.Sequence_number[start], modulus=2 ** 32)
         if TCP.Flags[start] & TCPFlag.SYN:
             self.offset += 1

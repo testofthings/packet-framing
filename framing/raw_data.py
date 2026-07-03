@@ -3,7 +3,8 @@
 import ipaddress
 import mmap
 import pathlib
-from typing import Iterable, List, BinaryIO, Union, Self
+from collections.abc import Buffer
+from typing import Any, Iterable, List, BinaryIO, Union, Self
 
 # IP address, shouldn't this be defined by Python?
 IPAddress = Union[ipaddress.IPv6Address, ipaddress.IPv4Address]
@@ -76,7 +77,7 @@ class RawData(LengthEntity):
         """Get data as a HW address"""
         return ":".join([f"{self.octet(i):02x}" for i in range(0, self.byte_length())])
 
-    def as_string(self, encoding='ascii', errors='strict') -> str:
+    def as_string(self, encoding: str ='ascii', errors: str = 'strict') -> str:
         """Get data as a string"""
         return self.as_bytes(0, self.byte_length()).decode(encoding, errors=errors)
 
@@ -88,23 +89,23 @@ class RawData(LengthEntity):
         shift = 7 - (bit_offset % 8)
         return (octet >> shift) & 1
 
-    def subBlockBits(self, bit_offset: int, bit_length: int) -> 'RawData':
+    def sub_block_bits(self, bit_offset: int, bit_length: int) -> 'RawData':
         """Get sub-block, empty if beyond data"""
         if bit_offset % 8 == 0 and bit_length % 8 == 0:
-            return self.subBlock(bit_offset // 8, bit_length // 8)
+            return self.sub_block(bit_offset // 8, bit_length // 8)
         return BitAlignedData(self, bit_offset, bit_length)
 
-    def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
+    def sub_block(self, byte_offset: int, byte_length: int) -> 'RawData':
         """Get sub-block, empty if beyond data"""
         raise NotImplementedError()
 
-    def tailBits(self, bit_offset: int) -> 'RawData':
+    def tail_bits(self, bit_offset: int) -> 'RawData':
         """Get raw data tail, empty if beyond data"""
         if bit_offset % 8 == 0:
-            return self.tailBytes(bit_offset // 8)
+            return self.tail_bytes(bit_offset // 8)
         return BitAlignedData(self, bit_offset)
 
-    def tailBytes(self, byte_offset: int) -> 'RawData':
+    def tail_bytes(self, byte_offset: int) -> 'RawData':
         """Get raw data tail, empty if beyond data"""
         raise NotImplementedError()
 
@@ -115,15 +116,15 @@ class RawData(LengthEntity):
         while d0 >= 0 and d0 == other.octet(i):
             i += 1
             d0 = self.octet(i)
-        return self.subBlock(0, i)
+        return self.sub_block(0, i)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.dump()
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         return self.get_bit_length() != 0
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any) -> bool:
         if not isinstance(other, RawData):
             return False
         blen = self.get_bit_length()
@@ -137,7 +138,7 @@ class RawData(LengthEntity):
                 return False
         return True
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         h = self.byte_length()
         if h < 0:
             raise ValueError("Cannot calculate hash for stream")
@@ -152,13 +153,13 @@ class RawData(LengthEntity):
         """Show as hex string"""
         return "".join([f"{self.octet(i):02x}" for i in range(0, self.byte_length())])
 
-    def dump(self, center_line=False) -> str:
+    def dump(self, center_line: bool = False) -> str:
         """Print a classic data dump"""
         if self.bit_length() == 0:
             return "()"
         if self.bit_length() % 8 != 0:
             bl = self.bit_length()
-            def div(i: int):
+            def div(i: int) -> bool:
                 return i < bl - 1 and (bl - i - 1) % 4 == 0
 
             return "".join([f"{self.bit(i)}" + (" " if div(i) else "") for i in range(0, bl)])
@@ -187,8 +188,8 @@ class RawData(LengthEntity):
 
 class ByteData(RawData):
     """Bytes"""
-    def __init__(self, data, byte_start: int, byte_length: int):
-        self.data = data
+    def __init__(self, data: Buffer, byte_start: int, byte_length: int):
+        self.data = memoryview(data)
         self.start = byte_start
         self.length = byte_length
         assert byte_start >= 0
@@ -208,13 +209,13 @@ class ByteData(RawData):
         if ml < byte_length:
             raise EOFError("Not enough bytes")
         mo = self.start + byte_offset
-        return self.data[mo:mo + ml]
+        return bytes(self.data[mo:mo + ml])
 
-    def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
+    def sub_block(self, byte_offset: int, byte_length: int) -> 'RawData':
         ml = min(byte_length, max(0, self.length - byte_offset))
         return ByteData(self.data, self.start + byte_offset, ml)
 
-    def tailBytes(self, byte_offset: int) -> 'RawData':
+    def tail_bytes(self, byte_offset: int) -> 'RawData':
         ml = max(0, self.length - byte_offset)
         return ByteData(self.data, self.start + byte_offset, ml)
 
@@ -223,7 +224,7 @@ class RawDataSequence(RawData):
     """Sequence of RawData"""
     def __init__(self, components: List[RawData]):
         self.components = components
-        self.length = sum([c.bit_length() for c in components])
+        self.length = sum(c.bit_length() for c in components)
 
     def bit_length(self) -> int:
         return self.length
@@ -272,7 +273,7 @@ class RawDataSequence(RawData):
             off -= c_len
         return -1
 
-    def subBlockBits(self, bit_offset: int, bit_length: int) -> 'RawData':
+    def sub_block_bits(self, bit_offset: int, bit_length: int) -> 'RawData':
         """Get sub-block"""
         if bit_offset == 0 and bit_length == self.bit_length():
             return self
@@ -284,7 +285,7 @@ class RawDataSequence(RawData):
             if off + c_len > bit_offset:
                 st = max(0, bit_offset - off)
                 ln = min(c_len - st, bit_length - got)
-                nc.append(c.subBlockBits(st, ln))
+                nc.append(c.sub_block_bits(st, ln))
                 got += ln
                 if got >= bit_length:
                     return Raw.sequence(nc)
@@ -292,14 +293,14 @@ class RawDataSequence(RawData):
             off += c_len
         return Raw.sequence(nc)
 
-    def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
+    def sub_block(self, byte_offset: int, byte_length: int) -> 'RawData':
         """Get sub-block"""
-        return self.subBlockBits(byte_offset * 8, byte_length * 8)
+        return self.sub_block_bits(byte_offset * 8, byte_length * 8)
 
-    def tailBytes(self, byte_offset: int) -> 'RawData':
-        return self.tailBits(byte_offset * 8)
+    def tail_bytes(self, byte_offset: int) -> 'RawData':
+        return self.tail_bits(byte_offset * 8)
 
-    def tailBits(self, bit_offset: int) -> 'RawData':
+    def tail_bits(self, bit_offset: int) -> 'RawData':
         """Get raw data tail"""
         if bit_offset == 0:
             return self
@@ -309,7 +310,7 @@ class RawDataSequence(RawData):
         for i, c in enumerate(self.components):
             c_len = c.bit_length()
             if off < c_len:
-                nc = [c.tailBits(off)]
+                nc = [c.tail_bits(off)]
                 nc.extend(self.components[i + 1:])
                 # do not call Raw.sequence(), these components already optimized
                 if len(nc) == 1:
@@ -334,26 +335,26 @@ class ZeroData(RawData):
     def bit(self, bit_offset: int) -> int:
         return 0 if bit_offset < self.length else -1
 
-    def subBlockBits(self, bit_offset: int, bit_length: int) -> 'RawData':
+    def sub_block_bits(self, bit_offset: int, bit_length: int) -> 'RawData':
         ml = min(bit_length, max(0, self.length - bit_offset))
         return ZeroData(ml)
 
-    def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
+    def sub_block(self, byte_offset: int, byte_length: int) -> 'RawData':
         ml = min(byte_length * 8, max(0, self.length - byte_offset * 8))
         return ZeroData(ml)
 
-    def tailBits(self, bit_offset: int) -> 'RawData':
+    def tail_bits(self, bit_offset: int) -> 'RawData':
         ml = max(0, self.length - bit_offset)
         return ZeroData(ml)
 
-    def tailBytes(self, byte_offset: int) -> 'RawData':
+    def tail_bytes(self, byte_offset: int) -> 'RawData':
         ml = max(0, self.length - byte_offset * 8)
         return ZeroData(ml)
 
 
 class BitAlignedData(RawData):
     """Data not necessary aligned to octet boundary"""
-    def __init__(self, data: RawData, bit_offset: int, bit_length=-1):
+    def __init__(self, data: RawData, bit_offset: int, bit_length: int = -1):
         self.data = data
         self.offset = bit_offset
         self.length = bit_length
@@ -366,25 +367,25 @@ class BitAlignedData(RawData):
     def byte_length(self) -> int:
         return self.bit_length() // 8
 
-    def subBlockBits(self, bit_offset: int, bit_length: int) -> 'RawData':
+    def sub_block_bits(self, bit_offset: int, bit_length: int) -> 'RawData':
         ml = min(bit_length, max(0, self.length - bit_offset))
-        return self.data.subBlockBits(self.offset + bit_offset, ml)
+        return self.data.sub_block_bits(self.offset + bit_offset, ml)
 
-    def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
+    def sub_block(self, byte_offset: int, byte_length: int) -> 'RawData':
         ml = min(byte_length * 8, max(0, self.length - byte_offset * 8))
-        return self.data.subBlockBits(self.offset + byte_offset * 8, ml)
+        return self.data.sub_block_bits(self.offset + byte_offset * 8, ml)
 
-    def tailBits(self, bit_offset: int) -> 'RawData':
+    def tail_bits(self, bit_offset: int) -> 'RawData':
         if self.length < 0:
-            return self.data.tailBits(self.offset + bit_offset)
+            return self.data.tail_bits(self.offset + bit_offset)
         ml = max(0, self.length - bit_offset)
-        return self.subBlockBits(self.offset + bit_offset, ml)
+        return self.sub_block_bits(self.offset + bit_offset, ml)
 
-    def tailBytes(self, byte_offset: int) -> 'RawData':
+    def tail_bytes(self, byte_offset: int) -> 'RawData':
         if self.length < 0:
-            return self.data.tailBits(self.offset + byte_offset * 8)
+            return self.data.tail_bits(self.offset + byte_offset * 8)
         ml = max(0, self.length - byte_offset * 8)
-        return self.subBlockBits(self.offset + byte_offset * 8, ml)
+        return self.sub_block_bits(self.offset + byte_offset * 8, ml)
 
     def octet(self, byte_offset: int) -> int:
         if self.length >= 0 and byte_offset >= self.length // 8:
@@ -413,8 +414,9 @@ class FileData(ByteData):
         self.file = file
         self.file_path = file_path
 
-    def close(self):
+    def close(self) -> Self:
         self.file.close()
+        return self
 
 
 class AppendableRawData(RawData):
@@ -431,7 +433,7 @@ class AppendableRawData(RawData):
 
     def forward(self, byte_length: int) -> 'AppendableRawData':
         """Move data forward by given length"""
-        r = AppendableRawData(self.fixed.tailBytes(byte_length))
+        r = AppendableRawData(self.fixed.tail_bytes(byte_length))
         r.closed = self.closed
         return r
 
@@ -457,41 +459,46 @@ class AppendableRawData(RawData):
     def bit(self, bit_offset: int) -> int:
         return self.fixed.bit(bit_offset)
 
-    def subBlockBits(self, bit_offset: int, bit_length: int) -> 'RawData':
-        return self.fixed.subBlockBits(bit_offset, bit_length)
+    def sub_block_bits(self, bit_offset: int, bit_length: int) -> 'RawData':
+        return self.fixed.sub_block_bits(bit_offset, bit_length)
 
-    def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
-        return self.fixed.subBlock(byte_offset, byte_length)
+    def sub_block(self, byte_offset: int, byte_length: int) -> 'RawData':
+        return self.fixed.sub_block(byte_offset, byte_length)
 
-    def tailBits(self, bit_offset: int) -> 'RawData':
-        return self.fixed.tailBits(bit_offset)
+    def tail_bits(self, bit_offset: int) -> 'RawData':
+        return self.fixed.tail_bits(bit_offset)
 
-    def tailBytes(self, byte_offset: int) -> 'RawData':
-        return self.fixed.tailBytes(byte_offset)
+    def tail_bytes(self, byte_offset: int) -> 'RawData':
+        return self.fixed.tail_bytes(byte_offset)
 
     def close(self) -> 'RawData':
         self.closed = True
         return self
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.fixed.__repr__()
 
-    def __eq__(self, other):
-        return self.fixed == other
+    def __eq__(self, other: Any) -> bool:
+        match other:
+            case AppendableRawData(fixed=of):
+                return self.fixed == of
+            case RawData():
+                return self.fixed == other
+        return False
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         return (not self.closed) or self.fixed.bit_length() > 0
 
 
 class StreamData(RawData):
     """Stream data, input stream should be in blocking mode"""
-    def __init__(self, stream: BinaryIO, name: str, request_size=65536):
+    def __init__(self, stream: BinaryIO, name: str, request_size: int = 65536) -> None:
         self.stream = stream
         self.stream_name = name
         self.buffer = AppendableRawData(Raw.empty)
         self.request_size = request_size
 
-    def _read_until(self, to_byte_length: int):
+    def _read_until(self, to_byte_length: int) -> None:
         """Read until given data length or EOF (-1 to read until EOF)"""
         while not self.buffer.closed:
             if 0 <= to_byte_length <= self.buffer.fixed.bytes_available():
@@ -524,19 +531,20 @@ class StreamData(RawData):
         self._read_until(bit_offset // 8 + 1)
         return self.buffer.bit(bit_offset)
 
-    def subBlock(self, byte_offset: int, byte_length: int) -> 'RawData':
+    def sub_block(self, byte_offset: int, byte_length: int) -> 'RawData':
         self._read_until(byte_offset + byte_length)
-        return self.buffer.subBlock(byte_offset, byte_length)
+        return self.buffer.sub_block(byte_offset, byte_length)
 
-    def tailBytes(self, byte_offset: int) -> 'RawData':
+    def tail_bytes(self, byte_offset: int) -> 'RawData':
         self._read_until(-1)
-        return self.buffer.tailBytes(byte_offset)
+        return self.buffer.tail_bytes(byte_offset)
 
-    def close(self):
+    def close(self) -> Self:
         self.stream.close()
         self.buffer.close()
+        return self
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.stream_name} read={self.buffer.bytes_available()}\n{self.buffer}"
 
 
@@ -546,7 +554,7 @@ class Raw:
     empty = ZeroData(0)
 
     @classmethod
-    def bytes(cls, data: bytes) -> RawData:
+    def bytes(cls, data: bytes | bytearray) -> RawData:
         """Create from bytes"""
         return ByteData(data, 0, len(data))
 
@@ -557,7 +565,7 @@ class Raw:
         return ByteData(b, 0, len(b))
 
     @classmethod
-    def string(cls, value: str, encoding='ascii'):
+    def string(cls, value: str, encoding: str ='ascii') -> RawData:
         """Create from string"""
         return cls.bytes(value.encode(encoding))
 
@@ -578,16 +586,16 @@ class Raw:
             b[i // 8] += int(s)
         if bit_l % 8 != 0:
             b[-1] <<= (8 - bit_l % 8)
-        r = ByteData(b, 0, len(b)).subBlockBits(0, bit_l)
+        r = ByteData(bytes(b), 0, len(b)).sub_block_bits(0, bit_l)
         return r
 
     @classmethod
-    def zeroes(cls, byte_length: int = None, bit_length: int = None) -> RawData:
+    def zeroes(cls, byte_length: int = 0, bit_length: int = 0) -> RawData:
         """Create zero data of given length"""
-        if byte_length is not None:
-            assert bit_length is None or bit_length == byte_length * 8
+        if byte_length > 0:
+            assert bit_length <= 0 or bit_length == byte_length * 8
             return ZeroData(byte_length * 8)
-        if bit_length is not None:
+        if bit_length > 0:
             return ZeroData(bit_length)
         return cls.empty
 
@@ -618,6 +626,6 @@ class Raw:
         return FileData(f, file_path)
 
     @classmethod
-    def stream(cls, stream: BinaryIO, name="stream", request_size=65536) -> StreamData:
+    def stream(cls, stream: BinaryIO, name: str = "stream", request_size: int =65536) -> StreamData:
         """Access stream as raw data"""
         return StreamData(stream, name, request_size)

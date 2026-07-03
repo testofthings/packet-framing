@@ -1,3 +1,5 @@
+"""IPv4 frame definition and related types"""
+
 import enum
 from typing import Tuple
 
@@ -8,9 +10,10 @@ from framing.frame_types.tcp_frames import TCP
 from framing.frame_types.udp_frames import UDP
 from framing.raw_data import IPAddress
 
+# pylint: disable=invalid-name
 
 class IPv4(Frame):
-    """IPv4 frame"""
+    """IPv4 packet"""
     structure = Structure['IPv4']()
 
     Version = structure.integer(IntegerFormat(bits=4), default=4)

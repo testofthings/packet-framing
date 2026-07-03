@@ -12,21 +12,27 @@ F = typing.TypeVar("F", bound='Frame')
 # Field value type
 T = typing.TypeVar("T")
 
+# Field frame value type
+FrameT = typing.TypeVar("FrameT", bound='Frame')
+
+
+class StructureError(Exception):
+    """Structure manipulation error"""
+
 
 class EncodingState:
     """Encoding state"""
-    pass
 
 
 class FieldOffset:
     """Field offset definition"""
-    def __init__(self, field: Optional['Field'] = None):
+    def __init__(self, field: Optional['AnyField'] = None):
         self.prefix: Optional[FieldOffset] = None
-        self.field: Optional[Field] = field
+        self.field: Optional[AnyField] = field
         self.fixed_bit_offset = 0
         self.min_tail_length = 0
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         r = []
         if self.prefix:
             r.append(f"{self.prefix}")
@@ -38,15 +44,17 @@ class FieldOffset:
 
 class Calculator:
     """Integer value calculator"""
-    def __init__(self, next_step: Optional['Calculator']):
+    def __init__(self, next_step: Optional['Calculator']) -> None:
         self.next_step = next_step
 
     def pull(self, backend: 'FrameBackend') -> float:
         """Pull value from source"""
+        assert self.next_step, "No next step missing"
         return self.next_step.pull(backend)
 
     def push(self, backend: 'FrameBackend', value: float) -> float:
         """Push value to source"""
+        assert self.next_step, "No next step missing"
         return self.next_step.push(backend, value)
 
 
@@ -57,9 +65,13 @@ class FieldPointer(typing.Generic[F, T]):
         raise NotImplementedError()
 
 
+# Any field pointer
+AnyFieldPointer = FieldPointer[Any, Any]
+
+
 class Field(FieldPointer[F, T]):
     """Base class for fields"""
-    def __init__(self, type_name: str, default_value: T, fixed_bit_offset=-1):
+    def __init__(self, type_name: str, default_value: T | None, fixed_bit_offset: int = -1) -> None:
         self.field_name = "field?"
         self.type_name = type_name
         self.default_value = default_value
@@ -69,23 +81,22 @@ class Field(FieldPointer[F, T]):
         self.min_bit_length = -1
         self.direct_decode = False
         self.offset = FieldOffset(self)
-        self.structure: Optional['Structure'] = None  # set by structure herself
         self.end_offset_resolver: Optional[Calculator] = None
         self.length_resolver: Optional[Calculator] = None
         self.consumed_by: Optional[Field[F, Any]] = None
 
-    def get(self, frame: F) -> T:
-        return frame.backend.get(self)
+    def get(self, frame: 'Frame') -> T:
+        v: T = frame.backend.get(self)
+        return v
 
     def get_choice(self, frame: F) -> T:
         """Return the selected choice, when this is a selection field, otherwise the value itself"""
         v = self.get(frame)
-        if v.backend.choice:
-            return v.backend.choice.get(v)
         return v
 
-    def get_default_value(self, frame: F) -> T:
+    def get_default_value(self, frame: F) -> T:  # pylint: disable=unused-argument
         """Get default value for field"""
+        assert self.default_value is not None, "Without static default value, field must override get_default_value()"
         return self.default_value
 
     def __getitem__(self, frame: F) -> T:
@@ -100,22 +111,16 @@ class Field(FieldPointer[F, T]):
         frame.backend.set(self, value)
         return frame
 
-    def _validate_length(self, bit_length: int) -> int:
-        """Validate bit length against minimum and maximum lengths, raise error if too short"""
-        if self.min_bit_length >= 0 and bit_length < self.min_bit_length:
-            raise EOFError(f"Field '{self.field_name}' too short: {bit_length} < {self.min_bit_length} bits")
-        if self.max_bit_length > 0:
-            bit_length = min(bit_length, self.max_bit_length)
-        return bit_length
-
     def get_bit_length(self, frame: F) -> int:
         """Get bit length for a value"""
         v = frame.backend.get(self)
         return self.encoding_bit_length(frame.backend, v)
 
-    def as_frame(self, frame: F, frame_type: Optional[Type[F]] = None, default_frame=True) -> Optional['Frame']:
+    def as_frame(self, frame: F, frame_type: Optional[Type['Frame']] = None,
+                 default_frame: bool = True) -> Optional['Frame']:
         """Return value as frame, use type information when available"""
-        return frame.backend.get_as_frame(self, frame_type, default_frame)
+        v: Optional[Frame] = frame.backend.get_as_frame(self, frame_type, default_frame)
+        return v
 
     def as_raw(self, frame: F) -> Optional[RawData]:
         """Get as raw, do not try to attempt to parse payload. Does not work, if payload determines the length"""
@@ -126,13 +131,21 @@ class Field(FieldPointer[F, T]):
         enc = self.encode(self.get(frame), EncodingState())
         return f"{enc}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.field_name}: {self.type_name}"
 
-    def __lt__(self, other: 'Field') -> bool:
+    def __lt__(self, other: 'AnyField') -> bool:
         return self.field_name < other.field_name
 
     # Methods for access by backend
+
+    def validate_length(self, bit_length: int) -> int:
+        """Validate bit length against minimum and maximum lengths, raise error if too short"""
+        if self.min_bit_length >= 0 and bit_length < self.min_bit_length:
+            raise EOFError(f"Field '{self.field_name}' too short: {bit_length} < {self.min_bit_length} bits")
+        if self.max_bit_length > 0:
+            bit_length = min(bit_length, self.max_bit_length)
+        return bit_length
 
     def encoding_bit_length(self, backend: 'FrameBackend', value: T) -> int:
         """Resolve encoding length for a value"""
@@ -142,7 +155,8 @@ class Field(FieldPointer[F, T]):
         """Encode a value"""
         raise NotImplementedError()
 
-    def decode_bit_length(self, data: RawData, bit_offset: int, value: Optional[T], backend: 'FrameBackend') -> int:
+    def decode_bit_length(self, data: RawData, bit_offset: int, value: Optional[T],  # pylint: disable=unused-argument
+                          backend: 'FrameBackend') -> int:
         """Resolve bit length on decoding, value is provided if known"""
         if self.fixed_bit_length >= 0:
             return self.fixed_bit_length
@@ -165,6 +179,10 @@ class Field(FieldPointer[F, T]):
         raise NotImplementedError()
 
 
+# Any field
+AnyField = Field[Any, Any]
+
+
 class FrameBackend:
     """Base class for frame backend"""
     def __init__(self, frame: 'Frame'):
@@ -173,7 +191,7 @@ class FrameBackend:
         self.structure = FrameStructure.get_struct(frame)
         if not self.structure.built:
             self.structure.finish_building(frame)
-        self.choice: Optional[Field] = self.structure.get_field_by() if self.structure.is_selection else None
+        self.choice: Optional[AnyField] = self.structure.get_field_by() if self.structure.is_selection else None
         self.parent: Optional[FrameBackend] = None
 
     def structure_name(self) -> str:
@@ -186,31 +204,31 @@ class FrameBackend:
 
     def set(self, field: Field[F, T], value: T) -> Self:
         """Set field value"""
-        raise NotImplementedError("Editing not allowed with this backend")
+        raise StructureError("Editing not allowed with this backend")
 
-    def get_item(self, sequence_field: Field, item_field: Field[F, T], index: int):
+    def get_item(self, sequence_field: AnyField, item_field: Field[F, T], index: int) -> T:
         """Get item from sequence field"""
         raise NotImplementedError()
 
-    def iterate(self, sequence_field: Field, item_field: Field[F, T],
-                count=-1, terminator: Optional[Callable[[T], bool]] = None) -> typing.Iterator[T]:
+    def iterate(self, sequence_field: AnyField, item_field: Field[F, T],
+                count: int = -1, terminator: Optional[Callable[[T], bool]] = None) -> typing.Iterator[T]:
         """Iterate sequence field values without storing them"""
         raise NotImplementedError()
 
-    def get_raw(self, field: Field) -> typing.Tuple[RawData, int]:
+    def get_raw(self, field: AnyField) -> typing.Tuple[RawData, int]:
         """Get field raw data"""
         raise NotImplementedError()
 
-    def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type[F]] = None,
-                     default_frame=True) -> Optional['Frame']:
+    def get_as_frame(self, field: Field[F, T], frame_type: Optional[Type['Frame']] = None,
+                     default_frame: bool = True) -> Optional['Frame']:
         """Get field value as frame, use implicit or explicit type"""
         raise NotImplementedError()
 
-    def decode_as_frame(self, mapping: Dict[FieldPointer, Dict[Any, Type['Frame']]], data: RawData) -> 'Frame':
+    def decode_as_frame(self, mapping: Dict[AnyFieldPointer, Dict[Any, Type['Frame']]], data: RawData) -> 'Frame':
         """Decore raw field as a frame with given mappings"""
         raise NotImplementedError()
 
-    def factory(self, decode: RawData = None) -> Callable[['Frame'], 'FrameBackend']:
+    def factory(self, decode: RawData | None = None) -> Callable[['Frame'], 'FrameBackend']:
         """Create a fresh backend for given frame"""
         raise NotImplementedError()
 
@@ -231,10 +249,11 @@ class FrameBackend:
         return Raw.empty
 
     def add_mapping(self, mapping: 'LayerMapping') -> Self:
-        """All layer mappings"""
-        return self
+        """Add layer mappings"""
+        raise NotImplementedError()
 
-    def dump(self, bit_offset=0, indent='', width=0, copy_to_avoid_update=False) -> str:
+    def dump(self, bit_offset: int = 0, indent: str = '', width: int = 0, copy_to_avoid_update: bool = False) -> str:
+        """Dump frame content for debugging"""
         raise NotImplementedError()
 
     def close(self) -> Self:
@@ -242,13 +261,11 @@ class FrameBackend:
         return self
 
 
-TF = typing.TypeVar("TF", bound='Frame')
-
-
 class Frame(LengthEntity):
     """Base class for frames"""
     def __init__(self, backend_factory: Callable[['Frame'], FrameBackend]):
         self.backend = backend_factory(self)
+        self.structure: FrameStructure[Any]  # set by backend when initialized
 
     def bit_length(self) -> int:
         return self.backend.get_bit_length()
@@ -260,60 +277,72 @@ class Frame(LengthEntity):
         """Encode the frame into bytes"""
         return self.backend.encode()
 
-    def __truediv__(self, field: Field[Self, TF]) -> TF:
-        return field.as_frame(self)
+    def __truediv__(self, field: Field[Self, F]) -> F:
+        sub_frame = field.as_frame(self)
+        if sub_frame is None:
+            raise ValueError(f"Field '{field.field_name}' value is not a frame")
+        return typing.cast(F, sub_frame)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.backend.__repr__()
 
 
 class FrameStructure(typing.Generic[F]):
     """Frame structure definition"""
-    def __init__(self):
+    def __init__(self) -> None:
         self.structure_name = "Unnamed"
         self.is_selection = False
-        self.fields: typing.Dict[str, Field] = {}
+        self.fields: typing.Dict[str, AnyField] = {}
         self.fields_fixed_bit_offset = 0
         self.fields_length = FieldOffset()
-        self.commit_procedures: List[typing.Tuple[Optional[Field], Callable[[F], None]]] = []
+        self.commit_procedures: List[typing.Tuple[Optional[AnyField], Callable[[F], None]]] = []
         self.built = False
 
-    def field(self, field: Field) -> Field:
+    def field(self, field: AnyField) -> AnyField:
+        """Add field to structure"""
         raise NotImplementedError()
 
-    def commit(self, frame: F):
+    def commit(self, frame: F) -> Self:
+        """Commit procedure, called after frame is built, used for example to set field names"""
         for cp in self.commit_procedures:
             cp[1](frame)
+        return self
 
     @classmethod
-    def get_struct(cls, frame_type: F) -> 'FrameStructure[F]':
-        """"Get structure for a frame type"""
+    def get_struct(cls, frame_type: FrameT | Type[FrameT]) -> 'FrameStructure[FrameT]':
+        """"Get structure for a frame or frame type"""
+        struct: Optional[FrameStructure[Any]] = None
         if hasattr(frame_type, "structure_"):
-            return getattr(frame_type, "structure_")  # underscored to avoid naming collision
-        return getattr(frame_type, "structure")
+            struct = getattr(frame_type, "structure_")  # underscored to avoid naming collision
+        elif hasattr(frame_type, "structure"):
+            struct = getattr(frame_type, "structure")
+        if not isinstance(struct, FrameStructure):
+            raise ValueError(f"Frame type {frame_type} does not have a valid structure")
+        return struct
 
-    def is_field_here(self, field: Field) -> bool:
+    def is_field_here(self, field: AnyField) -> bool:
         """Is a field defined for this field"""
         f = self.fields.get(field.field_name)
         return f == field
 
-    def get_field_by(self, key=None) -> Field[F, Any]:
+    def get_field_by(self, key: Any = None) -> Field[F, Any]:
         """The field by key or the default field, used for selections"""
         if key is not None:
             f = self.fields.get(key)
             if f:
                 return f
-        return self.fields.values().__iter__().__next__()
+        field = next(iter(self.fields.values()))
+        return field
 
     def _get_a_name(self, override: Optional[str]) -> str:
         """Get name or temporary name for a field"""
         return override if override else f"__{len(self.fields)}"
 
-    def finish_building(self, frame: F):
+    def finish_building(self, frame: F) -> Self:
         """Finish building the structure"""
         # find field names
         self.structure_name = type(frame).__name__
-        i_names: typing.Dict[Field, str] = {}
+        i_names: typing.Dict[AnyField, str] = {}
         all_members = inspect.getmembers(frame)
         for member in all_members:
             name, v = member
@@ -331,8 +360,9 @@ class FrameStructure(typing.Generic[F]):
             v.field_name = nn
         self._resolve_offsets()
         self.built = True
+        return self
 
-    def _resolve_offsets(self):
+    def _resolve_offsets(self) -> None:
         """Resolve offsets"""
         prefix = None
         prefix_offset = 0
@@ -364,9 +394,9 @@ class FrameStructure(typing.Generic[F]):
 
 class LayerMapping:
     """Map lower layer selector into upper layer payload"""
-    def __init__(self, payload: Field = None, base: Optional['LayerMapping'] = None):
+    def __init__(self, payload: AnyField | None = None, base: Optional['LayerMapping'] = None):
         assert not (payload and base), "Cannot provide both payload and base mapping"
-        self._mappings: Dict[Field, Dict[FieldPointer, Dict]] = {}
+        self._mappings: Dict[AnyField, Dict[AnyFieldPointer, Dict[AnyField, Any]]] = {}
         self._payload = payload
         if payload:
             self._mappings[payload] = {}
@@ -374,7 +404,7 @@ class LayerMapping:
             self._payload = base._payload
             base.merge(self)
 
-    def resolve_payload_type(self, frame: Frame, field: Field) -> Type[Frame]:
+    def resolve_payload_type(self, frame: Frame, field: AnyField) -> Type[Frame]:
         """Resolve payload type, return raw frame if no mapping found"""
         layer_map = self.get_mappings(field)
         assert layer_map, f"No known payload mapping for {field}"
@@ -383,10 +413,10 @@ class LayerMapping:
             p_type = m.get(type_v)
             if p_type is not None:
                 return p_type
-        from framing.backends import RawFrame
+        from framing.backends import RawFrame  # pylint: disable=import-outside-toplevel,cyclic-import
         return RawFrame
 
-    def decode_payload(self, frame: Frame, field: Field, data: Optional[RawData] = None) -> Frame:
+    def decode_payload(self, frame: Frame, field: AnyField, data: Optional[RawData] = None) -> Frame:
         """Resolve payload type and decode the frame using this mapping"""
         layer_map = self.get_mappings(field)
         assert layer_map, f"No known payload mapping for {field}"
@@ -395,14 +425,18 @@ class LayerMapping:
             data = be.get_raw(field)[0]
         return be.decode_as_frame(layer_map, data)
 
-    def by(self, type_field: FieldPointer[Any, T], mappings: typing.Dict[T, Type[Frame]]) -> Self:
+    def by(self, type_field: FieldPointer[Any, T], mappings: typing.Dict[Any, Type[Frame]]) -> Self:
         """Add mappings for defined payload"""
+        if self._payload is None:
+            raise ValueError("Cannot add mapping without payload field")
         mp = self._mappings[self._payload]
         mp.setdefault(type_field, {}).update(mappings)
         return self
 
-    def many_by(self, fields: Dict[Field, FieldPointer[Any, T]], mappings: typing.Dict[T, Type[Frame]]) -> Self:
+    def many_by(self, fields: Dict[AnyField, AnyFieldPointer], mappings: typing.Dict[Any, Type[Frame]]) -> Self:
         """Add mappings for defined payload for many type fields"""
+        if self._payload is None:
+            raise ValueError("Cannot add mapping without payload field")
         first = True
         t_map = self._mappings.get(self._payload, {}).values()
         for pf, tf in fields.items():
@@ -415,11 +449,11 @@ class LayerMapping:
                 nt_map.update(tm)
         return self
 
-    def is_mapped(self, payload: Field) -> bool:
+    def is_mapped(self, payload: AnyField) -> bool:
         """Is payload mapped?"""
         return payload in self._mappings
 
-    def get_mappings(self, payload: Field) -> Optional[Dict[FieldPointer, Dict[Any, Type[Frame]]]]:
+    def get_mappings(self, payload: AnyField) -> Optional[Dict[AnyFieldPointer, Dict[Any, Type[Frame]]]]:
         """Get mappings for a payload, if any"""
         return self._mappings.get(payload)
 
@@ -431,7 +465,7 @@ class LayerMapping:
     def merge(self, mapping: 'LayerMapping') -> Self:
         """Merge mappings with other mapping object"""
         for f, mm in self._mappings.items():
-            mapping._mappings.setdefault(f, {}).update(mm)
+            mapping._mappings.setdefault(f, {}).update(mm)  # pylint: disable=protected-access
         return self
 
     def __add__(self, other: 'LayerMapping') -> 'LayerMapping':

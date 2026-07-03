@@ -7,18 +7,18 @@ from framing.raw_data import RawData, AppendableRawData, Raw
 
 class RawDataQueue:
     """Raw data quueue with offset handling"""
-    def __init__(self, prefix: RawData = None, offset=0, modulus=2 ** 32):
+    def __init__(self, prefix: RawData | None = None, offset: int = 0, modulus: int = 2 ** 32) -> None:
         self.offset = offset  # bytes
         self.modulus = modulus
         self.head = AppendableRawData(prefix or Raw.empty)
         # fragment offset relative to self.offset
         self.fragments: List[Tuple[int, RawData]] = []
 
-    # FIXME: Offset wrapping is not working, especially with forwarding!!!
+    # TODO: Offset wrapping is not working, especially with forwarding!!!
 
-    def push(self, data: RawData, offset: int = None) -> RawData:
+    def push(self, data: RawData, offset: int = -1) -> RawData:
         """Push data to end of the queue"""
-        if offset is None:
+        if offset < 0:
             # as default, continuous data
             offset = self.offset + self.head.bytes_available()
         # avoid off-set wrapping, trust Python has enough bits in int
@@ -26,7 +26,7 @@ class RawDataQueue:
         fix_length = self.head.fixed.byte_length()
         if off < fix_length:
             # part of the data already in
-            data = data.tailBytes(fix_length - off)
+            data = data.tail_bytes(fix_length - off)
             if data.byte_length() == 0:
                 return data
             off = fix_length
@@ -44,13 +44,13 @@ class RawDataQueue:
         head_len = self.head.fixed.byte_length()
         while self.fragments and self.fragments[0][0] <= head_len:
             f_off, f_data = self.fragments[0]
-            add_data = f_data.tailBytes(head_len - f_off)
+            add_data = f_data.tail_bytes(head_len - f_off)
             self.head.append(add_data)
             self.fragments = self.fragments[1:]
             head_len += add_data.byte_length()
         return data
 
-    def forward(self, length) -> Self:
+    def forward(self, length: int) -> Self:
         """Forward offset from beginning of the queue"""
         assert length <= self.head.fixed.byte_length(), "Forwarding queue too fast"
         self.head = self.head.forward(length)
@@ -67,7 +67,7 @@ class RawDataQueue:
 
     def pull(self, byte_length: int) -> RawData:
         """Pull data from beginning of the queue"""
-        r = self.head.subBlock(0, byte_length)
+        r = self.head.sub_block(0, byte_length)
         self.forward(byte_length)
         return r
 
@@ -75,15 +75,16 @@ class RawDataQueue:
         """Pull all data from beginning of the queue"""
         return self.pull(self.available())
 
-    def close(self):
+    def close(self) -> Self:
         """Close the queue, no more data can be added"""
         self.head.closed = True
+        return self
 
     def is_closed(self) -> bool:
         """Check if the queue is closed"""
         return self.head.closed
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         r = [
             f"offset={self.offset} length={self.head.bytes_available()}",
             f"{self.head}"

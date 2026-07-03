@@ -1,5 +1,6 @@
 "Value codecs, such as integer codecs"
 
+from abc import ABC
 import typing
 from typing import Self
 
@@ -32,19 +33,19 @@ class ValueCodec(typing.Generic[V]):
         return -1
 
 
-class IntegerCodec(ValueCodec[int]):
+class IntegerCodec(ABC, ValueCodec[int]):
     """Base class for integer codecs"""
     def default_value(self) -> int:
         return 0
 
     def decode_direct(self, bit_offset: int, data: RawData) -> int:
         """Decode directly from frame data. Caller must know when supported"""
-        return self.decode(data.tailBits(bit_offset))
+        return self.decode(data.tail_bits(bit_offset))
 
 
 class FixedByteIntegerCodec(IntegerCodec):
     """Fixed byte-length integer codec"""
-    def __init__(self, byte_length: int, little_end=False):
+    def __init__(self, byte_length: int, little_end: bool = False):
         self.length = byte_length
         self.little_end = little_end
         if little_end:
@@ -69,7 +70,7 @@ class FixedByteIntegerCodec(IntegerCodec):
             d = data
             offset = bit_offset // 8
         else:
-            d = data.tailBits(bit_offset)
+            d = data.tail_bits(bit_offset)
             offset = 0
         v = 0
         octet = 0
@@ -89,17 +90,17 @@ class FixedByteIntegerCodec(IntegerCodec):
 
 
 class FixedBitIntegerCodec(IntegerCodec):
-    """"""
-    def __init__(self, bit_length: int, little_end=False):
+    """Fixed bit-length integer codec"""
+    def __init__(self, bit_length: int, little_end: bool = False):
         self.byte_codec = FixedByteIntegerCodec((bit_length + 7) // 8, little_end)
         self.length = bit_length
 
     def encode(self, value: int) -> RawData:
         b = self.byte_codec.encode(value)
         if self.byte_codec.little_end:
-            r = b.tailBits(8 - self.length % 8)
+            r = b.tail_bits(8 - self.length % 8)
         else:
-            r = b.subBlockBits(0, self.length)
+            r = b.sub_block_bits(0, self.length)
         return r
 
     def decode(self, data: RawData) -> int:
@@ -136,7 +137,8 @@ class FixedBitIntegerCodec(IntegerCodec):
 
 class IntegerFormat:
     """Codec formatter"""
-    def __init__(self, bits=0, bytes=0, big_end: bool = False):
+    def __init__(self, bits: int = 0, bytes: int = 0,  # pylint: disable=redefined-builtin
+                 big_end: bool = False) -> None:
         self.bit_length = bits or (bytes * 8) or 16
         self.little_end = not big_end
 
@@ -145,17 +147,17 @@ class IntegerFormat:
         self.bit_length = bits
         return self
 
-    def bytes(self, bytes: int) -> Self:
+    def bytes(self, bytes: int) -> Self:  # pylint: disable=redefined-builtin
         """Set byte length"""
         self.bit_length = bytes * 8
         return self
 
-    def little_endian(self, flag=True) -> Self:
+    def little_endian(self, flag: bool = True) -> Self:
         """Choose little endian format"""
         self.little_end = flag
         return self
 
-    def big_endian(self, flag=True) -> Self:
+    def big_endian(self, flag: bool = True) -> Self:
         """Choose big endian format"""
         self.little_end = not flag
         return self
@@ -164,5 +166,4 @@ class IntegerFormat:
         """Create the codec"""
         if self.bit_length % 8 != 0:
             return FixedBitIntegerCodec(bit_length=self.bit_length, little_end=self.little_end)
-        else:
-            return FixedByteIntegerCodec(byte_length=self.bit_length // 8, little_end=self.little_end)
+        return FixedByteIntegerCodec(byte_length=self.bit_length // 8, little_end=self.little_end)

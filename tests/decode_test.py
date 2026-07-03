@@ -25,14 +25,14 @@ def test_partial_decode():
     with pytest.raises(EOFError):
         ip_len = ip.bit_length()
 
-    ip = IPv4(Frames.dissect(ip_raw.subBlockBits(0, 1)))
+    ip = IPv4(Frames.dissect(ip_raw.sub_block_bits(0, 1)))
     ip_s = f"{ip}"
     with pytest.raises(EOFError):
         ip_v = IPv4.Version[ip]
     with pytest.raises(EOFError):
         ip_len = ip.bit_length()
 
-    ip = IPv4(Frames.dissect(ip_raw.subBlock(0, 1)))
+    ip = IPv4(Frames.dissect(ip_raw.sub_block(0, 1)))
     ip_s = f"{ip}"
     assert IPv4.Version[ip] == 4
     assert IPv4.IHL[ip] == 5
@@ -41,14 +41,14 @@ def test_partial_decode():
     with pytest.raises(EOFError):
         ip_len = ip.bit_length()
 
-    ip = IPv4(Frames.dissect(ip_raw.subBlock(0, 10)))
+    ip = IPv4(Frames.dissect(ip_raw.sub_block(0, 10)))
     ip_s = f"{ip}"
     assert IPv4.Source_IP[ip] == Raw.hex("")
     assert IPv4.Destination_IP[ip] == Raw.hex("")
     with pytest.raises(EOFError):
         ip_len = ip.bit_length()
 
-    ip = IPv4(Frames.dissect(ip_raw.subBlock(0, 14)))
+    ip = IPv4(Frames.dissect(ip_raw.sub_block(0, 14)))
     ip_s = f"{ip}"
     assert IPv4.Source_IP[ip] == Raw.hex("12c2")
     assert IPv4.Destination_IP[ip] == Raw.hex("")

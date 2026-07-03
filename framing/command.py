@@ -3,11 +3,10 @@
 import argparse
 import pathlib
 import re
-from typing import Any, Callable, Dict, Iterable, Optional, Type
+from typing import Any, Callable, Dict, Iterable, Self, Type
 import yaml
 
-from framing.base import Field, Frame
-from framing.fields import RawField
+from framing.base import AnyField, Frame
 from framing.frame_types.ethernet_frames import EthernetII
 from framing.frame_types.ip_utilities import TCPStackLayer
 from framing.frame_types.ip_utilities import DNSStackLayer
@@ -22,26 +21,27 @@ from framing.layer_stack import FrameStack, StackLayer, RawStackLayer, StackStat
 
 
 class PayloadFieldStackLayer(StackLayer):
-    """Generic stack layer"""
-    def __init__(self, frame_type: Type[Frame], type_field: Field, payload_field: RawField):
+    """Stack layer with data in payload field"""
+    def __init__(self, frame_type: Type[Frame], type_field: AnyField, payload_field: AnyField):
         super().__init__(frame_type)
         self.type_field = type_field
         self.payload_field = payload_field
 
     def receive(self, state: StackState) -> Iterable[StackState]:
+        # TODO: This code is never tested for!
         frame = self.frame_type(Frames.dissect(state.data))
         pay_type = self.type_field[frame]
-        pay_data = self.payload_field[frame]
+        pay_data = self.payload_field.as_raw(frame) or Raw.empty
         s_state = state.add(frame, pay_type, pay_data)
         return [s_state]
 
-    def __repr__(self):
-        return f"{self.frame_type.structure.structure_name}.{self.payload_field}"
+    def __repr__(self) -> str:
+        return f"{self.frame_type.__name__}.{self.payload_field}"
 
 
 class LayerBuilder:
     """Stack layer builder"""
-    def __init__(self, short_name: str, new: Callable[[], StackLayer], sub: Dict[Any, 'LayerBuilder'] = None):
+    def __init__(self, short_name: str, new: Callable[[], StackLayer], sub: Dict[Any, 'LayerBuilder'] | None = None):
         self.short_name = short_name
         self.new = new
         self.sub = sub or {}
@@ -50,14 +50,12 @@ class LayerBuilder:
 
     mappings: Dict[str, 'LayerBuilder'] = {}
 
-    def build_layer(self, transport: Optional[Frame], spec: Dict[Any, Any]) -> StackLayer:
+    def build_layer(self, spec: Dict[Any, Any]) -> StackLayer:
         """Build this layer"""
         return self.new().configure(spec)
 
-    def build(self, stack: FrameStack, spec: Dict[Any, Any]):
+    def build(self, stack: FrameStack, spec: Dict[Any, Any]) -> Self:
         """Build stack layers by specification"""
-        transport = stack.layer.frame_type
-
         p_regexp = re.compile(r"^_(\d+)$")  # '_'+number for decimal protocol type
         x_regexp = re.compile(r"^_x([0-9a-fA-F]+)$") # '_x' for hexadecimal protocol type
         for k, v in spec.items():
@@ -83,7 +81,7 @@ class LayerBuilder:
                 layer_builder = self.mappings.get(proto_name)
                 if layer_builder is None:
                     raise ValueError(f'Unknown protocol "{proto_name}"')
-                layer = layer_builder.build_layer(transport, v)
+                layer = layer_builder.build_layer(v)
                 next_item = stack.next[key] = FrameStack(layer)
                 layer_builder.build(next_item, v)
             else:
@@ -97,23 +95,24 @@ class LayerBuilder:
                 if not keys:
                     raise ValueError(f'No mapping for "{k}" in "{self.short_name}"')
                 for key in keys:
-                    layer = layer_builder.build_layer(transport, v)
+                    layer = layer_builder.build_layer(v)
                     next_value = stack.next[key] = FrameStack(layer)
                     layer_builder.build(next_value, v)
 
         use_defaults = spec.get('defaults', True)
         if use_defaults and not stack.next:
             self.build_defaults(stack)
+        return self
 
 
-    def build_defaults(self, stack: FrameStack):
+    def build_defaults(self, stack: FrameStack) -> Self:
         """Build default sub layers"""
-        transport = stack.layer.frame_type
         for k, v in self.sub.items():
-            layer = v.build_layer(transport, {})
+            layer = v.build_layer({})
             next_item = stack.next[k] = FrameStack(layer)
             v.build_defaults(next_item)
         stack.layer.show_unmapped = True
+        return self
 
 
     def prepare_full_spec(self, spec: Dict[Any, Any]) -> Dict[Any, Any]:
@@ -149,8 +148,8 @@ class StackBuilder:
 
     tls_handshake = LayerBuilder('tls-handshake',
                                  lambda: PayloadFieldStackLayer(TLSHandshake,
-                                                                 TLSHandshake.HandshakeType,
-                                                                   TLSHandshake.message))
+                                                                TLSHandshake.HandshakeType,
+                                                                TLSHandshake.message))
     tls_record = LayerBuilder('tls-record', TLSRecordLayer,
                               sub={22: tls_handshake})
 
@@ -179,17 +178,17 @@ class StackBuilder:
             layer_builder = LayerBuilder.mappings.get(k)
             if layer_builder is None:
                 raise ValueError(f'Unknown protocol "{k}"')
-            layer = layer_builder.build_layer(None, v)
+            layer = layer_builder.build_layer(v)
             stack = FrameStack(layer)
             layer_builder.build(stack, v)
             break
         else:
-            layer = cls.pcap.build_layer(None, {})
+            layer = cls.pcap.build_layer({})
             stack = FrameStack(layer)
             cls.pcap.build_defaults(stack)
         return stack
 
-def main():
+def main() -> None:
     """Entry point to the command"""
     # Create the argument parser
     parser = argparse.ArgumentParser(description='PCAP printing tool')
@@ -212,7 +211,7 @@ def main():
                 s = f"{state.get_frame()}"
                 # drop first line of frame dump, it contains extra frame name
                 first_line_len = s.find('\n')
-                if first_line_len > 0 and first_line_len < len(s):
+                if 0 < first_line_len < len(s):
                     s = s[first_line_len + 1:]
                 print(f"{state.get_layer_names()}\n{s}")
         finally:

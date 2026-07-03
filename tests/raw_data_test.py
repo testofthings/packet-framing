@@ -23,18 +23,18 @@ def test_bits():
 
 def test_bit_alignment():
     b = Raw.hex("13ad15")
-    bb = b.subBlockBits(4, 16)
+    bb = b.sub_block_bits(4, 16)
     assert bb.octet(0) == 0x3a
     assert bb.octet(1) == 0xd1
     assert bb == Raw.hex("3ad1")
     assert bb.as_bytes(0, 2) == bytes.fromhex("3ad1")
 
-    bb = bb.subBlockBits(4, 8)
+    bb = bb.sub_block_bits(4, 8)
     assert isinstance(bb, ByteData)
     assert bb.octet(0) == 0xad
     assert bb == Raw.hex("ad")
 
-    bb = b.tailBits(17)
+    bb = b.tail_bits(17)
     assert f"{bb}" == "001 0101"
 
 
@@ -46,27 +46,27 @@ def test_merged_data():
     assert b != Raw.hex("01 02 03 04 ff")
     assert b.as_bytes(1, 4) == bytes.fromhex("02030405")
 
-    b2 = b.tailBytes(1)
+    b2 = b.tail_bytes(1)
     assert b2 == Raw.hex("02 03 04 05")
 
-    b2 = b.tailBytes(3)
+    b2 = b.tail_bytes(3)
     assert b2 == Raw.hex("04 05")
 
-    b2 = b.tailBytes(10)
+    b2 = b.tail_bytes(10)
     assert b2 == Raw.empty
 
-    assert b.subBlockBits(0, 8) == Raw.octets(0x01)
-    assert b.subBlockBits(8, 8) == Raw.octets(0x02)
-    assert b.subBlockBits(16, 8) == Raw.octets(0x03)
-    assert b.subBlockBits(24, 8) == Raw.octets(0x04)
-    assert b.subBlockBits(32, 8) == Raw.octets(0x05)
+    assert b.sub_block_bits(0, 8) == Raw.octets(0x01)
+    assert b.sub_block_bits(8, 8) == Raw.octets(0x02)
+    assert b.sub_block_bits(16, 8) == Raw.octets(0x03)
+    assert b.sub_block_bits(24, 8) == Raw.octets(0x04)
+    assert b.sub_block_bits(32, 8) == Raw.octets(0x05)
 
-    assert b.subBlockBits(5, 0) == Raw.empty
-    assert b.subBlockBits(5, 5) == Raw.bits("00100")
-    assert b.subBlockBits(10, 0) == Raw.empty
-    assert b.subBlockBits(10, 2) == Raw.bits("00")
-    assert b.tailBits(5 * 8) == Raw.empty
-    assert b.tailBits(15 * 8) == Raw.empty
+    assert b.sub_block_bits(5, 0) == Raw.empty
+    assert b.sub_block_bits(5, 5) == Raw.bits("00100")
+    assert b.sub_block_bits(10, 0) == Raw.empty
+    assert b.sub_block_bits(10, 2) == Raw.bits("00")
+    assert b.tail_bits(5 * 8) == Raw.empty
+    assert b.tail_bits(15 * 8) == Raw.empty
 
     b = Raw.sequence([Raw.hex("10"), Raw.bits("1"), Raw.hex("10")])
     assert b.octet(0) == 0x10
