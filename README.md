@@ -41,7 +41,7 @@ Similarly you can only show the PCAP frames:
 
 ## Supported protocols and formats
 
-The supported protocols are formats are [listed separately](documentation/Formats.md).
+The supported protocols and formats are [listed separately](documentation/Formats.md).
 
 ## Protocol modeling idea
 
@@ -72,4 +72,4 @@ class IPv4(Frame):
 
 ```
 
-See [architecture](document/Architecture.md) for more details.
+See [architecture](documentation/Architecture.md) for more details.

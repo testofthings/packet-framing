@@ -16,8 +16,10 @@ class Frames:
         return lambda f: ComposingBackend(f, LayerMapping())
 
     @classmethod
-    def dissect(cls, data: RawData, mappings: LayerMapping = LayerMapping()) -> Callable[['Frame'], FrameBackend]:
+    def dissect(cls, data: RawData, mappings: LayerMapping | None = None) -> Callable[['Frame'], FrameBackend]:
         """Dissect frame from data"""
+        if mappings is None:
+            mappings = LayerMapping()
         return lambda f: DissectorBackend(f, mappings, data)
 
     @classmethod
@@ -28,10 +30,12 @@ class Frames:
 
     @classmethod
     def dissect_pull(cls, frame_type: Type[F], queue: RawDataQueue,
-                     mappings: LayerMapping = LayerMapping()) -> Optional[F]:
+                     mappings: LayerMapping | None = None) -> Optional[F]:
         """Dissect frame from queue, if enough data. Pulls the frame data if success."""
         if not queue.head:
             return None  # no data
+        if mappings is None:
+            mappings = LayerMapping()
         try:
             f = frame_type(cls.dissect(queue.head.fixed, mappings=mappings))
             length = f.byte_length()
