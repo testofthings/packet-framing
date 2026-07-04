@@ -7,7 +7,7 @@ from framing.base import Frame, LayerMapping
 from framing.codecs import IntegerFormat
 from framing.fields import Structure, Sequence, ValueOf
 from framing.frame_types.ethernet_frames import EthernetII, Ethernet_Payloads
-from framing.frame_types.ipv6_frames import ip_frame_type
+from framing.frame_types.ipv6_frames import ip_frame_type, IPv6_Payloads
 from framing.frames import Frames
 from framing.layer_stack import StackLayer, StackState
 from framing.raw_data import Raw, RawData
@@ -74,9 +74,9 @@ def frame_for_link_type(link_type: int, data: RawData) -> Frame:
     if data.byte_length() == 0:
         raise ValueError("Empty packet data")
     if link_type == LINKTYPE_ETHERNET:
-        return EthernetII(Frames.dissect(data, mappings=Ethernet_Payloads))
+        return EthernetII(Frames.dissect(data, mappings=Ethernet_Payloads + IPv6_Payloads))
     if link_type == LINKTYPE_RAW:
-        return ip_frame_type(data)(Frames.dissect(data))
+        return ip_frame_type(data)(Frames.dissect(data, mappings=IPv6_Payloads))
     raise ValueError(f"Unsupported LinkType {link_type}")
 
 
