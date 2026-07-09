@@ -2,8 +2,13 @@ import pathlib
 
 from framing.frame_types.ethernet_frames import EthernetII, Ethernet_Payloads
 from framing.frame_types.ipv4_frames import IPv4
+from framing.frame_types.ipv6_frames import IPv6, IPReassembler
+from framing.frame_types.udp_frames import UDP
 from framing.frames import Frames
-from framing.frame_types.pcap_frames import PCAPFile, FileHeader, PacketRecord, PCAP_Payloads
+from framing.frame_types.pcap_frames import (
+    PCAPFile, FileHeader, PacketRecord, PCAP_Payloads,
+    frame_for_link_type, LINKTYPE_ETHERNET, LINKTYPE_RAW,
+)
 from framing.raw_data import Raw
 
 
@@ -90,5 +95,39 @@ def test_pcap_layering():
     assert eth.bit_length() == 42 * 8
     assert (eth / EthernetII.data).bit_length() == 28 * 8
     assert EthernetII.padding[eth] == Raw.empty
+
+    b.close()
+
+
+def test_frame_for_link_type_ethernet():
+    b = Raw.file(pathlib.Path("samples/sample-1.pcap"))
+    pcap = PCAPFile(Frames.dissect(b))
+    lt = FileHeader.LinkType[PCAPFile.File_Header[pcap]]
+    assert lt == LINKTYPE_ETHERNET
+
+    rec = pcap.Packet_Records.item(pcap, 1)
+    top = frame_for_link_type(lt, PacketRecord.Packet_Data[rec])
+    assert isinstance(top, EthernetII)
+    assert isinstance(EthernetII.data.as_frame(top), IPv4)
+
+    b.close()
+
+
+def test_frame_for_link_type_raw_ip():
+    b = Raw.file(pathlib.Path("samples/raw-ip.pcap"))
+    pcap = PCAPFile(Frames.dissect(b))
+    lt = FileHeader.LinkType[PCAPFile.File_Header[pcap]]
+    assert lt == LINKTYPE_RAW
+
+    recs = list(PCAPFile.Packet_Records.iterate(pcap))
+    tops = [frame_for_link_type(lt, PacketRecord.Packet_Data[r]) for r in recs]
+    assert isinstance(tops[0], IPv4)
+    assert isinstance(tops[1], IPv6)
+
+    reasm = IPReassembler()
+    for top in tops:
+        udp = reasm.push_frame(top)
+        assert isinstance(udp, UDP)
+        assert UDP.Destination_port[udp] == 0x1234
 
     b.close()
