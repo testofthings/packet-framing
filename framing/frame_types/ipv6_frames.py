@@ -62,6 +62,16 @@ class Fragment(Frame):
 IPx = Union[IPv4 | IPv6]
 
 
+def ip_frame_type(data: RawData) -> Type[Frame]:
+    """Pick IPv4 or IPv6 by the version nibble."""
+    version = data.octet(0) >> 4
+    if version == 4:
+        return IPv4
+    if version == 6:
+        return IPv6
+    raise ValueError(f"Unknown IP version {version}")
+
+
 IPv6_Payloads = LayerMapping(base=IP_Payloads).many_by({
     IPv6.Payload: IPv6.Next_header,
     Fragment.Payload: Fragment.Next_Header,

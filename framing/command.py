@@ -11,7 +11,7 @@ from framing.frame_types.ethernet_frames import EthernetII
 from framing.frame_types.ip_utilities import TCPStackLayer
 from framing.frame_types.ip_utilities import DNSStackLayer
 from framing.frame_types.ipv6_frames import IPStackLayer
-from framing.frame_types.pcap_frames import PCAPStackLayer
+from framing.frame_types.pcap_frames import PCAPStackLayer, LINKTYPE_ETHERNET, LINKTYPE_RAW
 from framing.frame_types.tls_frames import TLSHandshake
 from framing.frame_types.ip_utilities import UDPStackLayer
 from framing.frame_types.tls_frames import TLSRecordLayer
@@ -165,7 +165,7 @@ class StackBuilder:
                        sub={0x0800: ip, 0x86dd: ip})
 
     pcap = LayerBuilder('pcap', PCAPStackLayer,
-                        sub={1: eth})
+                        sub={LINKTYPE_ETHERNET: eth, LINKTYPE_RAW: ip})
     raw = LayerBuilder('raw', RawStackLayer)
 
     @classmethod
