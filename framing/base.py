@@ -17,7 +17,7 @@ FrameT = typing.TypeVar("FrameT", bound='Frame')
 
 
 class StructureError(Exception):
-    """Structure manimupulation error"""
+    """Structure manipulation error"""
 
 
 class EncodingState:

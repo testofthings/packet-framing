@@ -14,7 +14,7 @@ class RawDataQueue:
         # fragment offset relative to self.offset
         self.fragments: List[Tuple[int, RawData]] = []
 
-    # FIXME: Offset wrapping is not working, especially with forwarding!!!
+    # TODO: Offset wrapping is not working, especially with forwarding!!!
 
     def push(self, data: RawData, offset: int = -1) -> RawData:
         """Push data to end of the queue"""
