@@ -1,19 +1,38 @@
-export PYPI_API_KEY := 
+.PHONY: check-version compare-pyproject-version compare-changelog ensure-release-tag unit-tests
 
-export REPO_URL = --repository-url https://test.pypi.org/legacy/
+check-version: compare-pyproject-version
 
-# Default target, test, build and release
-# Set REPO_URL to empty string to upload to real PyPi
-release: unit-tests
-	$(MAKE) release-build
-	$(MAKE) release-upload
+# Make sure pyproject.toml has been updated to match RELEASE_TAG.
+# Checks the line 'version = "X.X..."' in section [project].
+compare-pyproject-version: compare-changelog
+	@PYPROJECT_VERSION=$$(grep -m 1 '^version' pyproject.toml | tr -d " \t" | sed -E 's/version="([^"]+)"/\1/'); \
+	echo "Found pyproject.toml version: $$PYPROJECT_VERSION"; \
+	if [ "$$PYPROJECT_VERSION" != "$(RELEASE_TAG)" ]; then \
+		echo "Error: RELEASE_TAG $(RELEASE_TAG) does not match pyproject.toml version $$PYPROJECT_VERSION"; \
+		exit 1; \
+	else \
+		echo "pyproject.toml has been updated to match RELEASE_TAG"; \
+	fi
 
-release-build:
-	rm -rf build/ dist/ *.egg-info
-	python setup.py sdist bdist_wheel
+# Make sure CHANGELOG.md has been updated to match RELEASE_TAG.
+# Checks the first line starting with '##'.
+# Format should be ## X.X... for CHANGELOG entries.
+compare-changelog: ensure-release-tag
+	@CHANGELOG_VERSION=$$(grep -m 1 '^##' CHANGELOG.md | sed 's/^## //'); \
+	echo "Found CHANGELOG version: $$CHANGELOG_VERSION"; \
+	if [ "$$CHANGELOG_VERSION" != "$(RELEASE_TAG)" ]; then \
+		echo "Error: RELEASE_TAG $(RELEASE_TAG) does not match CHANGELOG version $$CHANGELOG_VERSION"; \
+		exit 1; \
+	else \
+		echo "CHANGELOG.md has been updated to match RELEASE_TAG\n"; \
+	fi
 
-release-upload:
-	TWINE_USERNAME="__token__" TWINE_PASSWORD="$(PYPI_API_KEY)" twine upload $(REPO_URL) dist/*
+# Make sure RELEASE_TAG is set.
+ensure-release-tag:
+	@if [ -z "$(RELEASE_TAG)" ]; then \
+		echo "Error: No RELEASE_TAG given"; \
+		exit 1; \
+	fi
 
 unit-tests:
 	python -m pytest tests/
