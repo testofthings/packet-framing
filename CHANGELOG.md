@@ -1,0 +1,18 @@
+# Changelog
+
+## 0.3.0
+### Added
+- Pcap files containing raw IP frames, without an Ethernet header, can now be parsed
+- A dev container for development
+- Automatic code checks on pull requests, running pylint, mypy and pytest
+- A release workflow that uploads to PyPI on a version tag push
+
+### Changed
+- Packaging moved from `setup.py` to `pyproject.toml`
+- Python 3.11 or newer is required
+
+### Fixed
+- A large number of pylint and mypy findings across the codebase, and dead code removed
+
+### Documentation
+- README and documentation updated to reflect the current status of the repository
