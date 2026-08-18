@@ -10,8 +10,9 @@ jobs:
   build:
     name: Build distribution package
     runs-on: ubuntu-slim
-    permissions: # Mandatory for trusted publishing
-      id-token: write
+    permissions:
+      contents: read
+      id-token: write # For trusted publishing
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
