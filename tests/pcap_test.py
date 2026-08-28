@@ -1,15 +1,23 @@
 import pathlib
 
+import pytest
+
 from framing.frame_types.ethernet_frames import EthernetII, Ethernet_Payloads
 from framing.frame_types.ipv4_frames import IPv4
 from framing.frame_types.ipv6_frames import IPv6, IPReassembler
 from framing.frame_types.udp_frames import UDP
 from framing.frames import Frames
 from framing.frame_types.pcap_frames import (
-    PCAPFile, FileHeader, PacketRecord, PCAP_Payloads,
+    PCAPFile, FileHeader, PacketRecord, PCAP_Payloads, PCAPStackLayer,
     frame_for_link_type, LINKTYPE_ETHERNET, LINKTYPE_RAW,
 )
-from framing.raw_data import Raw
+from framing.layer_stack import StackState
+from framing.raw_data import Raw, RawData
+
+
+def pcap_file_header(magic: str = "d4 c3 b2 a1", version: str = "02 00 04 00") -> RawData:
+    """A PCAP file header with the given magic number and version, Ethernet link type"""
+    return Raw.hex(f"{magic} {version} 00000000 00000000 ffff0000 01000000")
 
 
 def test_pcap():
@@ -131,3 +139,62 @@ def test_frame_for_link_type_raw_ip():
         assert UDP.Destination_port[udp] == 0x1234
 
     b.close()
+
+
+def test_check_format():
+    # microsecond and nanosecond timestamp magic numbers, both least significant octet first
+    for magic in ("d4 c3 b2 a1", "4d 3c b2 a1"):
+        pcap = PCAPFile(Frames.dissect(pcap_file_header(magic)))
+        assert pcap.check_format() is pcap
+
+    # version 2.3 has the same packet record layout as 2.4
+    for version in ("02 00 03 00", "02 00 04 00"):
+        pcap = PCAPFile(Frames.dissect(pcap_file_header(version=version)))
+        assert pcap.check_format() is pcap
+
+
+def test_check_format_unsupported():
+    # PCAPNG starts with a Section Header Block
+    shb = Raw.hex("0a0d0d0a 1c000000 4d3c2b1a 01000000 ffffffffffffffff 1c000000")
+    with pytest.raises(ValueError, match="PCAPNG format, which is not supported"):
+        PCAPFile(Frames.dissect(shb)).check_format()
+
+    # most significant octet first files, microsecond and nanosecond timestamps
+    for magic in ("a1 b2 c3 d4", "a1 b2 3c 4d"):
+        with pytest.raises(ValueError, match="most significant octet first"):
+            PCAPFile(Frames.dissect(pcap_file_header(magic))).check_format()
+
+    with pytest.raises(ValueError, match="Not a PCAP file, the magic number is 01020304"):
+        PCAPFile(Frames.dissect(pcap_file_header("01 02 03 04"))).check_format()
+
+    # a newer minor version may hold something we cannot read, likewise for other major versions
+    for version in ("02 00 05 00", "03 00 04 00", "01 00 04 00", "1f 02 00 00"):
+        with pytest.raises(ValueError, match="Unsupported PCAP file version .*versions up to 2.4"):
+            PCAPFile(Frames.dissect(pcap_file_header(version=version))).check_format()
+
+    # before version 2.3 the packet length fields are the other way around
+    for version in ("02 00 00 00", "02 00 02 00"):
+        with pytest.raises(ValueError, match="Length fields interchanged"):
+            PCAPFile(Frames.dissect(pcap_file_header(version=version))).check_format()
+
+    with pytest.raises(ValueError, match="too short to be a PCAP file"):
+        PCAPFile(Frames.dissect(Raw.hex("d4 c3 b2 a1 02 00"))).check_format()
+
+
+def test_open_file_checks_format():
+    with pytest.raises(ValueError, match="PCAPNG format, which is not supported"):
+        PCAPFile.open_file(pathlib.Path("samples/sample-1.pcapng"), mappings=None)
+
+    # the supported files still open
+    pcap = PCAPFile.open_file(pathlib.Path("samples/sample-1-head.pcap"), mappings=PCAP_Payloads)
+    assert len(PCAPFile.Packet_Records[pcap]) == 10
+    Frames.close(pcap)
+
+
+def test_stack_layer_checks_format():
+    data = Raw.file(pathlib.Path("samples/sample-1.pcapng"))
+    try:
+        with pytest.raises(ValueError, match="PCAPNG format, which is not supported"):
+            list(PCAPStackLayer().receive(StackState(data)))
+    finally:
+        data.close()

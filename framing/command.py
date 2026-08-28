@@ -223,6 +223,8 @@ def main() -> None:
                 if 0 < first_line_len < len(s):
                     s = s[first_line_len + 1:]
                 print(f"{state.get_layer_names()}\n{s}")
+        except ValueError as e:
+            raise SystemExit(f"{f}: {e}") from e  # e.g. unsupported file format
         finally:
             data.close()
 

@@ -22,6 +22,22 @@ from framing.raw_data import Raw, RawData
 
 Int = IntegerFormat().big_endian()  # big endian integers
 
+# PCAP file magic numbers, the first four octets of a file
+MAGIC_NUMBER = Raw.hex("D4C3B2A1")                  # least significant octet first, microsecond timestamps
+MAGIC_NUMBER_NANOSECONDS = Raw.hex("4D3CB2A1")      # least significant octet first, nanosecond timestamps
+MAGIC_NUMBER_MSB = Raw.hex("A1B2C3D4")              # most significant octet first, microsecond timestamps
+MAGIC_NUMBER_MSB_NANOSECONDS = Raw.hex("A1B23C4D")  # most significant octet first, nanosecond timestamps
+MAGIC_NUMBER_PCAPNG = Raw.hex("0A0D0D0A")           # PCAPNG Section Header Block
+
+# The PCAP file format versions we can read. A new minor version may add things a reader of an older
+# version cannot handle, so newer minor versions are not read, which is what libpcap does, too.
+MAJOR_VERSION = 2
+MINOR_VERSION = 4
+
+# The Captured and Original Packet Length fields were interchanged in version 2.3, older files have
+# them the other way around. Version 2.3 files are read as 2.4, as libpcap wrote them interchanged.
+MINOR_VERSION_LENGTHS_INTERCHANGED = 3
+
 # PCAP link-layer header types
 LINKTYPE_ETHERNET = 1
 LINKTYPE_RAW = 101
@@ -32,9 +48,9 @@ class FileHeader(Frame):
     """PCAP file header"""
     structure = Structure['FileHeader']()
 
-    Magic_Number = structure.raw(bytes=4, default=Raw.hex("D4C3B2A1"))
-    Major_Version = structure.integer(Int.bytes(2), default=2)
-    Minor_Version = structure.integer(Int.bytes(2), default=4)
+    Magic_Number = structure.raw(bytes=4, default=MAGIC_NUMBER)
+    Major_Version = structure.integer(Int.bytes(2), default=MAJOR_VERSION)
+    Minor_Version = structure.integer(Int.bytes(2), default=MINOR_VERSION)
     Reserved1 = structure.raw(bytes=4)
     Reserved2 = structure.raw(bytes=4)
     SnapLen = structure.integer(Int.bytes(4))
@@ -59,10 +75,39 @@ class PCAPFile(Frame):
     File_Header = structure.sub(FileHeader)
     Packet_Records = Sequence(structure.sub(PacketRecord))
 
+    def check_format(self) -> 'PCAPFile':
+        """Check that this is a PCAP file in the supported byte order and version.
+        Raises ValueError, if it is not."""
+        try:
+            hdr = PCAPFile.File_Header[self]
+            magic = FileHeader.Magic_Number[hdr]
+            major, minor = FileHeader.Major_Version[hdr], FileHeader.Minor_Version[hdr]
+        except EOFError as e:
+            raise ValueError("The file is too short to be a PCAP file") from e
+        if magic == MAGIC_NUMBER_PCAPNG:
+            raise ValueError("The file is in PCAPNG format, which is not supported")
+        if magic in (MAGIC_NUMBER_MSB, MAGIC_NUMBER_MSB_NANOSECONDS):
+            raise ValueError(f"PCAP file magic number {magic.to_hex()} is most significant octet first, "
+                             "only least significant octet first files are supported")
+        if magic not in (MAGIC_NUMBER, MAGIC_NUMBER_NANOSECONDS):
+            raise ValueError(f"Not a PCAP file, the magic number is {magic.to_hex()}")
+        if major != MAJOR_VERSION or minor > MINOR_VERSION:
+            raise ValueError(f"Unsupported PCAP file version {major}.{minor}, "
+                             f"versions up to {MAJOR_VERSION}.{MINOR_VERSION} are supported")
+        if minor < MINOR_VERSION_LENGTHS_INTERCHANGED:
+            raise ValueError(f"PCAP file version {major}.{minor} has the Captured and Original Packet "
+                             "Length fields interchanged, which is not supported")
+        return self
+
     @classmethod
     def open_file(cls, file: pathlib.Path, mappings: Optional[LayerMapping]) -> 'PCAPFile':
         """Open and dissect a PCAP file"""
         f = PCAPFile(Frames.dissect_file(file))
+        try:
+            f.check_format()
+        except ValueError:
+            Frames.close(f)  # do not leave the file open
+            raise
         return mappings.add_to(f) if mappings else f
 
 
@@ -101,7 +146,7 @@ class PCAPStackLayer(StackLayer):
         super().__init__(PCAPFile)
 
     def receive(self, state: StackState) -> Iterable[StackState]:
-        file = PCAPFile(Frames.dissect(state.data))
+        file = PCAPFile(Frames.dissect(state.data)).check_format()
         hdr = PCAPFile.File_Header[file]
         pay_type = FileHeader.LinkType[hdr]
         state = state.add(file)

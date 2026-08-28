@@ -10,6 +10,8 @@
 - A release workflow that uploads to PyPI on a version tag push
 
 ### Changed
+- A capture file is verified to be a supported PCAP file, unsupported files, e.g. PCAPNG files, are rejected with an error
+  message instead of being parsed into nonsense records
 - Packaging moved from `setup.py` to `pyproject.toml`
 - Python 3.11 or newer is required
 
