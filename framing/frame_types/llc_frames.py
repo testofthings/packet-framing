@@ -1,4 +1,4 @@
-"""IEEE 802.2 LLC frame definition with SNAP header"""
+"""IEEE 802.2 LLC frame definition with SNAP header, and payload mappings"""
 
 from framing.base import Frame, LayerMapping
 from framing.codecs import IntegerFormat

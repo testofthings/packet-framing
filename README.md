@@ -20,7 +20,8 @@ $ python -m framing traffic.pcap
 ```
 
 By default, the tool parses _IP_ traffic in _Ethernet_ frames captured by PCAP.
-Raw IP captures without Ethernet framing (PCAP LinkType 101) are also supported.
+Raw IP captures without Ethernet framing (PCAP LinkType 101) and
+IEEE 802.11 captures (PCAP LinkType 105) are also supported.
 The protocol stack to apply in dissection is specified by _YAML_ or _JSON_ using command-line argument `--stack` or `-s`.
 For example, to parse only the TCP layer and above, use the following:
 

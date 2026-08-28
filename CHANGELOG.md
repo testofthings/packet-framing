@@ -2,6 +2,8 @@
 
 ## 0.3.0
 ### Added
+- IEEE 802.11 (Wi-Fi) MAC frames are parsed from captures with PCAP LinkType 105, including the
+  IEEE 802.2 LLC/SNAP encapsulation, which makes the IP traffic in them accessible
 - Pcap files containing raw IP frames, without an Ethernet header, can now be parsed
 - A dev container for development
 - Automatic code checks on pull requests, running pylint, mypy and pytest

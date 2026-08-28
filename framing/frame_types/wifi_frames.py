@@ -1,4 +1,4 @@
-"""IEEE 802.11 (Wi-Fi) MAC frame definitions"""
+"""IEEE 802.11 (Wi-Fi) MAC frame definitions, payload mappings and stack layer"""
 
 import enum
 from typing import Any, Dict, Iterable, Type
