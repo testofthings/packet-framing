@@ -179,7 +179,7 @@ data decides its octet order:
 
 ```python
 # pcap_frames.py: PCAP integers are least significant octet first, unless the magic number says otherwise
-Int = IntegerFormat().big_endian().swappable()
+Int = IntegerFormat(lsb_first=True).swappable()
 
 SnapLen = structure.integer(Int.bytes(4))
 ```

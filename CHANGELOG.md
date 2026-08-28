@@ -12,6 +12,10 @@
 - A release workflow that uploads to PyPI on a version tag push
 
 ### Changed
+- **Breaking**: The octet order of an integer field is chosen with `IntegerFormat(lsb_first=...)`.
+  The methods `big_endian()` and `little_endian()` are removed, as they did the opposite of what
+  their names said: `big_endian()` produced least significant octet first. Replace a call to
+  `big_endian()` with `lsb_first=True` and a call to `little_endian()` with the default
 - A capture file is verified to be a supported PCAP file, unsupported files, e.g. PCAPNG files, are rejected with an error
   message instead of being parsed into nonsense records
 - Packaging moved from `setup.py` to `pyproject.toml`

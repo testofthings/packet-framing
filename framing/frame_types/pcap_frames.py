@@ -21,7 +21,7 @@ from framing.raw_data import Raw, RawData
 
 
 # PCAP integers are least significant octet first, unless the magic number tells otherwise
-Int = IntegerFormat().big_endian().swappable()
+Int = IntegerFormat(lsb_first=True).swappable()
 
 # PCAP file magic numbers, the first four octets of a file
 MAGIC_NUMBER = Raw.hex("D4C3B2A1")                  # least significant octet first, microsecond timestamps

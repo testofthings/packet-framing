@@ -15,8 +15,8 @@ from framing.raw_data import Raw
 
 # pylint: disable=invalid-name
 
-# 802.11 integers are least significant octet first, which this library calls big endian
-LE = IntegerFormat().big_endian()
+# 802.11 integers are least significant octet first
+LE = IntegerFormat(lsb_first=True)
 
 # Frame Control Type values, 9.2.4.1.3
 TYPE_MANAGEMENT = 0

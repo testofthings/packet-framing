@@ -49,17 +49,17 @@ class IntegerCodec(ABC, ValueCodec[int]):
 
 class FixedByteIntegerCodec(IntegerCodec):
     """Fixed byte-length integer codec"""
-    def __init__(self, byte_length: int, little_end: bool = False):
+    def __init__(self, byte_length: int, lsb_first: bool = False):
         self.length = byte_length
-        self.little_end = little_end
-        if little_end:
-            self.steps = list(range(byte_length - 1, -1, -1))
-        else:
+        self.lsb_first = lsb_first
+        if lsb_first:
             self.steps = list(range(0, byte_length))
+        else:
+            self.steps = list(range(byte_length - 1, -1, -1))
         self.reverse = list(reversed(self.steps))
 
     def swapped(self) -> Optional[IntegerCodec]:
-        return FixedByteIntegerCodec(self.length, not self.little_end)
+        return FixedByteIntegerCodec(self.length, not self.lsb_first)
 
     def encode(self, value: int) -> RawData:
         b = bytearray(self.length)
@@ -98,23 +98,23 @@ class FixedByteIntegerCodec(IntegerCodec):
 
 class FixedBitIntegerCodec(IntegerCodec):
     """Fixed bit-length integer codec"""
-    def __init__(self, bit_length: int, little_end: bool = False):
-        self.byte_codec = FixedByteIntegerCodec((bit_length + 7) // 8, little_end)
+    def __init__(self, bit_length: int, lsb_first: bool = False):
+        self.byte_codec = FixedByteIntegerCodec((bit_length + 7) // 8, lsb_first)
         self.length = bit_length
 
     def encode(self, value: int) -> RawData:
         b = self.byte_codec.encode(value)
-        if self.byte_codec.little_end:
-            r = b.tail_bits(8 - self.length % 8)
-        else:
+        if self.byte_codec.lsb_first:
             r = b.sub_block_bits(0, self.length)
+        else:
+            r = b.tail_bits(8 - self.length % 8)
         return r
 
     def decode(self, data: RawData) -> int:
-        if self.byte_codec.little_end:
-            b = Raw.zeroes(bit_length=8 - self.length % 8) + data
-        else:
+        if self.byte_codec.lsb_first:
             b = data + Raw.zeroes(bit_length=8 - self.length % 8)
+        else:
+            b = Raw.zeroes(bit_length=8 - self.length % 8) + data
         return self.byte_codec.decode(b)
 
     def decode_direct(self, bit_offset: int, data: RawData) -> int:
@@ -130,8 +130,8 @@ class FixedBitIntegerCodec(IntegerCodec):
             raise EOFError()  # only check the last part to minimize impact
         r_shift = 8 - ((bit_offset + self.length) % 8)
         v = v >> r_shift if r_shift < 8 else v
-        if not self.byte_codec.little_end:
-            # big endian
+        if self.byte_codec.lsb_first:
+            # a bit field which is not a whole number of octets, least significant octet first
             raise NotImplementedError()
         return v
 
@@ -145,9 +145,9 @@ class FixedBitIntegerCodec(IntegerCodec):
 class IntegerFormat:
     """Codec formatter"""
     def __init__(self, bits: int = 0, bytes: int = 0,  # pylint: disable=redefined-builtin
-                 big_end: bool = False) -> None:
+                 lsb_first: bool = False) -> None:
         self.bit_length = bits or (bytes * 8) or 16
-        self.little_end = not big_end
+        self.lsb_first = lsb_first  # by default most significant octet first, as in network protocols
         self.swap_end = False
 
     def bits(self, bits: int) -> Self:
@@ -160,16 +160,6 @@ class IntegerFormat:
         self.bit_length = bytes * 8
         return self
 
-    def little_endian(self, flag: bool = True) -> Self:
-        """Choose little endian format"""
-        self.little_end = flag
-        return self
-
-    def big_endian(self, flag: bool = True) -> Self:
-        """Choose big endian format"""
-        self.little_end = not flag
-        return self
-
     def swappable(self, flag: bool = True) -> Self:
         """The octet order may be swapped by the data, e.g. told by a magic number.
         Only apply to a format of your own, never to the default format of a field."""
@@ -179,5 +169,5 @@ class IntegerFormat:
     def create_codec(self) -> IntegerCodec:
         """Create the codec"""
         if self.bit_length % 8 != 0:
-            return FixedBitIntegerCodec(bit_length=self.bit_length, little_end=self.little_end)
-        return FixedByteIntegerCodec(byte_length=self.bit_length // 8, little_end=self.little_end)
+            return FixedBitIntegerCodec(bit_length=self.bit_length, lsb_first=self.lsb_first)
+        return FixedByteIntegerCodec(byte_length=self.bit_length // 8, lsb_first=self.lsb_first)
