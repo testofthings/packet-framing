@@ -171,6 +171,36 @@ IPv4.TTL[frame]     = 64
 
 `Frames.compose()` and `Frames.dissect(data)` return `Callable[[Frame], FrameBackend]` — the lambda is called inside `Frame.__init__`.
 
+### Octet order — `int_swap`
+
+Some formats exist in two octet orders, told apart by a magic number in the data, e.g. PCAP files.
+Rather than declaring the frames twice, a field can be declared **swappable**, which means that the
+data decides its octet order:
+
+```python
+# pcap_frames.py: PCAP integers are least significant octet first, unless the magic number says otherwise
+Int = IntegerFormat().big_endian().swappable()
+
+SnapLen = structure.integer(Int.bytes(4))
+```
+
+The choice is then made when the frame is created:
+
+```python
+frame = PCAPFile(Frames.dissect(data, int_swap=is_msb_first(data)))
+```
+
+The flag lives in `FrameBackend.int_swap` for decoding and in `EncodingState.int_swap` for encoding.
+A swappable `IntField` holds two codecs, the declared one and `codec.swapped()`, and picks by the
+flag. A field which is not declared swappable keeps its declared order whatever the flag says, so one
+frame can mix fields of a fixed order and fields of the order of the data. A field which is not a
+whole number of octets has no octet order and is never swapped. Raw fields, field offsets and field
+lengths are the same in both orders.
+
+The flag is inherited by sub-frames, as they are part of the same protocol definition. It is *not*
+inherited by a payload frame resolved through a `LayerMapping`, since the payload is another protocol
+which has the octet order of its own definition.
+
 ---
 
 ## Field offset resolution

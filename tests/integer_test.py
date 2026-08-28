@@ -12,6 +12,24 @@ def test_fixed_byte_int():
     assert codec.decode(Raw.hex("01 00 02")) == 0x020001
 
 
+def test_swapped_codec():
+    codec = IntegerFormat(bytes=3).create_codec()
+    swapped = codec.swapped()
+    assert swapped is not None
+    assert swapped.encode(3) == Raw.hex("03 00 00")
+    assert swapped.decode(Raw.hex("01 00 02")) == 0x020001
+    assert codec.decode(Raw.hex("01 00 02")) == 0x010002  # the original codec is not changed
+
+    # swapping twice gives the original order
+    again = swapped.swapped()
+    assert again is not None
+    assert again.decode(Raw.hex("01 00 02")) == 0x010002
+
+    # a field which is not a whole number of octets has no octet order
+    assert IntegerFormat(bits=4).create_codec().swapped() is None
+    assert IntegerFormat(bits=13).create_codec().swapped() is None
+
+
 def test_fixed_bit_int():
     codec = IntegerFormat(bits=4).create_codec()
     b0 = codec.encode(4)

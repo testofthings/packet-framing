@@ -2,7 +2,7 @@
 
 from abc import ABC
 import typing
-from typing import Self
+from typing import Optional, Self
 
 from framing.raw_data import RawData, Raw
 
@@ -38,6 +38,10 @@ class IntegerCodec(ABC, ValueCodec[int]):
     def default_value(self) -> int:
         return 0
 
+    def swapped(self) -> Optional['IntegerCodec']:
+        """The same codec with the octet order swapped, None when there is no octet order"""
+        return None
+
     def decode_direct(self, bit_offset: int, data: RawData) -> int:
         """Decode directly from frame data. Caller must know when supported"""
         return self.decode(data.tail_bits(bit_offset))
@@ -53,6 +57,9 @@ class FixedByteIntegerCodec(IntegerCodec):
         else:
             self.steps = list(range(0, byte_length))
         self.reverse = list(reversed(self.steps))
+
+    def swapped(self) -> Optional[IntegerCodec]:
+        return FixedByteIntegerCodec(self.length, not self.little_end)
 
     def encode(self, value: int) -> RawData:
         b = bytearray(self.length)
@@ -141,6 +148,7 @@ class IntegerFormat:
                  big_end: bool = False) -> None:
         self.bit_length = bits or (bytes * 8) or 16
         self.little_end = not big_end
+        self.swap_end = False
 
     def bits(self, bits: int) -> Self:
         """Set bit length"""
@@ -160,6 +168,12 @@ class IntegerFormat:
     def big_endian(self, flag: bool = True) -> Self:
         """Choose big endian format"""
         self.little_end = not flag
+        return self
+
+    def swappable(self, flag: bool = True) -> Self:
+        """The octet order may be swapped by the data, e.g. told by a magic number.
+        Only apply to a format of your own, never to the default format of a field."""
+        self.swap_end = flag
         return self
 
     def create_codec(self) -> IntegerCodec:

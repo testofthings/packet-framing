@@ -25,6 +25,18 @@ class CFrame(Frame):
     s_field = Sequence(LVField(structure.raw(), IntegerFormat(bytes=2))).terminator_test(lambda r: not r)
 
 
+SwappableInt = IntegerFormat().swappable()  # the octet order is told by the data
+
+
+class SwapFrame(Frame):
+    structure = Structure['SwapFrame']()
+
+    swappable = structure.integer(SwappableInt.bytes(2))
+    fixed = structure.integer(IntegerFormat(bytes=2))
+    nibble = structure.integer(SwappableInt.bits(4))  # not a whole number of octets
+    nibble_2 = structure.integer(SwappableInt.bits(4))
+
+
 class DFrame(Frame):
     structure = Structure['DFrame']()
 
@@ -116,3 +128,32 @@ def test_min_length():
     with pytest.raises(EOFError):
         d = EFrame.s_field[e_frame]
 
+
+
+def test_swappable_integer():
+    data = Raw.hex("0102 0304 56")
+
+    frame = SwapFrame(Frames.dissect(data))
+    assert SwapFrame.swappable[frame] == 0x0102
+    assert SwapFrame.fixed[frame] == 0x0304
+    assert SwapFrame.nibble[frame] == 0x5
+    assert SwapFrame.nibble_2[frame] == 0x6
+
+    # only the field which is declared swappable follows the octet order of the data
+    frame = SwapFrame(Frames.dissect(data, int_swap=True))
+    assert SwapFrame.swappable[frame] == 0x0201
+    assert SwapFrame.fixed[frame] == 0x0304
+    assert SwapFrame.nibble[frame] == 0x5  # no octet order to swap
+    assert SwapFrame.nibble_2[frame] == 0x6
+
+
+def test_swappable_integer_compose():
+    for int_swap, encoded, printed in ((False, "0102 0304 56", "01 02  .."),
+                                       (True, "0201 0304 56", "02 01  ..")):
+        frame = SwapFrame(Frames.compose(int_swap=int_swap))
+        SwapFrame.swappable[frame] = 0x0102
+        SwapFrame.fixed[frame] = 0x0304
+        SwapFrame.nibble[frame] = 0x5
+        SwapFrame.nibble_2[frame] = 0x6
+        assert frame.encode() == Raw.hex(encoded)
+        assert SwapFrame.swappable.to_string(frame) == printed

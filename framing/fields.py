@@ -310,9 +310,12 @@ class RawField(ConfigurableField[F, RawData]):
 
 class IntField(ConfigurableField[F, int], Calculator, CalculatorSource):
     """Integer field"""
-    def __init__(self, codec: IntegerCodec, default_value: int, fixed_bit_offset: int):
+    def __init__(self, codec: IntegerCodec, default_value: int, fixed_bit_offset: int,
+                 swappable: bool = False):
         super().__init__("int", default_value)
         self.codec = codec
+        # the codec with the octet order swapped, the codec itself for a field which is not swappable
+        self.swap_codec = (codec.swapped() or codec) if swappable else codec
         self.fixed_bit_length = codec.get_fixed_bit_length()
         self.fixed_bit_offset = fixed_bit_offset
         if fixed_bit_offset >= 0 and self.fixed_bit_length >= 0:
@@ -323,11 +326,15 @@ class IntField(ConfigurableField[F, int], Calculator, CalculatorSource):
         """Configure flag values for this field, for example for TCP flags"""
         return self
 
+    def _codec_by(self, int_swap: bool) -> IntegerCodec:
+        """The codec to use, a swappable field can have the octet order swapped by the data"""
+        return self.swap_codec if int_swap else self.codec
+
     def encoding_bit_length(self, backend: FrameBackend, value: int) -> int:
-        return self.codec.get_bit_length(value)
+        return self.codec.get_bit_length(value)  # the length is the same in both octet orders
 
     def encode(self, value: int, state: EncodingState) -> RawData:
-        return self.codec.encode(value)
+        return self._codec_by(state.int_swap).encode(value)
 
     def decode_bit_length(self, data: RawData, bit_offset: int, value: Optional[int],
                           backend: 'FrameBackend') -> int:
@@ -336,11 +343,11 @@ class IntField(ConfigurableField[F, int], Calculator, CalculatorSource):
         return super().decode_bit_length(data, bit_offset, None, backend)
 
     def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> int:
-        v = self.codec.decode(data)
+        v = self._codec_by(backend.int_swap).decode(data)
         return v
 
     def decode_direct(self, frame_data: RawData, backend: FrameBackend) -> int:
-        v = self.codec.decode_direct(self.fixed_bit_offset, frame_data)
+        v = self._codec_by(backend.int_swap).decode_direct(self.fixed_bit_offset, frame_data)
         return v
 
     def calculator(self) -> Calculator:
@@ -678,14 +685,15 @@ class Structure(FrameStructure[F]):
     def integer(self, int_format: IntegerFormat = IntegerFormat(),
                 bytes: int =-1, bits: int =-1,  # pylint: disable=redefined-builtin
                 default: int = 0, name: str = "") -> IntField[F]:
-        """Add integer field"""
+        """Add integer field. NOTE: The default format is shared by all callers, do not configure it."""
         fn = self._get_a_name(name)
         if bytes > 0:
             int_format = int_format.bytes(bytes)
         if bits > 0:
             int_format = int_format.bits(bits)
         codec = int_format.create_codec()
-        f: IntField[F] = IntField(codec, default, fixed_bit_offset=self.fields_fixed_bit_offset)
+        f: IntField[F] = IntField(codec, default, fixed_bit_offset=self.fields_fixed_bit_offset,
+                                  swappable=int_format.swap_end)
         f.structure = self
         self.fields[fn] = f
         self._update_fixed_length(f)

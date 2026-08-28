@@ -11,22 +11,23 @@ from framing.raw_data import RawData, Raw
 class Frames:
     """Frame processing utilities"""
     @classmethod
-    def compose(cls) -> Callable[['Frame'], FrameBackend]:
-        """Create new frame for composing"""
-        return lambda f: ComposingBackend(f, LayerMapping())
+    def compose(cls, int_swap: bool = False) -> Callable[['Frame'], FrameBackend]:
+        """Create new frame for composing. The integer octet order can be reversed from the declared one."""
+        return lambda f: ComposingBackend(f, LayerMapping(), int_swap)
 
     @classmethod
-    def dissect(cls, data: RawData, mappings: LayerMapping | None = None) -> Callable[['Frame'], FrameBackend]:
-        """Dissect frame from data"""
+    def dissect(cls, data: RawData, mappings: LayerMapping | None = None,
+                int_swap: bool = False) -> Callable[['Frame'], FrameBackend]:
+        """Dissect frame from data. The integer octet order can be reversed from the declared one."""
         if mappings is None:
             mappings = LayerMapping()
-        return lambda f: DissectorBackend(f, mappings, data)
+        return lambda f: DissectorBackend(f, mappings, data, int_swap)
 
     @classmethod
-    def dissect_file(cls, file: pathlib.Path) -> Callable[['Frame'], FrameBackend]:
-        """Dissect frame from file"""
+    def dissect_file(cls, file: pathlib.Path, int_swap: bool = False) -> Callable[['Frame'], FrameBackend]:
+        """Dissect frame from file. The integer octet order can be reversed from the declared one."""
         data = Raw.file(file)
-        return lambda f: DissectorBackend(f, LayerMapping(), data)
+        return lambda f: DissectorBackend(f, LayerMapping(), data, int_swap)
 
     @classmethod
     def dissect_pull(cls, frame_type: Type[F], queue: RawDataQueue,

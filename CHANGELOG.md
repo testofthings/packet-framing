@@ -4,6 +4,8 @@
 ### Added
 - IEEE 802.11 (Wi-Fi) MAC frames are parsed from captures with PCAP LinkType 105, including the
   IEEE 802.2 LLC/SNAP encapsulation, which makes the IP traffic in them accessible
+- PCAP files are read in either octet order, the order is told by the magic number of the file.
+  An integer field can be declared _swappable_, which lets the data decide its octet order
 - Pcap files containing raw IP frames, without an Ethernet header, can now be parsed
 - A dev container for development
 - Automatic code checks on pull requests, running pylint, mypy and pytest

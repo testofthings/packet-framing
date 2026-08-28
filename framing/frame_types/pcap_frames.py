@@ -20,7 +20,8 @@ from framing.raw_data import Raw, RawData
 # pylint: disable=invalid-name
 
 
-Int = IntegerFormat().big_endian()  # big endian integers
+# PCAP integers are least significant octet first, unless the magic number tells otherwise
+Int = IntegerFormat().big_endian().swappable()
 
 # PCAP file magic numbers, the first four octets of a file
 MAGIC_NUMBER = Raw.hex("D4C3B2A1")                  # least significant octet first, microsecond timestamps
@@ -31,17 +32,20 @@ MAGIC_NUMBER_PCAPNG = Raw.hex("0A0D0D0A")           # PCAPNG Section Header Bloc
 
 # The PCAP file format versions we can read. A new minor version may add things a reader of an older
 # version cannot handle, so newer minor versions are not read, which is what libpcap does, too.
+# Versions older than 2.3 have the Captured and Original Packet Length fields interchanged.
 MAJOR_VERSION = 2
 MINOR_VERSION = 4
-
-# The Captured and Original Packet Length fields were interchanged in version 2.3, older files have
-# them the other way around. Version 2.3 files are read as 2.4, as libpcap wrote them interchanged.
-MINOR_VERSION_LENGTHS_INTERCHANGED = 3
+MINOR_VERSION_OLDEST = 3
 
 # PCAP link-layer header types
 LINKTYPE_ETHERNET = 1
 LINKTYPE_RAW = 101
 LINKTYPE_IEEE802_11 = 105
+
+
+def is_msb_first(data: RawData) -> bool:
+    """Is the PCAP file data most significant octet first? Told by the magic number."""
+    return data.sub_block(0, 4) in (MAGIC_NUMBER_MSB, MAGIC_NUMBER_MSB_NANOSECONDS)
 
 
 class FileHeader(Frame):
@@ -86,23 +90,20 @@ class PCAPFile(Frame):
             raise ValueError("The file is too short to be a PCAP file") from e
         if magic == MAGIC_NUMBER_PCAPNG:
             raise ValueError("The file is in PCAPNG format, which is not supported")
-        if magic in (MAGIC_NUMBER_MSB, MAGIC_NUMBER_MSB_NANOSECONDS):
-            raise ValueError(f"PCAP file magic number {magic.to_hex()} is most significant octet first, "
-                             "only least significant octet first files are supported")
-        if magic not in (MAGIC_NUMBER, MAGIC_NUMBER_NANOSECONDS):
+        if magic not in (MAGIC_NUMBER, MAGIC_NUMBER_NANOSECONDS,
+                         MAGIC_NUMBER_MSB, MAGIC_NUMBER_MSB_NANOSECONDS):
             raise ValueError(f"Not a PCAP file, the magic number is {magic.to_hex()}")
-        if major != MAJOR_VERSION or minor > MINOR_VERSION:
-            raise ValueError(f"Unsupported PCAP file version {major}.{minor}, "
-                             f"versions up to {MAJOR_VERSION}.{MINOR_VERSION} are supported")
-        if minor < MINOR_VERSION_LENGTHS_INTERCHANGED:
-            raise ValueError(f"PCAP file version {major}.{minor} has the Captured and Original Packet "
-                             "Length fields interchanged, which is not supported")
+        if major != MAJOR_VERSION or not MINOR_VERSION_OLDEST <= minor <= MINOR_VERSION:
+            raise ValueError(f"Unsupported PCAP file version {major}.{minor}, versions "
+                             f"{MAJOR_VERSION}.{MINOR_VERSION_OLDEST} to {MAJOR_VERSION}.{MINOR_VERSION} "
+                             "are supported")
         return self
 
     @classmethod
     def open_file(cls, file: pathlib.Path, mappings: Optional[LayerMapping]) -> 'PCAPFile':
         """Open and dissect a PCAP file"""
-        f = PCAPFile(Frames.dissect_file(file))
+        data = Raw.file(file)
+        f = PCAPFile(Frames.dissect(data, int_swap=is_msb_first(data)))
         try:
             f.check_format()
         except ValueError:
@@ -146,7 +147,7 @@ class PCAPStackLayer(StackLayer):
         super().__init__(PCAPFile)
 
     def receive(self, state: StackState) -> Iterable[StackState]:
-        file = PCAPFile(Frames.dissect(state.data)).check_format()
+        file = PCAPFile(Frames.dissect(state.data, int_swap=is_msb_first(state.data))).check_format()
         hdr = PCAPFile.File_Header[file]
         pay_type = FileHeader.LinkType[hdr]
         state = state.add(file)
