@@ -178,8 +178,8 @@ class ComposingBackend(BackendImplementation):
         assert isinstance(field, ConfigurableField)
         assert field.structure == self.structure, self._bad_field_access(field)
         if self.choice:
-            # update the choice
-            self.field_values.pop(self.choice)
+            # update the choice, the old one may not have a value yet
+            self.field_values.pop(self.choice, None)
             self.choice = field
         self.field_values[field] = value
         return self

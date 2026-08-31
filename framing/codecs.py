@@ -80,13 +80,11 @@ class FixedByteIntegerCodec(IntegerCodec):
             d = data.tail_bits(bit_offset)
             offset = 0
         v = 0
-        octet = 0
         for i in self.reverse:
             v <<= 8
-            octet = d.octet(offset + i)
-            v |= octet
-        if octet < 0:
-            raise EOFError()  # only check the last part to minimize impact
+            v |= d.octet(offset + i)
+        if v < 0:
+            raise EOFError()  # a missing octet is -1, which makes the whole value negative
         return v
 
     def get_bit_length(self, value: int) -> int:
@@ -121,6 +119,8 @@ class FixedBitIntegerCodec(IntegerCodec):
         octet_off = bit_offset // 8
         l_mask = 0xff >> (bit_offset % 8)
         octet = data.octet(octet_off)
+        if octet < 0:
+            raise EOFError()  # masking below would hide the missing octet
         v = octet & l_mask if l_mask else octet
         for i in range(0, self.length // 8):
             v <<= 8

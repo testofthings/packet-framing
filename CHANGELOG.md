@@ -22,6 +22,11 @@
 - Python 3.11 or newer is required
 
 ### Fixed
+- Encoding a frame with a `Selection` stored the type value of the last declared alternative,
+  instead of the value of the chosen one
+- A value cut short by the end of the data was not detected for least significant octet first
+  integers, which gave a wrong value instead of an error
+- Setting a value to a freshly selected alternative of a `Selection` raised `KeyError`
 - A large number of pylint and mypy findings across the codebase, and dead code removed
 
 ### Documentation

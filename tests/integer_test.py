@@ -1,3 +1,5 @@
+import pytest
+
 from framing.codecs import IntegerFormat
 from framing.raw_data import Raw
 
@@ -63,3 +65,12 @@ def test_direct_int():
     assert codec.decode_direct(8, raw) == 0x00
     assert codec.decode_direct(12, raw) == 0x03
     assert codec.decode_direct(16, raw) == 0x3e
+
+
+def test_truncated_integer():
+    # a missing octet is detected in both octet orders
+    for lsb_first in (False, True):
+        codec = IntegerFormat(bytes=4, lsb_first=lsb_first).create_codec()
+        assert codec.decode(Raw.hex("01 02 03 04")) is not None
+        with pytest.raises(EOFError):
+            codec.decode(Raw.hex("01 02"))

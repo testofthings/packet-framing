@@ -392,11 +392,9 @@ class SubStructureField(ConfigurableField[F, FrameT]):
 
         def proc(f: Frame) -> None:
             choice = self.get(f)
-            choice_struct = cast(Structure[Any], choice.backend.structure)
-            key = selection.reverse_map.get(choice_struct, 0)  # value 0 assumed be the default choice key
-            if key is None:
-                raise ValueError(
-                    f"Choice {choice_struct.structure_name} not found in selection {selection.structure_name}")
+            chosen = choice.backend.choice  # the field of the chosen alternative
+            # the key of the default choice is assumed to be zero
+            key = selection.reverse_map.get(chosen, 0) if chosen else 0
             choice_resolver.push(f.backend, key)
 
         self.structure.at_commit(proc)
@@ -720,7 +718,7 @@ class Selection(Structure[F]):
         super().__init__()
         self.is_selection = True
         self.choice_map: Dict[Any, AnyField] = {}
-        self.reverse_map: Dict[Structure[Any], Any] = {}
+        self.reverse_map: Dict[AnyField, Any] = {}
 
     def _update_fixed_length(self, field: AnyField) -> None:
         self.fields_fixed_bit_offset = 0  # all choices start from offset 0
@@ -731,7 +729,7 @@ class Selection(Structure[F]):
             raise StructureError(f"Duplicate key {key} in {self.structure_name}")
         assert isinstance(value, ConfigurableField), "Provide a field for choice(...)"
         self.choice_map[key] = value
-        self.reverse_map[value.structure] = key
+        self.reverse_map[value] = key
         return value
 
     def get_field_by(self, key: Any = None) -> Field[F, Any]:
