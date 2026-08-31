@@ -104,12 +104,7 @@ class PCAPFile(Frame):
         """Open and dissect a PCAP file"""
         data = Raw.file(file)
         f = PCAPFile(Frames.dissect(data, int_swap=is_msb_first(data)))
-        try:
-            f.check_format()
-        except ValueError:
-            Frames.close(f)  # do not leave the file open
-            raise
-        return mappings.add_to(f) if mappings else f
+        return Frames.check_file(f, PCAPFile.check_format, mappings)
 
 
 # Define PCAP payload type mappings

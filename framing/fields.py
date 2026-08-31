@@ -25,6 +25,21 @@ class Multiplier(Calculator):
         return self.next_step.push(backend, value / self.multiplier)
 
 
+class Adder(Calculator):
+    """Add to (or subtract from) the value"""
+    def __init__(self, addend: float, next_step: Calculator):
+        super().__init__(next_step)
+        self.addend = addend
+
+    def pull(self, backend: FrameBackend) -> float:
+        assert self.next_step, "Adder must have next step"
+        return self.next_step.pull(backend) + self.addend
+
+    def push(self, backend: FrameBackend, value: float) -> float:
+        assert self.next_step, "Adder must have next step"
+        return self.next_step.push(backend, value - self.addend)
+
+
 class CopyToField(Calculator):
     """Copy value to other field on push"""
     def __init__(self, field: 'IntField[F]', next_step: Calculator):
@@ -108,6 +123,14 @@ class ValueOf(CalculatorSource):
 
     def __truediv__(self, value: float) -> 'ValueOf':
         self.end = Multiplier(1 / value, self.end)
+        return self
+
+    def __add__(self, value: float) -> 'ValueOf':
+        self.end = Adder(value, self.end)
+        return self
+
+    def __sub__(self, value: float) -> 'ValueOf':
+        self.end = Adder(-value, self.end)
         return self
 
     def copy_to(self, field: 'IntField[F]') -> Self:

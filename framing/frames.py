@@ -30,6 +30,16 @@ class Frames:
         return lambda f: DissectorBackend(f, LayerMapping(), data, int_swap)
 
     @classmethod
+    def check_file(cls, frame: F, check: Callable[[F], Any], mappings: LayerMapping | None = None) -> F:
+        """Check a frame dissected from a file, close the file if the check fails, add the mappings"""
+        try:
+            check(frame)
+        except ValueError:
+            cls.close(frame)  # do not leave the file open
+            raise
+        return mappings.add_to(frame) if mappings else frame
+
+    @classmethod
     def dissect_pull(cls, frame_type: Type[F], queue: RawDataQueue,
                      mappings: LayerMapping | None = None) -> Optional[F]:
         """Dissect frame from queue, if enough data. Pulls the frame data if success."""

@@ -12,7 +12,8 @@ from framing.frame_types.ip_utilities import TCPStackLayer
 from framing.frame_types.ip_utilities import DNSStackLayer
 from framing.frame_types.ipv6_frames import IPStackLayer
 from framing.frame_types.llc_frames import LLC
-from framing.frame_types.pcap_frames import PCAPStackLayer, LINKTYPE_ETHERNET, LINKTYPE_IEEE802_11, LINKTYPE_RAW
+from framing.frame_types.capture_files import CaptureStackLayer
+from framing.frame_types.pcap_frames import LINKTYPE_ETHERNET, LINKTYPE_IEEE802_11, LINKTYPE_RAW
 from framing.frame_types.tls_frames import TLSHandshake
 from framing.frame_types.ip_utilities import UDPStackLayer
 from framing.frame_types.tls_frames import TLSRecordLayer
@@ -173,7 +174,7 @@ class StackBuilder:
     wifi = LayerBuilder('wifi', WiFiStackLayer,
                         sub={DATA: llc, QOS_DATA: llc})
 
-    pcap = LayerBuilder('pcap', PCAPStackLayer,
+    pcap = LayerBuilder('pcap', CaptureStackLayer,
                         sub={LINKTYPE_ETHERNET: eth, LINKTYPE_IEEE802_11: wifi, LINKTYPE_RAW: ip})
     raw = LayerBuilder('raw', RawStackLayer)
 
