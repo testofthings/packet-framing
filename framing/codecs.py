@@ -2,7 +2,7 @@
 
 from abc import ABC
 import typing
-from typing import Optional, Self
+from typing import Optional
 
 from framing.raw_data import RawData, Raw
 
