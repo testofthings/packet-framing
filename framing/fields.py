@@ -706,8 +706,9 @@ class Structure(FrameStructure[F]):
     def integer(self, int_format: IntegerFormat = IntegerFormat(),
                 bytes: int =-1, bits: int =-1,  # pylint: disable=redefined-builtin
                 default: int = 0, name: str = "") -> IntField[F]:
-        """Add integer field. NOTE: The default format is shared by all callers, do not configure it."""
+        """Add integer field."""
         fn = self._get_a_name(name)
+
         if bytes > 0:
             int_format = int_format.bytes(bytes)
         if bits > 0:

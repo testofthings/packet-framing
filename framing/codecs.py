@@ -150,21 +150,29 @@ class IntegerFormat:
         self.lsb_first = lsb_first  # by default most significant octet first, as in network protocols
         self.swap_end = False
 
-    def bits(self, bits: int) -> Self:
+    def _clone(self) -> 'IntegerFormat':
+        """Clone this format"""
+        c = IntegerFormat(bits=self.bit_length, lsb_first=self.lsb_first)
+        c.swap_end = self.swap_end
+        return c
+
+    def bits(self, bits: int) -> 'IntegerFormat':
         """Set bit length"""
-        self.bit_length = bits
-        return self
+        c = self._clone()
+        c.bit_length = bits
+        return c
 
-    def bytes(self, bytes: int) -> Self:  # pylint: disable=redefined-builtin
+    def bytes(self, bytes: int) -> 'IntegerFormat':  # pylint: disable=redefined-builtin
         """Set byte length"""
-        self.bit_length = bytes * 8
-        return self
+        c = self._clone()
+        c.bit_length = bytes * 8
+        return c
 
-    def swappable(self, flag: bool = True) -> Self:
-        """The octet order may be swapped by the data, e.g. told by a magic number.
-        Only apply to a format of your own, never to the default format of a field."""
-        self.swap_end = flag
-        return self
+    def swappable(self, flag: bool = True) -> 'IntegerFormat':
+        """The octet order may be swapped by the data, e.g. told by a magic number."""
+        c = self._clone()
+        c.swap_end = flag
+        return c
 
     def create_codec(self) -> IntegerCodec:
         """Create the codec"""
