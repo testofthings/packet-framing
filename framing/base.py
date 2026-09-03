@@ -231,7 +231,7 @@ class FrameBackend:
         """Decore raw field as a frame with given mappings"""
         raise NotImplementedError()
 
-    def factory(self, decode: RawData | None = None,
+    def factory(self, decode: Optional[RawData] = None,
                 int_swap: Optional[bool] = None) -> Callable[['Frame'], 'FrameBackend']:
         """Create a fresh backend for given frame"""
         raise NotImplementedError()

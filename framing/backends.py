@@ -204,7 +204,7 @@ class ComposingBackend(BackendImplementation):
             return None
         return RawFrame(self.factory())
 
-    def factory(self, decode: RawData | None = None,
+    def factory(self, decode: Optional[RawData] = None,
                 int_swap: Optional[bool] = None) -> Callable[[Frame], FrameBackend]:
         swap = self.int_swap if int_swap is None else int_swap
 
@@ -363,7 +363,7 @@ class DissectorBackend(BackendImplementation):
         off += offset.fixed_bit_offset
         return off
 
-    def factory(self, decode: RawData | None = None,
+    def factory(self, decode: Optional[RawData] = None,
                 int_swap: Optional[bool] = None) -> Callable[[Frame], FrameBackend]:
         swap = self.int_swap if int_swap is None else int_swap
 
