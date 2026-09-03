@@ -1,16 +1,41 @@
 import pathlib
+from typing import Iterator, Optional, Tuple
 
 import pytest
 
+from framing.base import LayerMapping
 from framing.command import StackBuilder
 from framing.frame_types.capture_files import (
-    CaptureStackLayer, capture_file_type, capture_packets, open_capture_file,
+    CaptureFile, CaptureStackLayer, capture_file_type, capture_packets, open_capture_file,
 )
-from framing.frame_types.pcap_frames import LINKTYPE_ETHERNET, PCAPFile
-from framing.frame_types.pcapng_frames import PCAPNGFile
+from framing.frame_types.pcap_frames import LINKTYPE_ETHERNET, FileHeader, PCAPFile, PCAPRecordIterator, PacketRecord
+from framing.frame_types.pcapng_frames import PCAPNGFile, PCAPNGPacketIterator, packet_data
 from framing.frames import Frames
 from framing.layer_stack import StackState
-from framing.raw_data import Raw
+from framing.raw_data import Raw, RawData
+
+
+def open_capture_file(file: pathlib.Path, mappings: Optional[LayerMapping] = None) -> CaptureFile:
+    """Open and dissect a capture file, PCAP or PCAPNG"""
+    data = Raw.file(file)
+    try:
+        file_type = capture_file_type(data)
+    finally:
+        data.close()  # the file is opened again by the format, reading the magic number is enough
+    if file_type is PCAPNGFile:
+        return PCAPNGFile.open_file(file, mappings)
+    return PCAPFile.open_file(file, mappings)
+
+
+def capture_packets(file: CaptureFile) -> Iterator[Tuple[int, RawData]]:
+    """Iterate the packets of a capture file as (link type, packet data) pairs"""
+    if isinstance(file, PCAPNGFile):
+        for block, link_type in PCAPNGPacketIterator(file):
+            yield link_type, packet_data(block)
+        return
+    link_type = FileHeader.LinkType[PCAPFile.File_Header[file]]  # the same for all records
+    for record in PCAPRecordIterator(file):
+        yield link_type, PacketRecord.Packet_Data.as_raw(record) or Raw.empty
 
 
 def test_capture_file_type():

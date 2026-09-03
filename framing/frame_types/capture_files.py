@@ -1,19 +1,18 @@
 """Capture files, PCAP and PCAPNG, told apart by the magic number of the file data"""
 
-import pathlib
-from typing import Iterable, Iterator, Optional, Tuple, Type, Union
+from typing import Iterable, Type, Union
 
-from framing.base import Frame, LayerMapping
+from framing.base import Frame
 from framing.frame_types.pcap_frames import (
-    FileHeader, PCAPFile, PCAPRecordIterator, PCAPStackLayer, PacketRecord,
+    PCAPFile, PCAPStackLayer,
     MAGIC_NUMBER, MAGIC_NUMBER_MSB, MAGIC_NUMBER_MSB_NANOSECONDS, MAGIC_NUMBER_NANOSECONDS,
 )
 from framing.frame_types.pcapng_frames import (
-    PCAPNGFile, PCAPNGPacketIterator, PCAPNGStackLayer, packet_data,
+    PCAPNGFile, PCAPNGStackLayer,
     MAGIC_NUMBER as MAGIC_NUMBER_PCAPNG,
 )
 from framing.layer_stack import StackLayer, StackState
-from framing.raw_data import Raw, RawData
+from framing.raw_data import RawData
 
 
 # pylint: disable=invalid-name
@@ -34,30 +33,6 @@ def capture_file_type(data: RawData) -> Type[Frame]:
     if magic in PCAP_MAGIC_NUMBERS:
         return PCAPFile
     raise ValueError(f"Not a PCAP or PCAPNG file, the magic number is {magic.to_hex()}")
-
-
-def open_capture_file(file: pathlib.Path, mappings: Optional[LayerMapping] = None) -> CaptureFile:
-    """Open and dissect a capture file, PCAP or PCAPNG"""
-    data = Raw.file(file)
-    try:
-        file_type = capture_file_type(data)
-    finally:
-        data.close()  # the file is opened again by the format, reading the magic number is enough
-    if file_type is PCAPNGFile:
-        return PCAPNGFile.open_file(file, mappings)
-    return PCAPFile.open_file(file, mappings)
-
-
-def capture_packets(file: CaptureFile) -> Iterator[Tuple[int, RawData]]:
-    """Iterate the packets of a capture file as (link type, packet data) pairs"""
-    if isinstance(file, PCAPNGFile):
-        for block, link_type in PCAPNGPacketIterator(file):
-            yield link_type, packet_data(block)
-        return
-    link_type = FileHeader.LinkType[PCAPFile.File_Header[file]]  # the same for all records
-    for record in PCAPRecordIterator(file):
-        yield link_type, PacketRecord.Packet_Data.as_raw(record) or Raw.empty
-
 
 class CaptureStackLayer(StackLayer):
     """Stack layer for a capture file, PCAP or PCAPNG"""
