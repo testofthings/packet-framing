@@ -6,7 +6,7 @@ import pytest
 from framing.base import LayerMapping
 from framing.command import StackBuilder
 from framing.frame_types.capture_files import (
-    CaptureFile, CaptureStackLayer, capture_file_type, capture_packets, open_capture_file,
+    CaptureFile, CaptureStackLayer, capture_file_type,
 )
 from framing.frame_types.pcap_frames import LINKTYPE_ETHERNET, FileHeader, PCAPFile, PCAPRecordIterator, PacketRecord
 from framing.frame_types.pcapng_frames import PCAPNGFile, PCAPNGPacketIterator, packet_data
