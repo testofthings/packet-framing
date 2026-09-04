@@ -32,14 +32,15 @@ class PayloadFieldStackLayer(StackLayer):
 
     def receive(self, state: StackState) -> Iterable[StackState]:
         # TODO: This code is never tested for!
-        frame = self.frame_type(Frames.dissect(state.data))
+        frame_type = self.get_frame_type(state)
+        frame = frame_type(Frames.dissect(state.data))
         pay_type = self.type_field[frame]
         pay_data = self.payload_field.as_raw(frame) or Raw.empty
         s_state = state.add(frame, pay_type, pay_data)
         return [s_state]
 
     def __repr__(self) -> str:
-        return f"{self.frame_type.__name__}.{self.payload_field}"
+        return f"{self.layer_name}.{self.payload_field}"
 
 
 class LayerBuilder:

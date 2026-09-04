@@ -91,7 +91,7 @@ class IPReassembler:
         r = self.push(ip)
         if r is None:
             return None
-        field = IPv6.Payload if isinstance(ip,IPv6) else IPv4.Payload
+        field = IPv6.Payload if isinstance(ip, IPv6) else IPv4.Payload
         out = IPv6_Payloads.decode_payload(ip, field, data=r)
         return out
 
@@ -135,7 +135,7 @@ class IPReassembler:
 class IPStackLayer(StackLayer):
     """IPx stack layer"""
     def __init__(self) -> None:
-        super().__init__(IPv4)
+        super().__init__(layer_name="IPx")
         self.queues: Dict[Tuple[RawData, RawData, RawData], Tuple[RawDataQueue, int]] = {}
 
     def get_frame_type(self, state: StackState) -> Type[Frame]:
@@ -199,6 +199,6 @@ class IPStackLayer(StackLayer):
         r = self.push(ip)
         if r is None:
             return None
-        field = IPv6.Payload if isinstance(ip,IPv6) else IPv4.Payload
+        field = IPv6.Payload if isinstance(ip, IPv6) else IPv4.Payload
         out = IPv6_Payloads.decode_payload(ip, field, data=r[1])
         return out

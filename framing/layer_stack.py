@@ -64,8 +64,11 @@ class StackState:
 
 class StackLayer:
     """Frame stack layer"""
-    def __init__(self, frame_type: Type[Frame] = RawFrame):
+    def __init__(self, frame_type: Type[Frame] = RawFrame, layer_name: str = ""):
+        if not layer_name and frame_type:
+            layer_name = frame_type.__name__
         self.frame_type = frame_type
+        self.layer_name = layer_name
         self.streaming = False  # streaming layer? (e.g. TCP)
         self.show_unmapped = False  # show unmapped data?
         # force frame type initialization
@@ -89,7 +92,7 @@ class StackLayer:
         return self
 
     def __repr__(self) -> str:
-        return f"{self.frame_type.__name__}"
+        return self.layer_name
 
 
 class FrameStack:
@@ -141,7 +144,7 @@ class FrameStack:
     def __repr__(self) -> str:
         s = f"{self.layer}"
         for k, v in self.next.items():
-            s += f"\n  {k}: {v.layer.frame_type.__name__}"
+            s += f"\n  {k}: {v.layer.layer_name}"
         return s
 
 
