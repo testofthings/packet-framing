@@ -11,10 +11,13 @@ from framing.frame_types.ethernet_frames import EthernetII
 from framing.frame_types.ip_utilities import TCPStackLayer
 from framing.frame_types.ip_utilities import DNSStackLayer
 from framing.frame_types.ipv6_frames import IPStackLayer
-from framing.frame_types.pcap_frames import PCAPStackLayer, LINKTYPE_ETHERNET, LINKTYPE_RAW
+from framing.frame_types.llc_frames import LLC
+from framing.frame_types.capture_files import CaptureStackLayer
+from framing.frame_types.pcap_frames import LINKTYPE_ETHERNET, LINKTYPE_IEEE802_11, LINKTYPE_RAW
 from framing.frame_types.tls_frames import TLSHandshake
 from framing.frame_types.ip_utilities import UDPStackLayer
 from framing.frame_types.tls_frames import TLSRecordLayer
+from framing.frame_types.wifi_frames import WiFiStackLayer, DATA, QOS_DATA
 from framing.frames import Frames
 from framing.raw_data import Raw
 from framing.layer_stack import FrameStack, StackLayer, RawStackLayer, StackState
@@ -164,8 +167,15 @@ class StackBuilder:
     eth = LayerBuilder('eth', lambda: PayloadFieldStackLayer(EthernetII, EthernetII.type, EthernetII.data),
                        sub={0x0800: ip, 0x86dd: ip})
 
-    pcap = LayerBuilder('pcap', PCAPStackLayer,
-                        sub={LINKTYPE_ETHERNET: eth, LINKTYPE_RAW: ip})
+    # 802.11 with LLC/SNAP encapsulation
+
+    llc = LayerBuilder('llc', lambda: PayloadFieldStackLayer(LLC, LLC.Type, LLC.Data),
+                       sub={0x0800: ip, 0x86dd: ip})
+    wifi = LayerBuilder('wifi', WiFiStackLayer,
+                        sub={DATA: llc, QOS_DATA: llc})
+
+    pcap = LayerBuilder('pcap', CaptureStackLayer,
+                        sub={LINKTYPE_ETHERNET: eth, LINKTYPE_IEEE802_11: wifi, LINKTYPE_RAW: ip})
     raw = LayerBuilder('raw', RawStackLayer)
 
     @classmethod
@@ -214,6 +224,8 @@ def main() -> None:
                 if 0 < first_line_len < len(s):
                     s = s[first_line_len + 1:]
                 print(f"{state.get_layer_names()}\n{s}")
+        except ValueError as e:
+            raise SystemExit(f"{f}: {e}") from e  # e.g. unsupported file format
         finally:
             data.close()
 

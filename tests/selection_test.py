@@ -39,3 +39,13 @@ def test_selection_decode():
     assert v.encode() == Raw.hex("01234567")
 
 
+
+
+def test_selection_encode_chosen_key():
+    x = XFrame(Frames.compose())
+    a = XFrame.value.select(x, ASelection.A)
+    ASelection.A[a] = 0x0102
+
+    # the key of the chosen alternative is stored, not the key of the last declared one
+    assert x.encode() == Raw.hex("01 0102")
+    assert XFrame.type[x] == 1

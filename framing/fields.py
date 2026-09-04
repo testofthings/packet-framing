@@ -25,6 +25,21 @@ class Multiplier(Calculator):
         return self.next_step.push(backend, value / self.multiplier)
 
 
+class Adder(Calculator):
+    """Add to (or subtract from) the value"""
+    def __init__(self, addend: float, next_step: Calculator):
+        super().__init__(next_step)
+        self.addend = addend
+
+    def pull(self, backend: FrameBackend) -> float:
+        assert self.next_step, "Adder must have next step"
+        return self.next_step.pull(backend) + self.addend
+
+    def push(self, backend: FrameBackend, value: float) -> float:
+        assert self.next_step, "Adder must have next step"
+        return self.next_step.push(backend, value - self.addend)
+
+
 class CopyToField(Calculator):
     """Copy value to other field on push"""
     def __init__(self, field: 'IntField[F]', next_step: Calculator):
@@ -108,6 +123,14 @@ class ValueOf(CalculatorSource):
 
     def __truediv__(self, value: float) -> 'ValueOf':
         self.end = Multiplier(1 / value, self.end)
+        return self
+
+    def __add__(self, value: float) -> 'ValueOf':
+        self.end = Adder(value, self.end)
+        return self
+
+    def __sub__(self, value: float) -> 'ValueOf':
+        self.end = Adder(-value, self.end)
         return self
 
     def copy_to(self, field: 'IntField[F]') -> Self:
@@ -310,9 +333,12 @@ class RawField(ConfigurableField[F, RawData]):
 
 class IntField(ConfigurableField[F, int], Calculator, CalculatorSource):
     """Integer field"""
-    def __init__(self, codec: IntegerCodec, default_value: int, fixed_bit_offset: int):
+    def __init__(self, codec: IntegerCodec, default_value: int, fixed_bit_offset: int,
+                 swappable: bool = False):
         super().__init__("int", default_value)
         self.codec = codec
+        # the codec with the octet order swapped, the codec itself for a field which is not swappable
+        self.swap_codec = (codec.swapped() or codec) if swappable else codec
         self.fixed_bit_length = codec.get_fixed_bit_length()
         self.fixed_bit_offset = fixed_bit_offset
         if fixed_bit_offset >= 0 and self.fixed_bit_length >= 0:
@@ -323,11 +349,15 @@ class IntField(ConfigurableField[F, int], Calculator, CalculatorSource):
         """Configure flag values for this field, for example for TCP flags"""
         return self
 
+    def _codec_by(self, int_swap: bool) -> IntegerCodec:
+        """The codec to use, a swappable field can have the octet order swapped by the data"""
+        return self.swap_codec if int_swap else self.codec
+
     def encoding_bit_length(self, backend: FrameBackend, value: int) -> int:
-        return self.codec.get_bit_length(value)
+        return self.codec.get_bit_length(value)  # the length is the same in both octet orders
 
     def encode(self, value: int, state: EncodingState) -> RawData:
-        return self.codec.encode(value)
+        return self._codec_by(state.int_swap).encode(value)
 
     def decode_bit_length(self, data: RawData, bit_offset: int, value: Optional[int],
                           backend: 'FrameBackend') -> int:
@@ -336,11 +366,11 @@ class IntField(ConfigurableField[F, int], Calculator, CalculatorSource):
         return super().decode_bit_length(data, bit_offset, None, backend)
 
     def decode(self, data: RawData, bit_length: int, backend: FrameBackend) -> int:
-        v = self.codec.decode(data)
+        v = self._codec_by(backend.int_swap).decode(data)
         return v
 
     def decode_direct(self, frame_data: RawData, backend: FrameBackend) -> int:
-        v = self.codec.decode_direct(self.fixed_bit_offset, frame_data)
+        v = self._codec_by(backend.int_swap).decode_direct(self.fixed_bit_offset, frame_data)
         return v
 
     def calculator(self) -> Calculator:
@@ -385,11 +415,9 @@ class SubStructureField(ConfigurableField[F, FrameT]):
 
         def proc(f: Frame) -> None:
             choice = self.get(f)
-            choice_struct = cast(Structure[Any], choice.backend.structure)
-            key = selection.reverse_map.get(choice_struct, 0)  # value 0 assumed be the default choice key
-            if key is None:
-                raise ValueError(
-                    f"Choice {choice_struct.structure_name} not found in selection {selection.structure_name}")
+            chosen = choice.backend.choice  # the field of the chosen alternative
+            # the key of the default choice is assumed to be zero
+            key = selection.reverse_map.get(chosen, 0) if chosen else 0
             choice_resolver.push(f.backend, key)
 
         self.structure.at_commit(proc)
@@ -678,14 +706,16 @@ class Structure(FrameStructure[F]):
     def integer(self, int_format: IntegerFormat = IntegerFormat(),
                 bytes: int =-1, bits: int =-1,  # pylint: disable=redefined-builtin
                 default: int = 0, name: str = "") -> IntField[F]:
-        """Add integer field"""
+        """Add integer field."""
         fn = self._get_a_name(name)
+
         if bytes > 0:
             int_format = int_format.bytes(bytes)
         if bits > 0:
             int_format = int_format.bits(bits)
         codec = int_format.create_codec()
-        f: IntField[F] = IntField(codec, default, fixed_bit_offset=self.fields_fixed_bit_offset)
+        f: IntField[F] = IntField(codec, default, fixed_bit_offset=self.fields_fixed_bit_offset,
+                                  swappable=int_format.swap_end)
         f.structure = self
         self.fields[fn] = f
         self._update_fixed_length(f)
@@ -712,7 +742,7 @@ class Selection(Structure[F]):
         super().__init__()
         self.is_selection = True
         self.choice_map: Dict[Any, AnyField] = {}
-        self.reverse_map: Dict[Structure[Any], Any] = {}
+        self.reverse_map: Dict[AnyField, Any] = {}
 
     def _update_fixed_length(self, field: AnyField) -> None:
         self.fields_fixed_bit_offset = 0  # all choices start from offset 0
@@ -723,7 +753,7 @@ class Selection(Structure[F]):
             raise StructureError(f"Duplicate key {key} in {self.structure_name}")
         assert isinstance(value, ConfigurableField), "Provide a field for choice(...)"
         self.choice_map[key] = value
-        self.reverse_map[value.structure] = key
+        self.reverse_map[value] = key
         return value
 
     def get_field_by(self, key: Any = None) -> Field[F, Any]:

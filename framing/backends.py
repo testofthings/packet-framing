@@ -11,9 +11,10 @@ from framing.raw_data import RawData, Raw
 
 class BackendImplementation(FrameBackend):
     """Frame backend implementation"""
-    def __init__(self, frame: Frame, mappings: LayerMapping) -> None:
+    def __init__(self, frame: Frame, mappings: LayerMapping, int_swap: bool = False) -> None:
         super().__init__(frame)
         self.mappings = mappings
+        self.int_swap = int_swap
         self.known_bit_length = -1
         self.field_values: Dict[AnyField, Any] = {}
 
@@ -40,10 +41,11 @@ class BackendImplementation(FrameBackend):
             value = f_ptr.get(self.frame)
             f_type = mm.get(value)
             if f_type is not None:
-                v = f_type(self.factory(data))
+                # the payload is another protocol, it has the octet order of its own definition
+                v = f_type(self.factory(data, int_swap=False))
                 return v
         # just raw frame
-        return RawFrame(self.factory(data))
+        return RawFrame(self.factory(data, int_swap=False))
 
     def dump(self, bit_offset: int = 0, indent: str = '', width: int = 80, copy_to_avoid_update: bool = False) -> str:
         r = []
@@ -68,7 +70,7 @@ class BackendImplementation(FrameBackend):
                     print_line(i_off, "", v)
                 i_off += 16 * 8
 
-        state = EncodingState()
+        state = EncodingState(self.int_swap)
         bit_off = bit_offset
         if self.choice is None:
             field_items = self.structure.fields.items()
@@ -176,8 +178,8 @@ class ComposingBackend(BackendImplementation):
         assert isinstance(field, ConfigurableField)
         assert field.structure == self.structure, self._bad_field_access(field)
         if self.choice:
-            # update the choice
-            self.field_values.pop(self.choice)
+            # update the choice, the old one may not have a value yet
+            self.field_values.pop(self.choice, None)
             self.choice = field
         self.field_values[field] = value
         return self
@@ -202,9 +204,12 @@ class ComposingBackend(BackendImplementation):
             return None
         return RawFrame(self.factory())
 
-    def factory(self, decode: RawData | None = None) -> Callable[[Frame], FrameBackend]:
+    def factory(self, decode: Optional[RawData] = None,
+                int_swap: Optional[bool] = None) -> Callable[[Frame], FrameBackend]:
+        swap = self.int_swap if int_swap is None else int_swap
+
         def f(frame: Frame) -> FrameBackend:
-            b = ComposingBackend(frame, self.mappings)
+            b = ComposingBackend(frame, self.mappings, swap)
             b.parent = self
             return b
         return f
@@ -226,7 +231,7 @@ class ComposingBackend(BackendImplementation):
         self.structure.commit(self.frame)
         self.known_bit_length = -1
         f_list = []
-        state = EncodingState()
+        state = EncodingState(self.int_swap)
         if self.choice:
             v = self.get(self.choice)
             return self.choice.encode(v, state)
@@ -237,7 +242,7 @@ class ComposingBackend(BackendImplementation):
 
     def copy(self, parent: Optional[FrameBackend] = None) -> 'ComposingBackend':
         n_frame = copy.copy(self.frame)
-        c = ComposingBackend(n_frame, self.mappings)
+        c = ComposingBackend(n_frame, self.mappings, self.int_swap)
         c.parent = parent
         c.choice = self.choice
         n_frame.backend = c
@@ -247,8 +252,9 @@ class ComposingBackend(BackendImplementation):
 
 class DissectorBackend(BackendImplementation):
     """Backend to dissect frame from raw data"""
-    def __init__(self, frame: Frame, mappings: LayerMapping, data: RawData):
-        super().__init__(frame, mappings)
+    def __init__(self, frame: Frame, mappings: LayerMapping, data: RawData,
+                 int_swap: bool = False):
+        super().__init__(frame, mappings, int_swap)
         self.is_decoder = True
         self.data = data
         self.end_offset_cache: Dict[AnyField, int] = {}
@@ -357,13 +363,16 @@ class DissectorBackend(BackendImplementation):
         off += offset.fixed_bit_offset
         return off
 
-    def factory(self, decode: RawData | None = None) -> Callable[[Frame], FrameBackend]:
+    def factory(self, decode: Optional[RawData] = None,
+                int_swap: Optional[bool] = None) -> Callable[[Frame], FrameBackend]:
+        swap = self.int_swap if int_swap is None else int_swap
+
         def f(frame: Frame) -> FrameBackend:
             b: FrameBackend
             if decode is None:
-                b = ComposingBackend(frame, self.mappings)
+                b = ComposingBackend(frame, self.mappings, swap)
             else:
-                b = DissectorBackend(frame, self.mappings, decode)
+                b = DissectorBackend(frame, self.mappings, decode, swap)
             b.parent = self
             return b
         return f
@@ -411,7 +420,8 @@ class DissectorBackend(BackendImplementation):
                      default_frame: bool = False) -> Optional[Frame]:
         if frame_type:
             raw_data, _ = self.get_raw(field)
-            return frame_type(self.factory(raw_data))
+            # the payload is another protocol, it has the octet order of its own definition
+            return frame_type(self.factory(raw_data, int_swap=False))
         v = self.get(field)
         if isinstance(v, Frame):
             return v
@@ -448,7 +458,7 @@ class DissectorBackend(BackendImplementation):
         limited_data = self.data.sub_block_bits(0, self.data.bits_available())
 
         n_frame = copy.copy(self.frame)
-        c = DissectorBackend(n_frame, self.mappings, limited_data)
+        c = DissectorBackend(n_frame, self.mappings, limited_data, self.int_swap)
         c.parent = parent
         c.choice = self.choice
         n_frame.backend = c

@@ -22,6 +22,8 @@ class StructureError(Exception):
 
 class EncodingState:
     """Encoding state"""
+    def __init__(self, int_swap: bool = False):
+        self.int_swap = int_swap
 
 
 class FieldOffset:
@@ -128,7 +130,7 @@ class Field(FieldPointer[F, T]):
 
     def to_string(self, frame: F) -> str:
         """A string representation of current value, for unit tests"""
-        enc = self.encode(self.get(frame), EncodingState())
+        enc = self.encode(self.get(frame), EncodingState(frame.backend.int_swap))
         return f"{enc}"
 
     def __repr__(self) -> str:
@@ -188,6 +190,7 @@ class FrameBackend:
     def __init__(self, frame: 'Frame'):
         self.frame = frame
         self.is_decoder = False
+        self.int_swap = False  # integer octet order reversed from the declared order
         self.structure = FrameStructure.get_struct(frame)
         if not self.structure.built:
             self.structure.finish_building(frame)
@@ -228,7 +231,8 @@ class FrameBackend:
         """Decore raw field as a frame with given mappings"""
         raise NotImplementedError()
 
-    def factory(self, decode: RawData | None = None) -> Callable[['Frame'], 'FrameBackend']:
+    def factory(self, decode: Optional[RawData] = None,
+                int_swap: Optional[bool] = None) -> Callable[['Frame'], 'FrameBackend']:
         """Create a fresh backend for given frame"""
         raise NotImplementedError()
 
