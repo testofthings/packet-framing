@@ -252,7 +252,7 @@ class RawField(ConfigurableField[F, RawData]):
         super().__init__("raw", default_value, fixed_bit_offset)
         self.max_bit_length = max_bit_length
         self.min_bit_length = min_bit_length
-        if max_bit_length == min_bit_length and max_bit_length > 0:
+        if max_bit_length == min_bit_length and max_bit_length > -1:
             # fixed length field
             self.fixed_bit_length = min_bit_length
             self.direct_decode = self.fixed_bit_offset >= 0 and self.fixed_bit_length >= 0
