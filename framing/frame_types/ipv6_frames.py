@@ -4,34 +4,39 @@ from typing import Any, Iterable, Tuple, Dict, Optional, Type, Union
 
 from framing.base import Frame, LayerMapping
 from framing.data_queue import RawDataQueue
-from framing.fields import Structure, ValueOf
+from framing.fields import ConfigurableField, Selection, Structure, ValueOf
 from framing.frame_types.ipv4_frames import IP_Payloads, IPv4, IPv4Flag
 from framing.frames import Frames
 from framing.layer_stack import StackLayer, StackState
 from framing.raw_data import IPAddress, Raw, RawData
 
-
 # pylint: disable=invalid-name
 
-class IPv6(Frame):
-    """IPv6 packet"""
-    structure = Structure['IPv6']()
+class ExtensionHeader(Frame):
+    """IPv6 extension headers"""
+    structure = Selection['ExtensionHeader']()
 
-    Version = structure.integer(bits=4, default=6)
-    Traffic_class = structure.integer(bits=8)
-    Flow_label = structure.integer(bits=20)
-    Payload_length = structure.integer(bits=16)
-    Next_header = structure.integer(bits=8)
-    Hop_limit = structure.integer(bits=8)
-    Source_address = structure.raw(bytes=16)
-    Destination_address = structure.raw(bytes=16)
+    # Choices completed after frame classes defined
+    Payload = structure.raw()  # default
+    Hop_by_Hop_Options: ConfigurableField['ExtensionHeader', Frame]
+    Routing: ConfigurableField['ExtensionHeader', Frame]
+    Fragment: ConfigurableField['ExtensionHeader', Frame]
+    ICMPv6: ConfigurableField['ExtensionHeader', Frame]
 
-    Payload = structure.raw().length_by(ValueOf(Payload_length))
 
-    def get_addresses(self) -> Tuple[IPAddress, IPAddress]:
-        """Quick access to source and destination address"""
-        return self.backend.get(self.Source_address).as_ip_address(), \
-            self.backend.get(self.Destination_address).as_ip_address()
+def _finish_choice(next_header: int, header_frame: Type[Frame]) -> ConfigurableField[ExtensionHeader, Frame]:
+    """Finish extension header choice"""
+    return ExtensionHeader.structure.choice(next_header, ExtensionHeader.structure.sub(header_frame))
+
+
+class IPv6ExtensionHeader(Frame):
+    """Other IPv6 extension header"""
+    structure = Structure['IPv6ExtensionHeader']()
+
+    Next_Header = structure.integer(bits=8)
+    Header_Ext_Length = structure.integer(bits=8)
+    Options = structure.raw().end_offset_by((ValueOf(Header_Ext_Length) + 1) * 8)
+    Payload = structure.sub(ExtensionHeader).choice_by(Next_Header)
 
 
 class ICMPv6(Frame):
@@ -58,6 +63,43 @@ class Fragment(Frame):
     Payload = structure.raw()
 
 
+
+class IPv6(Frame):
+    """IPv6 packet"""
+    structure = Structure['IPv6']()
+
+    Version = structure.integer(bits=4, default=6)
+    Traffic_class = structure.integer(bits=8)
+    Flow_label = structure.integer(bits=20)
+    Payload_length = structure.integer(bits=16)
+    Next_header = structure.integer(bits=8)
+    Hop_limit = structure.integer(bits=8)
+    Source_address = structure.raw(bytes=16)
+    Destination_address = structure.raw(bytes=16)
+    Payload = structure.sub(ExtensionHeader).choice_by(Next_header)
+
+    def get_addresses(self) -> Tuple[IPAddress, IPAddress]:
+        """Quick access to source and destination address"""
+        return self.backend.get(self.Source_address).as_ip_address(), \
+            self.backend.get(self.Destination_address).as_ip_address()
+
+
+# Extension header frame classes defined, complete choice
+ExtensionHeader.Hop_by_Hop_Options = _finish_choice(0, IPv6ExtensionHeader)
+ExtensionHeader.Routing = _finish_choice(0x2b, IPv6ExtensionHeader)
+ExtensionHeader.Fragment = _finish_choice(0x2c, Fragment)
+ExtensionHeader.ICMPv6 = _finish_choice(0x3a,  ICMPv6)
+
+
+IPv6_Payloads = LayerMapping(base=IP_Payloads).many_by({
+    IPv6.Payload: IPv6.Next_header,
+    Fragment.Payload: Fragment.Next_Header,
+}, {
+    0x2c: Fragment,
+    0x3a: ICMPv6,
+})
+
+
 # Either IPv4 or IPv6
 IPx = Union[IPv4 | IPv6]
 
@@ -70,15 +112,6 @@ def ip_frame_type(data: RawData) -> Type[Frame]:
     if version == 6:
         return IPv6
     raise ValueError(f"Unknown IP version {version}")
-
-
-IPv6_Payloads = LayerMapping(base=IP_Payloads).many_by({
-    IPv6.Payload: IPv6.Next_header,
-    Fragment.Payload: Fragment.Next_Header,
-}, {
-    0x2c: Fragment,
-    0x3a: ICMPv6,
-})
 
 
 class IPReassembler:
