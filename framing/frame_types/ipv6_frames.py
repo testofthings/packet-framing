@@ -1,5 +1,6 @@
 """IPv6 frame definition and related types"""
 
+from enum import IntEnum
 from typing import Any, Iterable, Tuple, Dict, Optional, Type, Union
 
 from framing.base import Frame, LayerMapping
@@ -84,11 +85,19 @@ class IPv6(Frame):
             self.backend.get(self.Destination_address).as_ip_address()
 
 
+# IPv6 next header values
+class Header(IntEnum):
+    Hop_by_Hop_Options = 0
+    Routing = 43
+    Fragment = 44
+    ICMPv6 = 58
+
+
 # Extension header frame classes defined, complete choice
-ExtensionHeader.Hop_by_Hop_Options = _finish_choice(0, IPv6ExtensionHeader)
-ExtensionHeader.Routing = _finish_choice(0x2b, IPv6ExtensionHeader)
-ExtensionHeader.Fragment = _finish_choice(0x2c, Fragment)
-ExtensionHeader.ICMPv6 = _finish_choice(0x3a,  ICMPv6)
+ExtensionHeader.Hop_by_Hop_Options = _finish_choice(Header.Hop_by_Hop_Options, IPv6ExtensionHeader)
+ExtensionHeader.Routing = _finish_choice(Header.Routing, IPv6ExtensionHeader)
+ExtensionHeader.Fragment = _finish_choice(Header.Fragment, Fragment)
+ExtensionHeader.ICMPv6 = _finish_choice(Header.ICMPv6,  ICMPv6)
 
 
 IPv6_Payloads = LayerMapping(base=IP_Payloads).many_by({
@@ -139,7 +148,7 @@ class IPReassembler:
                 return data
             key = IPv4.Source_IP[ip], IPv4.Destination_IP[ip], IPv4.Identification[ip]
         else:
-            if IPv6.Next_header[ip] != 0x2c:
+            if IPv6.Next_header[ip] != Header.Fragment:
                 return IPv6.Payload.as_raw(ip)
             # data is fragmented
             frag = IPv6.Payload.as_frame(ip, frame_type=Fragment)
@@ -198,7 +207,7 @@ class IPStackLayer(StackLayer):
             key = IPv4.Source_IP[ip], IPv4.Destination_IP[ip], IPv4.Identification[ip]
         else:
             pay_type = IPv6.Next_header[ip]
-            if pay_type != 0x2c:
+            if pay_type != Header.Fragment:
                 # not fragmented
                 data = IPv6.Payload.as_raw(ip)
                 return pay_type, data or Raw.empty
