@@ -1,10 +1,9 @@
 import pathlib
 
-from framing.frame_processors import IP2TCP, Ethernet2IP, PCAP2Ethernet
 from framing.frame_types.ethernet_frames import EthernetII, Ethernet_Payloads
-from framing.frame_types.ipv6_frames import IPv6, IPv6_Payloads, ICMPv6, Fragment
-from framing.frame_types.pcap_frames import PCAPFile, PCAPRecordIterator, PacketRecord, PCAP_Payloads
-from framing.frame_types.tcp_frames import TCP, TCPDataQueue, TCPFlag
+from framing.frame_types.ipv6_frames import IPReassembler, IPv6, IPv6_Payloads, ICMPv6, Fragment
+from framing.frame_types.pcap_frames import FileHeader, PCAPFile, PacketRecord, PCAP_Payloads, frame_for_link_type
+from framing.frame_types.tcp_frames import TCP
 from framing.frame_types.udp_frames import UDP
 from framing.frames import Frames
 from framing.raw_data import Raw
@@ -25,6 +24,24 @@ def test_decode_ip():
     ic = IPv6.Payload.as_frame(ip)
     assert isinstance(ic, ICMPv6)
 
+    Frames.close(pcap)
+
+
+def test_decode_ip_assemble():
+    assembler = IPReassembler()
+    pcap = PCAPFile.open_file(pathlib.Path("samples/tls13-over-ipv6.pcap"), mappings=PCAP_Payloads)
+    link_type = FileHeader.LinkType[PCAPFile.File_Header[pcap]]
+    pays = []
+    for rec in PCAPFile.Packet_Records.iterate(pcap):
+        frame = frame_for_link_type(link_type, PacketRecord.Packet_Data[rec])
+        assert isinstance(frame, EthernetII)
+        ip_frame = EthernetII.data.as_frame(frame, frame_type=IPv6)
+        assert IPv6.Version[ip_frame] == 6
+        pay = assembler.push_frame(ip_frame)
+        if pay is not None:
+            pays.append(pay)
+
+    assert all (isinstance(p, TCP) for p in pays)
     Frames.close(pcap)
 
 

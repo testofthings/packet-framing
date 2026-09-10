@@ -3,7 +3,7 @@
 import argparse
 import pathlib
 import re
-from typing import Any, Callable, Dict, Iterable, Self, Type
+from typing import Any, Callable, Dict, Iterable, Self, Set, Type
 import yaml
 
 from framing.base import AnyField, Frame
@@ -173,6 +173,9 @@ class StackBuilder:
                        sub={53: dns})
     ip = LayerBuilder('ip', IPStackLayer,
                       sub={6: tcp, 17: udp})
+    ip.sub[4] = ip  # IPv4
+    ip.sub[41] = ip  # IPv6
+
     eth = LayerBuilder('eth', lambda: PayloadFieldStackLayer(EthernetII, EthernetII.type, EthernetII.data),
                        sub={0x0800: ip, 0x86dd: ip})
 
