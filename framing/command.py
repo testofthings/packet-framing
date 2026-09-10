@@ -109,12 +109,20 @@ class LayerBuilder:
         return self
 
 
-    def build_defaults(self, stack: FrameStack) -> Self:
+    def build_defaults(self, stack: FrameStack, mapped: Dict[Any, StackLayer] | None = None) -> Self:
         """Build default sub layers"""
+        mapped = {} if mapped is None else mapped
+
         for k, v in self.sub.items():
-            layer = v.build_layer({})
+            layer = mapped.get(k)
+            new_layer = layer is None
+            if new_layer:
+                layer = v.build_layer({})
+            assert layer
+            mapped[k] = layer
             next_item = stack.next[k] = FrameStack(layer)
-            v.build_defaults(next_item)
+            if new_layer:
+                v.build_defaults(next_item, mapped.copy())
         stack.layer.show_unmapped = True
         return self
 
