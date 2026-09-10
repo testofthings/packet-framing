@@ -765,3 +765,12 @@ class Selection(Structure[F]):
 
     def _resolve_offsets(self) -> None:
         pass  # all zeroes ok
+
+    @classmethod
+    def frame(self, frame: Frame) -> Frame:
+        """Get selected frame if the given frame is a selection, otherwise return or the given frame"""
+        if frame.backend.choice:
+            choice_frame = frame.backend.choice.as_frame(frame)
+            if choice_frame:
+                return choice_frame
+        return frame
