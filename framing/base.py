@@ -434,10 +434,9 @@ class LayerMapping:
                 frame_type = payloads.get(payload_type)
                 if frame_type:
                     # found a matching frame type for the given payload type
-                    ret = frame_type(be.factory(data))
-        else:
-            # resolve payload type used any of the provided type fields
-            ret = be.decode_as_frame(layer_map, data)
+                    return frame_type(be.factory(data))
+        # resolve payload type used any of the provided type fields
+        ret = be.decode_as_frame(layer_map, data)
         return ret
 
     def by(self, type_field: FieldPointer[Any, T], mappings: typing.Dict[Any, Type[Frame]]) -> Self:

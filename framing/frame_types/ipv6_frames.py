@@ -182,6 +182,7 @@ class IPReassembler:
     def push(self, ip: IPx) -> Optional[Tuple[Optional[int], RawData]]:
         """Push IP frame, get back reassembled data, if possible"""
         more: Any
+        next_header: Optional[int] = None
         if isinstance(ip, IPv4):
             more = IPv4.Flags[ip] & IPv4Flag.MF
             offset = IPv4.Fragment_Offset[ip] * 8
@@ -201,6 +202,8 @@ class IPReassembler:
             offset = Fragment.Fragment_offset[frag] * 8
             data = Fragment.Payload.as_raw(frag)
             key = IPv6.Source_address[ip], IPv6.Destination_address[ip], Fragment.Identification[frag]
+            # reassembled payload type
+            next_header = Fragment.Next_Header[frag]
         ent = self.queues.get(key)
         if not ent:
             ent = self.queues.setdefault(key, (RawDataQueue(), 0))
@@ -213,7 +216,7 @@ class IPReassembler:
             # we have all data
             del self.queues[key]
             queue.close()
-            return None, queue.head
+            return next_header, queue.head
         self.queues[key] = queue, t_len
         return None
 
