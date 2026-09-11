@@ -203,3 +203,18 @@ def test_stack_layer_push_frame_after_extension_header():
     assert isinstance(result, TCP), f"expected TCP, got {type(result)}"
     assert TCP.Source_port[result] == 443
     assert TCP.Data[result] == Raw.string("hi")
+
+
+def test_payload_length_bounds_payload():
+    """Check that IPv6.Payload_length is used to bound the payload"""
+    icmp_body = "ECHO".encode()
+    icmp = bytes([128, 0, 0, 0]) + icmp_body  # type, code, checksum(2), body
+    trailing_padding = bytes(10)  # e.g. Ethernet padding appended after a short IPv6 packet
+    raw = _ipv6_packet(next_header=Header.ICMPv6, payload=icmp) + trailing_padding
+
+    ip = IPv6(Frames.dissect(Raw.hex(raw.hex()), mappings=IPv6_Payloads))
+    assert IPv6.Payload_length[ip] == len(icmp)
+
+    _, pay = ip.get_payload()
+    assert isinstance(pay, ICMPv6)
+    assert ICMPv6.Message_Body[pay] == Raw.string("ECHO")

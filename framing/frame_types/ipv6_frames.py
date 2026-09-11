@@ -79,7 +79,7 @@ class IPv6(Frame):
     Hop_limit = structure.integer(bits=8)
     Source_address = structure.raw(bytes=16)
     Destination_address = structure.raw(bytes=16)
-    Payload = structure.sub(ExtensionHeader).choice_by(Next_header)
+    Payload = structure.sub(ExtensionHeader).choice_by(Next_header).length_by(ValueOf(Payload_length))
 
     def get_addresses(self) -> Tuple[IPAddress, IPAddress]:
         """Quick access to source and destination address"""
