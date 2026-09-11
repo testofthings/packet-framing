@@ -123,7 +123,7 @@ class IPv6(Frame):
 #  3C 60 Destination Options Extension Header
 class Header(IntEnum):
     Hop_by_Hop_Options = 0
-    IPv4
+    IPv4 = 4
     Routing = 43
     Fragment = 44
     ICMPv6 = 58
