@@ -215,7 +215,7 @@ def main() -> None:
     # Create the argument parser
     parser = argparse.ArgumentParser(description='PCAP printing tool')
     parser.add_argument('-s', '--stack', type=str, help='JSON/YAML-configured stack')
-    parser.add_argument('read_file', type=str, action='append', help='Read PCAP file(s)')
+    parser.add_argument('read_file', nargs='*', help='Read PCAP file(s)')
     args = parser.parse_args()
 
     # construct the filtering
@@ -224,8 +224,13 @@ def main() -> None:
     stack = StackBuilder.build_stack(filter_d)
 
     # print extracted frames from files
-    for file in args.read_file or []:
+    files = args.read_file or []
+    for i, file in enumerate(files):
         f = pathlib.Path(file)
+        if len(files) > 1:
+            if i > 0:
+                print()
+            print(f"{f}\n")
         data = Raw.file(f)
         try:
             st = StackState(data)
