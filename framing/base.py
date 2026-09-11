@@ -227,7 +227,8 @@ class FrameBackend:
         """Get field value as frame, use implicit or explicit type"""
         raise NotImplementedError()
 
-    def decode_as_frame(self, mapping: Dict[AnyFieldPointer, Dict[Any, Type['Frame']]], data: RawData) -> 'Frame':
+    def decode_as_frame(self, mapping: Dict[AnyFieldPointer, Dict[Any, Type['Frame']]],
+                        data: RawData) -> Optional['Frame']:
         """Decore raw field as a frame with given mappings"""
         raise NotImplementedError()
 
@@ -421,8 +422,8 @@ class LayerMapping:
         return RawFrame
 
     def decode_payload(self, frame: Frame, payload: AnyField, payload_type: Optional[Any] = None,
-                       data: Optional[RawData] = None) -> Frame:
-        """Resolve payload type and decode the frame using this mapping"""
+                       data: Optional[RawData] = None) -> Optional[Frame]:
+        """Resolve payload type and decode the frame using this mapping, return None if payload remaind unknown"""
         layer_map = self.get_mappings(payload)
         assert layer_map, f"No known payload mapping for {payload}"
         be = frame.backend
@@ -435,6 +436,7 @@ class LayerMapping:
                 if frame_type:
                     # found a matching frame type for the given payload type
                     return frame_type(be.factory(data))
+            return None
         # resolve payload type used any of the provided type fields
         ret = be.decode_as_frame(layer_map, data)
         return ret

@@ -3,6 +3,7 @@
 from enum import IntEnum
 from typing import Any, Iterable, Tuple, Dict, Optional, Type, Union
 
+from framing.backends import RawFrame
 from framing.base import Frame, LayerMapping
 from framing.data_queue import RawDataQueue
 from framing.fields import ConfigurableField, Selection, Structure, ValueOf
@@ -177,7 +178,7 @@ class IPReassembler:
             return None
         field = IPv6.Payload if isinstance(ip, IPv6) else IPv4.Payload
         out = IPv6_Payloads.decode_payload(ip, field, payload_type=r[0], data=r[1])
-        return out
+        return out or RawFrame(Frames.dissect(r[1]))
 
     def push(self, ip: IPx) -> Optional[Tuple[Optional[int], RawData]]:
         """Push IP frame, get back reassembled data, if possible"""
@@ -291,4 +292,4 @@ class IPStackLayer(StackLayer):
             return None
         field = IPv6.Payload if isinstance(ip, IPv6) else IPv4.Payload
         out = IPv6_Payloads.decode_payload(ip, field, payload_type = r[0], data=r[1])
-        return out
+        return out or RawFrame(Frames.dissect(r[1]))

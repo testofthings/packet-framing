@@ -293,3 +293,17 @@ def test_reassembled_ipv4_fragments_resolve_correct_payload_type():
     assert isinstance(result, UDP), f"expected UDP, got {type(result)}"
     assert UDP.Source_port[result] == 1111
     assert UDP.Data[result] == Raw.string("0123456789ABCDEF")
+
+
+def test_unmapped_next_header_behind_extension_header_falls_back_to_raw_frame():
+    """decode_payload() must use the resolved payload_type as-is and fall back to RawFrame when it is not
+    in any mapping"""
+    body = "unmapped-behind-ext-header".encode()
+    ext = _ext_header(next_header=60, header_ext_length=0)  # next: Destination Options (unmapped)
+    raw = _ipv6_packet(next_header=Header.Hop_by_Hop_Options, payload=ext + body)
+
+    ip = IPv6(Frames.dissect(Raw.hex(raw.hex())))
+
+    result = IPReassembler().push_frame(ip)
+    assert isinstance(result, RawFrame), f"expected RawFrame, got {type(result)}"
+    assert RawFrame.data[result] == Raw.bytes(body)
