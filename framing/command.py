@@ -3,7 +3,7 @@
 import argparse
 import pathlib
 import re
-from typing import Any, Callable, Dict, Iterable, Self, Set, Type
+from typing import Any, Callable, Dict, Iterable, Self, Type
 import yaml
 
 from framing.base import AnyField, Frame

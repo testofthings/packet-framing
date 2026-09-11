@@ -3,7 +3,6 @@
 from enum import IntEnum
 from typing import Any, Iterable, Tuple, Dict, Optional, Type, Union
 
-from framing.backends import RawFrame
 from framing.base import Frame, LayerMapping
 from framing.data_queue import RawDataQueue
 from framing.fields import ConfigurableField, Selection, Structure, ValueOf
@@ -122,6 +121,7 @@ class IPv6(Frame):
 #  3B 59 No Next Header
 #  3C 60 Destination Options Extension Header
 class Header(IntEnum):
+    """IPv6 next header value enumeration"""
     Hop_by_Hop_Options = 0
     IPv4 = 4
     Routing = 43
