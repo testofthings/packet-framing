@@ -420,14 +420,25 @@ class LayerMapping:
         from framing.backends import RawFrame  # pylint: disable=import-outside-toplevel,cyclic-import
         return RawFrame
 
-    def decode_payload(self, frame: Frame, field: AnyField, data: Optional[RawData] = None) -> Frame:
+    def decode_payload(self, frame: Frame, payload: AnyField, payload_type: Optional[Any] = None,
+                       data: Optional[RawData] = None) -> Frame:
         """Resolve payload type and decode the frame using this mapping"""
-        layer_map = self.get_mappings(field)
-        assert layer_map, f"No known payload mapping for {field}"
+        layer_map = self.get_mappings(payload)
+        assert layer_map, f"No known payload mapping for {payload}"
         be = frame.backend
         if data is None:
-            data = be.get_raw(field)[0]
-        return be.decode_as_frame(layer_map, data)
+            data = be.get_raw(payload)[0]
+        if payload_type is not None:
+            # payload type known, find type field mapping for it
+            for payloads in layer_map.values():
+                frame_type = payloads.get(payload_type)
+                if frame_type:
+                    # found a matching frame type for the given payload type
+                    ret = frame_type(be.factory(data))
+        else:
+            # resolve payload type used any of the provided type fields
+            ret = be.decode_as_frame(layer_map, data)
+        return ret
 
     def by(self, type_field: FieldPointer[Any, T], mappings: typing.Dict[Any, Type[Frame]]) -> Self:
         """Add mappings for defined payload"""
@@ -478,3 +489,15 @@ class LayerMapping:
         self.merge(m)
         other.merge(m)
         return m
+
+    def __repr__(self) -> str:
+        r = []
+        if self._payload:
+            r.append(f"** {self._payload.field_name} of {self._payload}")
+        for field, mappings in self._mappings.items():
+            r.append(f"{field.field_name}:")
+            for type_field, mapping in mappings.items():
+                r.append(f"  {type_field}:")
+                for k, v in mapping.items():
+                    r.append(f"    {k}: {v}")
+        return "\n".join(r)

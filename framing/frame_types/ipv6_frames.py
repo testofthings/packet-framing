@@ -176,10 +176,10 @@ class IPReassembler:
         if r is None:
             return None
         field = IPv6.Payload if isinstance(ip, IPv6) else IPv4.Payload
-        out = IPv6_Payloads.decode_payload(ip, field, data=r)
+        out = IPv6_Payloads.decode_payload(ip, field, payload_type=r[0], data=r[1])
         return out
 
-    def push(self, ip: IPx) -> Optional[RawData]:
+    def push(self, ip: IPx) -> Optional[Tuple[Optional[int], RawData]]:
         """Push IP frame, get back reassembled data, if possible"""
         more: Any
         if isinstance(ip, IPv4):
@@ -187,13 +187,13 @@ class IPReassembler:
             offset = IPv4.Fragment_Offset[ip] * 8
             data = IPv4.Payload.as_raw(ip)  # cannot always decode payload, as only fragment
             if offset == 0 and not more:
-                return data
+                return (None, data) if data else None
             key = IPv4.Source_IP[ip], IPv4.Destination_IP[ip], IPv4.Identification[ip]
         else:
             next_header = IPv6.Next_header[ip]
             if next_header != Header.Fragment:
-                _, payload = ip.get_payload()
-                return payload.encode()
+                pay_type, pay = ip.get_payload()
+                return pay_type, pay.encode()
             # data is fragmented
             frag = IPv6.Payload.as_frame(ip, frame_type=Fragment)
             assert isinstance(frag, Fragment)
@@ -213,7 +213,7 @@ class IPReassembler:
             # we have all data
             del self.queues[key]
             queue.close()
-            return queue.head
+            return None, queue.head
         self.queues[key] = queue, t_len
         return None
 
@@ -287,5 +287,5 @@ class IPStackLayer(StackLayer):
         if r is None:
             return None
         field = IPv6.Payload if isinstance(ip, IPv6) else IPv4.Payload
-        out = IPv6_Payloads.decode_payload(ip, field, data=r[1])
+        out = IPv6_Payloads.decode_payload(ip, field, payload_type = r[0], data=r[1])
         return out
