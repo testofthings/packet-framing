@@ -252,7 +252,7 @@ class RawField(ConfigurableField[F, RawData]):
         super().__init__("raw", default_value, fixed_bit_offset)
         self.max_bit_length = max_bit_length
         self.min_bit_length = min_bit_length
-        if max_bit_length == min_bit_length and max_bit_length > 0:
+        if max_bit_length == min_bit_length and max_bit_length > -1:
             # fixed length field
             self.fixed_bit_length = min_bit_length
             self.direct_decode = self.fixed_bit_offset >= 0 and self.fixed_bit_length >= 0
@@ -765,3 +765,12 @@ class Selection(Structure[F]):
 
     def _resolve_offsets(self) -> None:
         pass  # all zeroes ok
+
+    @classmethod
+    def frame(cls, frame: Frame) -> Frame:
+        """Get selected frame if the given frame is a selection, otherwise return or the given frame"""
+        if frame.backend.choice:
+            choice_frame = frame.backend.choice.as_frame(frame)
+            if choice_frame:
+                return choice_frame
+        return frame

@@ -32,14 +32,15 @@ class PayloadFieldStackLayer(StackLayer):
 
     def receive(self, state: StackState) -> Iterable[StackState]:
         # TODO: This code is never tested for!
-        frame = self.frame_type(Frames.dissect(state.data))
+        frame_type = self.get_frame_type(state)
+        frame = frame_type(Frames.dissect(state.data))
         pay_type = self.type_field[frame]
         pay_data = self.payload_field.as_raw(frame) or Raw.empty
         s_state = state.add(frame, pay_type, pay_data)
         return [s_state]
 
     def __repr__(self) -> str:
-        return f"{self.frame_type.__name__}.{self.payload_field}"
+        return f"{self.layer_name}.{self.payload_field}"
 
 
 class LayerBuilder:
@@ -108,12 +109,20 @@ class LayerBuilder:
         return self
 
 
-    def build_defaults(self, stack: FrameStack) -> Self:
+    def build_defaults(self, stack: FrameStack, mapped: Dict[Any, StackLayer] | None = None) -> Self:
         """Build default sub layers"""
+        mapped = {} if mapped is None else mapped
+
         for k, v in self.sub.items():
-            layer = v.build_layer({})
+            layer = mapped.get(k)
+            new_layer = layer is None
+            if new_layer:
+                layer = v.build_layer({})
+            assert layer
+            mapped[k] = layer
             next_item = stack.next[k] = FrameStack(layer)
-            v.build_defaults(next_item)
+            if new_layer:
+                v.build_defaults(next_item, mapped.copy())
         stack.layer.show_unmapped = True
         return self
 
@@ -164,6 +173,9 @@ class StackBuilder:
                        sub={53: dns})
     ip = LayerBuilder('ip', IPStackLayer,
                       sub={6: tcp, 17: udp})
+    ip.sub[4] = ip  # IPv4
+    ip.sub[41] = ip  # IPv6
+
     eth = LayerBuilder('eth', lambda: PayloadFieldStackLayer(EthernetII, EthernetII.type, EthernetII.data),
                        sub={0x0800: ip, 0x86dd: ip})
 
@@ -203,7 +215,7 @@ def main() -> None:
     # Create the argument parser
     parser = argparse.ArgumentParser(description='PCAP printing tool')
     parser.add_argument('-s', '--stack', type=str, help='JSON/YAML-configured stack')
-    parser.add_argument('read_file', type=str, action='append', help='Read PCAP file(s)')
+    parser.add_argument('read_file', nargs='*', help='Read PCAP file(s)')
     args = parser.parse_args()
 
     # construct the filtering
@@ -212,8 +224,13 @@ def main() -> None:
     stack = StackBuilder.build_stack(filter_d)
 
     # print extracted frames from files
-    for file in args.read_file or []:
+    files = args.read_file or []
+    for i, file in enumerate(files):
         f = pathlib.Path(file)
+        if len(files) > 1:
+            if i > 0:
+                print()
+            print(f"{f}\n")
         data = Raw.file(f)
         try:
             st = StackState(data)

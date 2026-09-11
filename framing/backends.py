@@ -36,7 +36,8 @@ class BackendImplementation(FrameBackend):
         mapping.merge(self.mappings)
         return self
 
-    def decode_as_frame(self, mapping: Dict[AnyFieldPointer, Dict[Any, Type[Frame]]], data: RawData) -> Frame:
+    def decode_as_frame(self, mapping: Dict[AnyFieldPointer, Dict[Any, Type[Frame]]],
+                        data: RawData) -> Optional[Frame]:
         for f_ptr, mm in mapping.items():
             value = f_ptr.get(self.frame)
             f_type = mm.get(value)
@@ -44,8 +45,7 @@ class BackendImplementation(FrameBackend):
                 # the payload is another protocol, it has the octet order of its own definition
                 v = f_type(self.factory(data, int_swap=False))
                 return v
-        # just raw frame
-        return RawFrame(self.factory(data, int_swap=False))
+        return None  # type unknown
 
     def dump(self, bit_offset: int = 0, indent: str = '', width: int = 80, copy_to_avoid_update: bool = False) -> str:
         r = []
@@ -278,7 +278,7 @@ class DissectorBackend(BackendImplementation):
         try:
             if layer_map:
                 # override field to decode as payload frame
-                v = self.decode_as_frame(layer_map, data)
+                v = self.decode_as_frame(layer_map, data) or RawFrame(self.factory(data))
             else:
                 v = field.decode(data, d_len, self)
         except EOFError as e:
